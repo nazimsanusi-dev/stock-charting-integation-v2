@@ -1,0 +1,27 @@
+name: Deploy Backend (Cloudflare Workers)
+
+on:
+  push:
+    branches: [main]
+    paths: [backend/**]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: backend
+          # Secrets are pre-configured via:
+          # wrangler secret put SHEET_URLS
+          # wrangler secret put SHEET_LABELS
+          # wrangler secret put GCP_SERVICE_ACCOUNT

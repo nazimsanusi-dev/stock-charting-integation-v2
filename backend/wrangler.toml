@@ -1,0 +1,10 @@
+name = "stock-monitor-api"
+main = "worker.py"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["python_workers"]
+
+# Set these via: wrangler secret put SHEET_URLS
+# [vars]
+# SHEET_URLS = '["https://docs.google.com/spreadsheets/d/YOUR_ID/edit"]'
+# SHEET_LABELS = '["My Stocks"]'
+# GCP_SERVICE_ACCOUNT = '{"type":"service_account", ...}'

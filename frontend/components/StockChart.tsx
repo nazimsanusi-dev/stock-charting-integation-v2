@@ -1,0 +1,215 @@
+"use client";
+
+import { useEffect, useRef, memo } from "react";
+import type { ChartData, ChartConfig } from "@/lib/types";
+
+const C = {
+  up: "#26A69A",
+  down: "#EF5350",
+  bg: "#FFFFFF",
+  grid: "#F0F0F0",
+  text: "#424242",
+  rsi: "#9C27B0",
+  macd: "#2196F3",
+  macdSignal: "#FF9800",
+  cvd: "#00BCD4",
+  cmf: "#4CAF50",
+  level: "#BDBDBD",
+};
+
+const EMA_COLORS = ["#2196F3", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#8BC34A"];
+
+interface Props {
+  data: ChartData;
+  config: ChartConfig;
+  ticker: string;
+}
+
+export const StockChart = memo(function StockChart({ data, config, ticker }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<ReturnType<typeof import("lightweight-charts")["createChart"]> | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !data.ohlcv.length) return;
+
+    let destroyed = false;
+
+    import("lightweight-charts").then(
+      ({ createChart, ColorType, CrosshairMode, CandlestickSeries, LineSeries, HistogramSeries }) => {
+        if (destroyed || !containerRef.current) return;
+
+        chartRef.current?.remove();
+
+        const chart = createChart(containerRef.current!, {
+          layout: {
+            background: { type: ColorType.Solid, color: C.bg },
+            textColor: C.text,
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 11,
+          },
+          grid: {
+            vertLines: { color: C.grid },
+            horzLines: { color: C.grid },
+          },
+          crosshair: { mode: CrosshairMode.Normal },
+          rightPriceScale: { borderColor: C.grid },
+          timeScale: { borderColor: C.grid, timeVisible: true },
+          autoSize: true,
+        });
+        chartRef.current = chart;
+
+        // ── Candlestick ──────────────────────────────────────────────────────
+        const candle = chart.addSeries(CandlestickSeries, {
+          upColor: C.up,
+          downColor: C.down,
+          borderUpColor: C.up,
+          borderDownColor: C.down,
+          wickUpColor: C.up,
+          wickDownColor: C.down,
+        });
+
+        const times = data.ohlcv.map((b) => b.time);
+
+        candle.setData(
+          data.ohlcv.map((b) => ({
+            time: b.time as unknown as import("lightweight-charts").Time,
+            open: b.open,
+            high: b.high,
+            low: b.low,
+            close: b.close,
+          })),
+        );
+
+        // ── EMA overlays ─────────────────────────────────────────────────────
+        Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
+          const points = values
+            .map((v, i) =>
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+            )
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+
+          if (!points.length) return;
+          const s = chart.addSeries(LineSeries, {
+            color: EMA_COLORS[idx % EMA_COLORS.length],
+            lineWidth: 1,
+            title: `EMA${period}`,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          });
+          s.setData(points);
+        });
+
+        // Helper: create a sub-pane and populate it
+        function subPane(
+          values: (number | null)[],
+          color: string,
+          title: string,
+          kind: "line" | "histogram" = "line",
+          extraLines?: { values: (number | null)[]; color: string; title: string }[],
+          zeroLine = false,
+        ) {
+          const pane = chart.addPane();
+          const points = values
+            .map((v, i) =>
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+            )
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+
+          if (!points.length) return;
+
+          if (kind === "histogram") {
+            const histPoints = points.map((p) => ({
+              ...p,
+              color: p.value >= 0 ? C.up : C.down,
+            }));
+            pane.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }).setData(histPoints);
+          }
+
+          const mainSeries = pane.addSeries(LineSeries, {
+            color,
+            lineWidth: 1,
+            title,
+            priceLineVisible: false,
+            lastValueVisible: true,
+          });
+          mainSeries.setData(kind === "histogram" ? points : points);
+
+          extraLines?.forEach((l) => {
+            const lp = l.values
+              .map((v, i) =>
+                v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+              )
+              .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+            if (!lp.length) return;
+            pane.addSeries(LineSeries, { color: l.color, lineWidth: 1, title: l.title, priceLineVisible: false, lastValueVisible: true }).setData(lp);
+          });
+
+          if (zeroLine) {
+            pane.addSeries(LineSeries, { color: C.level, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(
+              points.map((p) => ({ time: p.time, value: 0 })),
+            );
+          }
+
+          return pane;
+        }
+
+        // ── RSI ──────────────────────────────────────────────────────────────
+        if (config.showRsi) {
+          const rsiPane = chart.addPane();
+          const rsiPoints = data.indicators.rsi
+            .map((v, i) =>
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+            )
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+
+          if (rsiPoints.length) {
+            rsiPane.addSeries(LineSeries, { color: C.rsi, lineWidth: 1, title: "RSI(14)", priceLineVisible: false, lastValueVisible: true }).setData(rsiPoints);
+            [70, 30].forEach((lvl) => {
+              rsiPane.addSeries(LineSeries, { color: C.level, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(
+                rsiPoints.map((p) => ({ time: p.time, value: lvl })),
+              );
+            });
+          }
+        }
+
+        // ── MACD ─────────────────────────────────────────────────────────────
+        if (config.showMacd) {
+          const macdPane = chart.addPane();
+          const macdPoints = data.indicators.macd
+            .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+          const sigPoints = data.indicators.macd_signal
+            .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+          const histPoints = data.indicators.macd_histogram
+            .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v, color: v >= 0 ? C.up : C.down } : null))
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number; color: string }[];
+
+          if (histPoints.length) macdPane.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }).setData(histPoints);
+          if (macdPoints.length) macdPane.addSeries(LineSeries, { color: C.macd, lineWidth: 1, title: "MACD", priceLineVisible: false, lastValueVisible: true }).setData(macdPoints);
+          if (sigPoints.length) macdPane.addSeries(LineSeries, { color: C.macdSignal, lineWidth: 1, title: "Signal", priceLineVisible: false, lastValueVisible: true }).setData(sigPoints);
+        }
+
+        // ── CVD ──────────────────────────────────────────────────────────────
+        if (config.showCvd) {
+          subPane(data.indicators.cvd, C.cvd, "CVD", "line", [], true);
+        }
+
+        // ── CMF ──────────────────────────────────────────────────────────────
+        if (config.showCmf) {
+          subPane(data.indicators.cmf, C.cmf, "CMF(20)", "line", [], true);
+        }
+
+        chart.timeScale().fitContent();
+      },
+    );
+
+    return () => {
+      destroyed = true;
+      chartRef.current?.remove();
+      chartRef.current = null;
+    };
+  }, [data, config]);
+
+  return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: 420 }} />;
+});
