@@ -34,11 +34,24 @@ async def _route(request):
         return params.get(key, [default])[0]
 
     if path == "/debug/env":
-        return _json({
-            "SHEET_URLS_raw": os.environ.get("SHEET_URLS", "NOT SET"),
-            "SHEET_LABELS_raw": os.environ.get("SHEET_LABELS", "NOT SET"),
-            "GCP_set": bool(os.environ.get("GCP_SERVICE_ACCOUNT")),
-        })
+        debug = {}
+        try:
+            from js import Object  # type: ignore[import]
+            keys = list(Object.keys(env))
+            debug["env_keys"] = keys
+        except Exception as e:
+            debug["env_keys_error"] = str(e)
+        for key in ("SHEET_URLS", "SHEET_LABELS", "GCP_SERVICE_ACCOUNT"):
+            try:
+                debug[f"{key}_attr"] = str(getattr(env, key, "MISSING_ATTR"))
+            except Exception as e:
+                debug[f"{key}_attr_err"] = str(e)
+            try:
+                debug[f"{key}_item"] = str(env[key])
+            except Exception as e:
+                debug[f"{key}_item_err"] = str(e)
+        debug["os_SHEET_URLS"] = os.environ.get("SHEET_URLS", "NOT SET")
+        return _json(debug)
 
     if path == "/health":
         return _json({"status": "ok"})
