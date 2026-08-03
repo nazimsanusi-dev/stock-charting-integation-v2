@@ -1,10 +1,8 @@
 """Yahoo Finance v8 API — replaces yfinance."""
 import httpx
-from ..models import OHLCVBar
 
 PERIOD_MAP = {
     "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y", "5y": "5y", "max": "max",
-    # Malay labels from original app
     "3 Bulan": "3mo", "6 Bulan": "6mo", "1 Tahun": "1y",
     "2 Tahun": "2y", "5 Tahun": "5y", "Max": "max",
 }
@@ -17,7 +15,7 @@ INTERVAL_MAP = {
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockMonitor/1.0)"}
 
 
-async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> list[OHLCVBar]:
+async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> list[dict]:
     range_p = PERIOD_MAP.get(period, "1y")
     interval_p = INTERVAL_MAP.get(interval, "1d")
 
@@ -42,20 +40,19 @@ async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> 
     closes = quote.get("close", [])
     volumes = quote.get("volume", [])
 
-    bars: list[OHLCVBar] = []
+    bars: list[dict] = []
     for i, ts in enumerate(timestamps):
         o, h, l, c = opens[i], highs[i], lows[i], closes[i]
         v = volumes[i]
         if any(x is None for x in [o, h, l, c]):
             continue
-        bars.append(
-            OHLCVBar(
-                time=int(ts),
-                open=round(float(o), 4),
-                high=round(float(h), 4),
-                low=round(float(l), 4),
-                close=round(float(c), 4),
-                volume=float(v or 0),
-            )
-        )
+        bars.append({
+            "time": int(ts),
+            "open": round(float(o), 4),
+            "high": round(float(h), 4),
+            "low": round(float(l), 4),
+            "close": round(float(c), 4),
+            "volume": float(v or 0),
+        })
     return bars
+
