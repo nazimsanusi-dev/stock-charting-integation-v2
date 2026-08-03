@@ -29,6 +29,16 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: "https://stock-charting-integation-v2.nazimsanusi01.workers.dev"
 
+      - name: Create Pages Project (if not exists)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create stock-charting-integation-v2 --production-branch=main
+          workingDirectory: 'frontend'
+          wranglerVersion: 'latest'
+        continue-on-error: true
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
