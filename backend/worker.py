@@ -113,10 +113,23 @@ async def _route(request, env):
 
 
 async def on_fetch(request, env):
+    from js import Response, Headers  # type: ignore[import]
+    cors_headers = Headers.new({
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "*",
+    }.items())
+
+    if str(request.method).upper() == "OPTIONS":
+        return Response.new("", status=204, headers=cors_headers)
+
     try:
         _load_env(env)
         return await _route(request, env)
     except Exception:
         import traceback
-        from js import Response  # type: ignore[import]
-        return Response.new(f"Error:\n{traceback.format_exc()}", status=500)
+        return Response.new(
+            json.dumps({"error": traceback.format_exc()}),
+            status=500,
+            headers=cors_headers,
+        )
