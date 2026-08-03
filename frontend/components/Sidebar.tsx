@@ -26,24 +26,42 @@ export function Sidebar({ params, onChange }: Props) {
   const [search, setSearch] = useState("");
   const [emaInput, setEmaInput] = useState(params.chartConfig.emaPeriods.join(", "));
   const [loadingStocks, setLoadingStocks] = useState(false);
+  const [sheetsError, setSheetsError] = useState<string | null>(null);
+  const [stocksError, setStocksError] = useState<string | null>(null);
 
   // Load sheets on mount
   useEffect(() => {
-    api.sheets().then((r) => {
-      setSheets(r.sheets);
-      if (r.sheets.length > 0 && !params.selectedSheet) {
-        onChange({ ...params, selectedSheet: r.sheets[0] });
-      }
-    }).catch(() => {});
+    console.log("[Sidebar] fetching sheets…");
+    api.sheets()
+      .then((r) => {
+        console.log("[Sidebar] sheets loaded:", r.sheets);
+        setSheets(r.sheets);
+        setSheetsError(null);
+        if (r.sheets.length > 0 && !params.selectedSheet) {
+          onChange({ ...params, selectedSheet: r.sheets[0] });
+        }
+      })
+      .catch((err) => {
+        console.error("[Sidebar] sheets error:", err);
+        setSheetsError(String(err));
+      });
   }, []); // eslint-disable-line
 
   // Load stocks when sheet changes
   useEffect(() => {
     if (!params.selectedSheet) return;
+    console.log("[Sidebar] fetching stocks for", params.selectedSheet.url, "worksheet:", params.worksheet);
     setLoadingStocks(true);
+    setStocksError(null);
     api.stocks(params.selectedSheet.url, params.worksheet)
-      .then((r) => setStocks(r.stocks))
-      .catch(() => {})
+      .then((r) => {
+        console.log("[Sidebar] stocks loaded:", r.stocks.length);
+        setStocks(r.stocks);
+      })
+      .catch((err) => {
+        console.error("[Sidebar] stocks error:", err);
+        setStocksError(String(err));
+      })
       .finally(() => setLoadingStocks(false));
   }, [params.selectedSheet?.url, params.worksheet]);
 
@@ -81,6 +99,9 @@ export function Sidebar({ params, onChange }: Props) {
       <div className="font-semibold text-gray-700 text-sm tracking-wide">📈 Stock Monitor</div>
 
       {/* Sheet selector */}
+      {sheetsError && (
+        <p className="text-xs text-red-400 break-all">⚠ Sheets: {sheetsError}</p>
+      )}
       {sheets.length > 0 && (
         <div>
           <label className="label">Sheet</label>
@@ -112,6 +133,7 @@ export function Sidebar({ params, onChange }: Props) {
         />
         <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
           {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
+          {stocksError && <p className="text-xs text-red-400 break-all py-1">⚠ {stocksError}</p>}
           {filteredStocks.map((s) => (
             <label key={s.ticker} className="flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded hover:bg-gray-100 text-xs">
               <input
