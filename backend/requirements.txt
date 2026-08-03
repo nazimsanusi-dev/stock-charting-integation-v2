@@ -1,1 +1,2 @@
 # No pip packages — use Pyodide built-ins (numpy, cryptography) + js.fetch()
+numpy
