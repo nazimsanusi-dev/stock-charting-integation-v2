@@ -19,7 +19,7 @@ export function useChartData(
     setLoading(true);
     setError(null);
     try {
-      const result = await api.chart(ticker, period, interval, emaPeriods);
+      const result = await api.getChartData(ticker, period, interval, emaPeriods);
       setData(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
