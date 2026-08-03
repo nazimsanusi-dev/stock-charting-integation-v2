@@ -44,6 +44,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy out --project-name=stock-charting-integation-v2 --commit-dirty=true
+          command: pages deploy out --project-name=stock-charting-integation-v2 --branch=main --commit-dirty=true
           workingDirectory: 'frontend'
           wranglerVersion: 'latest'
