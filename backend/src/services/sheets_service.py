@@ -1,4 +1,4 @@
-"""Google Sheets REST API — uses Workers native fetch + micropip cryptography for JWT."""
+"""Google Sheets REST API — uses Workers native fetch + Web Crypto API for JWT."""
 import base64
 import json
 import time
@@ -8,32 +8,37 @@ _SCOPES = (
     "https://www.googleapis.com/auth/drive.readonly"
 )
 
-_crypto_ready = False
-
-
-async def _ensure_crypto():
-    global _crypto_ready
-    if not _crypto_ready:
-        import micropip  # type: ignore[import]
-        await micropip.install("cryptography")
-        _crypto_ready = True
-
 
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
 async def _make_jwt(payload: dict, private_key_pem: str) -> str:
-    await _ensure_crypto()
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import padding
+    from js import crypto, Uint8Array, Object  # type: ignore[import]
 
     header = _b64url(json.dumps({"alg": "RS256", "typ": "JWT"}, separators=(",", ":")).encode())
     body = _b64url(json.dumps(payload, separators=(",", ":")).encode())
-    signing_input = f"{header}.{body}".encode()
-    key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
-    sig = key.sign(signing_input, padding.PKCS1v15(), hashes.SHA256())
-    return f"{header}.{body}.{_b64url(sig)}"
+    signing_input = f"{header}.{body}"
+
+    # Parse PEM → DER bytes
+    pem_lines = [l for l in private_key_pem.strip().split("\n") if not l.startswith("-----")]
+    key_der = base64.b64decode("".join(pem_lines))
+
+    # Build Web Crypto algorithm descriptor
+    algo = Object.new()
+    algo.name = "RSASSA-PKCS1-v1_5"
+    algo.hash = "SHA-256"
+
+    # Import PKCS#8 private key
+    key_view = Uint8Array.new(key_der)
+    crypto_key = await crypto.subtle.importKey("pkcs8", key_view, algo, False, ["sign"])
+
+    # Sign
+    msg_view = Uint8Array.new(signing_input.encode())
+    sig_buffer = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", crypto_key, msg_view)
+    sig_bytes = bytes(Uint8Array.new(sig_buffer))
+
+    return f"{header}.{body}.{_b64url(sig_bytes)}"
 
 
 async def _get_access_token(sa: dict) -> str:
