@@ -2,6 +2,7 @@
 import base64
 import json
 import time
+from pyodide.ffi import to_js  # type: ignore[import]
 
 _SCOPES = (
     "https://www.googleapis.com/auth/spreadsheets.readonly "
@@ -31,7 +32,9 @@ async def _make_jwt(payload: dict, private_key_pem: str) -> str:
 
     # Import PKCS#8 private key
     key_view = Uint8Array.new(key_der)
-    crypto_key = await crypto.subtle.importKey("pkcs8", key_view, algo, False, ["sign"])
+    key_usages = to_js(["sign"])  # Tukar Python list -> Native JS Array
+    
+    crypto_key = await crypto.subtle.importKey("pkcs8", key_view, algo, False, key_usages)
 
     # Sign
     msg_view = Uint8Array.new(signing_input.encode())
