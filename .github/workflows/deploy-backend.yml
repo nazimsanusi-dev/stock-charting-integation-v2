@@ -1,28 +1,39 @@
-name: Deploy Backend
+name: Deploy Frontend (Cloudflare Pages)
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
+    branches: [main]
+    paths: [frontend/**]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Deploy to Cloudflare Workers
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: "https://stock-monitor.nazimsanusi01.workers.dev"
+
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: 'backend'
+          command: pages deploy out --project-name=stock-charting-integation-v2 --commit-dirty=true
+          workingDirectory: 'frontend'
           wranglerVersion: 'latest'
