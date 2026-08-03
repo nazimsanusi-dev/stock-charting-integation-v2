@@ -2,6 +2,7 @@
 import base64
 import json
 import time
+from urllib.parse import quote, urlencode
 from pyodide.ffi import to_js  # type: ignore[import]
 
 _SCOPES = (
@@ -32,8 +33,8 @@ async def _make_jwt(payload: dict, private_key_pem: str) -> str:
 
     # Import PKCS#8 private key
     key_view = Uint8Array.new(key_der)
-    key_usages = to_js(["sign"])  # Tukar Python list -> Native JS Array
-    
+    key_usages = to_js(["sign"])  # Convert Python list to native JS Array
+
     crypto_key = await crypto.subtle.importKey("pkcs8", key_view, algo, False, key_usages)
 
     # Sign
@@ -46,7 +47,6 @@ async def _make_jwt(payload: dict, private_key_pem: str) -> str:
 
 async def _get_access_token(sa: dict) -> str:
     from js import fetch, Headers  # type: ignore[import]
-    from urllib.parse import urlencode
 
     now = int(time.time())
     token = await _make_jwt({
@@ -80,7 +80,8 @@ async def get_worksheet_names(spreadsheet_url: str, sa: dict) -> list[str]:
     headers = Headers.new({"Authorization": f"Bearer {token}"}.items())
     resp = await fetch(f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}", method="GET", headers=headers)
     if not resp.ok:
-        raise Exception(f"Sheets API error: {resp.status}")
+        err_msg = await resp.text()
+        raise Exception(f"Sheets API error {resp.status}: {err_msg}")
     data = (await resp.json()).to_py()
     return [s["properties"]["title"] for s in data.get("sheets", [])]
 
@@ -91,12 +92,25 @@ async def get_stock_list(spreadsheet_url: str, worksheet: str, sa: dict) -> list
     sheet_id = _extract_sheet_id(spreadsheet_url)
     token = await _get_access_token(sa)
     headers = Headers.new({"Authorization": f"Bearer {token}"}.items())
+
+    # Format & URL-encode worksheet range (e.g. 'Sheet1'!A:B)
+    safe_worksheet = worksheet.replace("'", "''")
+    range_param = quote(f"'{safe_worksheet}'!A:B")
+
     resp = await fetch(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{worksheet}!A:B",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_param}",
         method="GET",
         headers=headers,
     )
     if not resp.ok:
-        raise Exception(f"Sheets API error: {resp.status}")
+        err_msg = await resp.text()
+        raise Exception(f"Sheets API error {resp.status}: {err_msg}")
+
     rows = (await resp.json()).to_py().get("values", [])
-    return [{"name": r[0], "ticker": r[1]} for r in rows[1:] if len(r) >= 2 and r[0] and r[1]]
+
+    # Column A = Nama (r[0]), Column B = Symbol (r[1])
+    return [
+        {"name": str(r[0]).strip(), "ticker": str(r[1]).strip()}
+        for r in rows[1:]
+        if len(r) >= 2 and r[0] and r[1]
+    ]
