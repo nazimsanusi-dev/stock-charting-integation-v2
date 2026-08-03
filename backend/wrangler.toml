@@ -1,6 +1,6 @@
 name = "stock-charting-integation-v2"
 main = "worker.py"
-compatibility_date = "2024-09-23"
+compatibility_date = "2024-12-02"
 compatibility_flags = ["python_workers"]
 
 # Set these via: wrangler secret put SHEET_URLS
