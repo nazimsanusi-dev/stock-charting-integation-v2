@@ -14,8 +14,13 @@ def _load_env(env) -> None:
 
 
 async def on_fetch(request, env):  # noqa: ANN001
-    _load_env(env)
-    from src.main import app
-    from src.worker_adapter import handle_asgi
-
-    return await handle_asgi(app, request, env)
+    try:
+        _load_env(env)
+        from src.main import app
+        from src.worker_adapter import handle_asgi
+        return await handle_asgi(app, request, env)
+    except Exception as e:
+        import traceback
+        from js import Response  # type: ignore[import]
+        error_text = f"Worker startup error:\n{traceback.format_exc()}"
+        return Response.new(error_text, status=500)
