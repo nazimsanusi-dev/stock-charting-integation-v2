@@ -18,6 +18,7 @@
         "bradlc.vscode-tailwindcss"
       ]
     }
+    
   },
   "updateContentCommand": "cd backend && pip3 install --user -r requirements.txt && cd ../frontend && npm ci",
   "postAttachCommand": {

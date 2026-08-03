@@ -27,7 +27,7 @@ jobs:
       - name: Build Next.js
         run: npm run build
         env:
-          NEXT_PUBLIC_API_BASE_URL: "https://stock-monitor.nazimsanusi01.workers.dev"
+          NEXT_PUBLIC_API_URL: "https://stock-charting-integation-v2.nazimsanusi01.workers.dev"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
