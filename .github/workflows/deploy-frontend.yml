@@ -23,10 +23,13 @@ jobs:
 
       - run: npm ci
 
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      - name: Install & Build Next.js
+              working-directory: frontend
+              run: |
+                npm ci
+                npm run build
+              env:
+                NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
