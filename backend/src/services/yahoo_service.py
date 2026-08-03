@@ -1,38 +1,37 @@
-"""Yahoo Finance v8 API — replaces yfinance."""
-import httpx
+"""Yahoo Finance v8 API — uses Cloudflare Workers native fetch."""
 
 PERIOD_MAP = {
     "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y", "5y": "5y", "max": "max",
     "3 Bulan": "3mo", "6 Bulan": "6mo", "1 Tahun": "1y",
     "2 Tahun": "2y", "5 Tahun": "5y", "Max": "max",
 }
-
 INTERVAL_MAP = {
     "1d": "1d", "1wk": "1wk", "1mo": "1mo",
     "Harian": "1d", "Mingguan": "1wk", "Bulanan": "1mo",
 }
 
-_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockMonitor/1.0)"}
-
 
 async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> list[dict]:
+    from js import fetch, Headers  # type: ignore[import]
+
     range_p = PERIOD_MAP.get(period, "1y")
     interval_p = INTERVAL_MAP.get(interval, "1d")
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        f"?range={range_p}&interval={interval_p}&includePrePost=false"
+    )
+    headers = Headers.new({"User-Agent": "Mozilla/5.0 (compatible; StockMonitor/1.0)"}.items())
+    resp = await fetch(url, method="GET", headers=headers)
+    if not resp.ok:
+        raise Exception(f"Yahoo Finance HTTP {resp.status}")
 
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-    params = {"range": range_p, "interval": interval_p, "includePrePost": "false"}
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(url, params=params, headers=_HEADERS)
-        resp.raise_for_status()
-
-    data = resp.json()
-    result = data["chart"]["result"]
+    data = (await resp.json()).to_py()
+    result = data.get("chart", {}).get("result")
     if not result:
         return []
 
     r = result[0]
-    timestamps: list[int] = r.get("timestamp", [])
+    timestamps = r.get("timestamp", [])
     quote = r["indicators"]["quote"][0]
     opens = quote.get("open", [])
     highs = quote.get("high", [])
