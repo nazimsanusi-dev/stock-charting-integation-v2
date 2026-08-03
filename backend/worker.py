@@ -4,11 +4,17 @@ import json
 
 
 def _load_env(env) -> None:
-    for key in ("SHEET_URLS", "SHEET_LABELS", "GCP_SERVICE_ACCOUNT"):
+    mapping = {
+        "SHEET_URLS": lambda: env.SHEET_URLS,
+        "SHEET_LABELS": lambda: env.SHEET_LABELS,
+        "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+    }
+    for key, getter in mapping.items():
         try:
-            value = getattr(env, key, None)
-            if value and key not in os.environ:
-                os.environ[key] = str(value)
+            if key not in os.environ:
+                value = getter()
+                if value is not None:
+                    os.environ[key] = str(value)
         except Exception:
             pass
 
@@ -35,13 +41,19 @@ async def _route(request, env):
 
     if path == "/debug/env":
         debug = {}
-        for key in ("SHEET_URLS", "SHEET_LABELS", "GCP_SERVICE_ACCOUNT"):
+        tests = {
+            "SHEET_URLS": lambda: env.SHEET_URLS,
+            "SHEET_LABELS": lambda: env.SHEET_LABELS,
+            "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+        }
+        for key, getter in tests.items():
             try:
-                val = getattr(env, key)
+                val = getter()
                 debug[key] = f"FOUND (len={len(str(val))})"
             except Exception as e:
-                debug[key] = f"ERROR: {e}"
+                debug[key] = f"ERROR: {type(e).__name__}: {e}"
         debug["os_SHEET_URLS"] = os.environ.get("SHEET_URLS", "NOT SET")
+        debug["env_type"] = str(type(env))
         return _json(debug)
 
     if path == "/health":
