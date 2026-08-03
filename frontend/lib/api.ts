@@ -14,6 +14,10 @@ export interface StocksResponse {
   stocks: Stock[];
 }
 
+export interface WorksheetsResponse {
+  worksheets: string[];
+}
+
 async function apiFetch(url: string): Promise<Response> {
   console.log("[api] →", url);
   const res = await fetch(url);
@@ -33,6 +37,13 @@ export const api = {
     const data: SheetsResponse = await res.json();
     console.log("[api] sheets:", data.sheets.length, "entries", data.sheets);
     return data;
+  },
+
+  // GET /api/worksheets?sheet_url=... → { worksheets: [...] }
+  async worksheets(sheetUrl: string): Promise<WorksheetsResponse> {
+    const query = new URLSearchParams({ sheet_url: sheetUrl });
+    const res = await apiFetch(`${API_BASE_URL}/api/worksheets?${query}`);
+    return res.json();
   },
 
   // GET /api/stocks?sheet_url=...&worksheet=... → { stocks: [{name, ticker}] }

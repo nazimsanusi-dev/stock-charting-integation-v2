@@ -22,6 +22,7 @@ interface Props {
 
 export function Sidebar({ params, onChange }: Props) {
   const [sheets, setSheets] = useState<SheetEntry[]>([]);
+  const [worksheets, setWorksheets] = useState<string[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [search, setSearch] = useState("");
   const [emaInput, setEmaInput] = useState(params.chartConfig.emaPeriods.join(", "));
@@ -47,7 +48,20 @@ export function Sidebar({ params, onChange }: Props) {
       });
   }, []); // eslint-disable-line
 
-  // Load stocks when sheet changes
+  // Auto-detect worksheets when sheet changes
+  useEffect(() => {
+    if (!params.selectedSheet) return;
+    api.worksheets(params.selectedSheet.url)
+      .then((r) => {
+        setWorksheets(r.worksheets);
+        if (r.worksheets.length > 0) {
+          onChange({ ...params, worksheet: r.worksheets[0] });
+        }
+      })
+      .catch(() => setWorksheets([]));
+  }, [params.selectedSheet?.url]); // eslint-disable-line
+
+  // Load stocks when sheet or worksheet changes
   useEffect(() => {
     if (!params.selectedSheet) return;
     console.log("[Sidebar] fetching stocks for", params.selectedSheet.url, "worksheet:", params.worksheet);
@@ -117,6 +131,22 @@ export function Sidebar({ params, onChange }: Props) {
               <option key={s.url} value={s.url}>
                 {s.label}
               </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Worksheet selector */}
+      {worksheets.length > 1 && (
+        <div>
+          <label className="label">Worksheet</label>
+          <select
+            className="select"
+            value={params.worksheet}
+            onChange={(e) => onChange({ ...params, worksheet: e.target.value, selectedStocks: [] })}
+          >
+            {worksheets.map((w) => (
+              <option key={w} value={w}>{w}</option>
             ))}
           </select>
         </div>
