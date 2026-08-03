@@ -33,6 +33,13 @@ async def _route(request):
     def q(key, default=None):
         return params.get(key, [default])[0]
 
+    if path == "/debug/env":
+        return _json({
+            "SHEET_URLS_raw": os.environ.get("SHEET_URLS", "NOT SET"),
+            "SHEET_LABELS_raw": os.environ.get("SHEET_LABELS", "NOT SET"),
+            "GCP_set": bool(os.environ.get("GCP_SERVICE_ACCOUNT")),
+        })
+
     if path == "/health":
         return _json({"status": "ok"})
 
