@@ -1,4 +1,4 @@
-"""Google Sheets REST API — uses Workers native fetch + Pyodide cryptography for JWT."""
+"""Google Sheets REST API — uses Workers native fetch + micropip cryptography for JWT."""
 import base64
 import json
 import time
@@ -8,12 +8,23 @@ _SCOPES = (
     "https://www.googleapis.com/auth/drive.readonly"
 )
 
+_crypto_ready = False
+
+
+async def _ensure_crypto():
+    global _crypto_ready
+    if not _crypto_ready:
+        import micropip  # type: ignore[import]
+        await micropip.install("cryptography")
+        _crypto_ready = True
+
 
 def _b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def _make_jwt(payload: dict, private_key_pem: str) -> str:
+async def _make_jwt(payload: dict, private_key_pem: str) -> str:
+    await _ensure_crypto()
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -30,7 +41,7 @@ async def _get_access_token(sa: dict) -> str:
     from urllib.parse import urlencode
 
     now = int(time.time())
-    token = _make_jwt({
+    token = await _make_jwt({
         "iss": sa["client_email"],
         "scope": _SCOPES,
         "aud": "https://oauth2.googleapis.com/token",
