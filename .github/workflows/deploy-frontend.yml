@@ -24,16 +24,18 @@ jobs:
       - run: npm ci
 
       - name: Install & Build Next.js
-              working-directory: frontend
-              run: |
-                npm ci
-                npm run build
-              env:
-                NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: "https://stock-monitor.nazimsanusi01.workers.dev"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy out --project-name=stock-monitor
+          command: pages deploy out --project-name=stock-charting-integation-v2 --commit-dirty=true
+          workingDirectory: 'frontend'
+          wranglerVersion: 'latest'
