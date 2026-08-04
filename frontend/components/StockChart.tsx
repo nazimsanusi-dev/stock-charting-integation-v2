@@ -114,7 +114,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           const s = chart.addSeries(LineSeries, {
             color: EMA_COLORS[idx % EMA_COLORS.length],
             lineWidth: 1,
-            title: `EMA${period}`,
+            title: ``, //EMA(${period}) untuk tahu nama line
             priceLineVisible: false,
             lastValueVisible: false,
           });
