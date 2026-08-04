@@ -13,7 +13,7 @@ const DEFAULT_PARAMS: SidebarParams = {
   selectedSheet: null,
   worksheet: "Sheet1",
   allStocks: [],
-  theme: "light",
+  theme: "dark",
   selectedStocks: [],
   viewMode: "single",
   timeframe: "1d",
