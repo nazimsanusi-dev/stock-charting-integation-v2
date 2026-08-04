@@ -67,12 +67,19 @@ def calc_macd(closes: list[float], fast: int = 12, slow: int = 26, signal: int =
     return macd, signal_line, hist
 
 
+def calc_cvd(opens: list[float], closes: list[float], volumes: list[float]) -> list[float]:
+    cvd, total = [], 0.0
+    for o, c, v in zip(opens, closes, volumes):
+        total += v if c > o else (-v if c < o else 0.0)
+        cvd.append(total)
+    return cvd
+
+
 def calc_cvd_candles(opens: list[float], highs: list[float], lows: list[float], closes: list[float], volumes: list[float]) -> list[dict]:
     cvd_candles = []
     running_close = 0.0
 
     for o, h, l, c, v in zip(opens, highs, lows, closes, volumes):
-        # Anggaran Delta berasaskan bar
         if c > o:
             delta = v
         elif c < o:
@@ -82,8 +89,6 @@ def calc_cvd_candles(opens: list[float], highs: list[float], lows: list[float], 
 
         cvd_open = running_close
         cvd_close = running_close + delta
-        
-        # Anggaran High & Low CVD berdasarkan pergerakan bar
         cvd_high = max(cvd_open, cvd_close)
         cvd_low = min(cvd_open, cvd_close)
 
@@ -131,11 +136,11 @@ def calculate_all(bars: list[dict], ema_periods: list[int] | None = None) -> dic
     macd, sig, hist = calc_macd(closes)
 
     return {
-        "ema":           {str(p): _nan_list(calc_ema(closes, p)) for p in ema_periods},
-        "rsi":           _nan_list(calc_rsi(closes)),
-        "macd":          _nan_list(macd),
-        "macd_signal":   _nan_list(sig),
-        "macd_histogram":_nan_list(hist),
-        "cvd":           [round(v, 2) for v in calc_cvd(opens, closes, vols)],
-        "cmf":           _nan_list(calc_cmf(highs, lows, closes, vols)),
+        "ema":            {str(p): _nan_list(calc_ema(closes, p)) for p in ema_periods},
+        "rsi":            _nan_list(calc_rsi(closes)),
+        "macd":           _nan_list(macd),
+        "macd_signal":    _nan_list(sig),
+        "macd_histogram": _nan_list(hist),
+        "cvd":            [round(v, 2) for v in calc_cvd(opens, closes, vols)],
+        "cmf":            _nan_list(calc_cmf(highs, lows, closes, vols)),
     }
