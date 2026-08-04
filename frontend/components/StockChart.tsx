@@ -41,6 +41,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
 
         chartRef.current?.remove();
 
+        // 1. Cipta Main Chart
         const chart = createChart(containerRef.current!, {
           layout: {
             background: { type: ColorType.Solid, color: C.bg },
@@ -59,7 +60,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
         });
         chartRef.current = chart;
 
-        // ── Candlestick Utama ───────────────────────────────────────────────
+        // 2. Candlestick Utama
         const candle = chart.addSeries(CandlestickSeries, {
           upColor: C.up,
           downColor: C.down,
@@ -81,7 +82,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           })),
         );
 
-        // ── Volume Overlay ──────────────────────────────────────────────────
+        // 3. Volume Overlay pada Main Chart
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -90,7 +91,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             priceLineVisible: false,
           });
           chart.priceScale("vol").applyOptions({
-            scaleMargins: { top: 0.78, bottom: 0 },
+            scaleMargins: { top: 0.8, bottom: 0 },
             borderVisible: false,
           });
           volSeries.setData(
@@ -102,7 +103,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           );
         }
 
-        // ── EMA Overlays (Tanpa Label Semak) ─────────────────────────────────
+        // 4. EMA Overlays
         Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
           const points = values
             .map((v, i) =>
@@ -121,23 +122,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           s.setData(points);
         });
 
-        // ── Helper Sub-Pane Multi-Scale ──────────────────────────────────────
-        let currentMarginTop = 0.55;
-        const PANE_HEIGHT = 0.12;
-
-        function addSubIndicator(scaleId: string, setup: (scaleId: string) => void) {
-          chart.priceScale(scaleId).applyOptions({
-            scaleMargins: { 
-              top: currentMarginTop, 
-              bottom: Math.max(0, 1 - currentMarginTop - PANE_HEIGHT) 
-            },
-            borderVisible: false,
-          });
-          currentMarginTop += PANE_HEIGHT + 0.03;
-          setup(scaleId);
-        }
-
-        // ── RSI ──────────────────────────────────────────────────────────────
+        // 5. RSI Pane Fizikal Terasing
         if (!mini && config.showRsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
@@ -146,33 +131,30 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
 
           if (rsiPoints.length) {
-            addSubIndicator("rsi_scale", (scaleId) => {
-              const rsiSeries = chart.addSeries(LineSeries, {
-                color: C.rsi,
-                lineWidth: 1,
-                title: "RSI(14)",
-                priceScaleId: scaleId,
-                priceLineVisible: false,
-                lastValueVisible: true,
-              });
-              rsiSeries.setData(rsiPoints);
+            const rsiPane = chart.addPane();
+            const rsiSeries = rsiPane.addSeries(LineSeries, {
+              color: C.rsi,
+              lineWidth: 1,
+              title: "RSI(14)",
+              priceLineVisible: false,
+              lastValueVisible: true,
+            });
+            rsiSeries.setData(rsiPoints);
 
-              [70, 30].forEach((lvl) => {
-                const line = chart.addSeries(LineSeries, {
-                  color: C.level,
-                  lineWidth: 1,
-                  lineStyle: 2,
-                  priceScaleId: scaleId,
-                  priceLineVisible: false,
-                  lastValueVisible: false,
-                });
-                line.setData(rsiPoints.map((p) => ({ time: p.time, value: lvl })));
+            [70, 30].forEach((lvl) => {
+              const line = rsiPane.addSeries(LineSeries, {
+                color: C.level,
+                lineWidth: 1,
+                lineStyle: 2,
+                priceLineVisible: false,
+                lastValueVisible: false,
               });
+              line.setData(rsiPoints.map((p) => ({ time: p.time, value: lvl })));
             });
           }
         }
 
-        // ── MACD ─────────────────────────────────────────────────────────────
+        // 6. MACD Pane Fizikal Terasing
         if (!mini && config.showMacd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
@@ -185,23 +167,22 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number; color: string }[];
 
           if (macdPoints.length) {
-            addSubIndicator("macd_scale", (scaleId) => {
-              if (histPoints.length) {
-                const h = chart.addSeries(HistogramSeries, { priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-                h.setData(histPoints);
-              }
-              const m = chart.addSeries(LineSeries, { color: C.macd, lineWidth: 1, title: "MACD", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-              m.setData(macdPoints);
+            const macdPane = chart.addPane();
+            if (histPoints.length) {
+              const h = macdPane.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false });
+              h.setData(histPoints);
+            }
+            const m = macdPane.addSeries(LineSeries, { color: C.macd, lineWidth: 1, title: "MACD", priceLineVisible: false, lastValueVisible: true });
+            m.setData(macdPoints);
 
-              if (sigPoints.length) {
-                const s = chart.addSeries(LineSeries, { color: C.macdSignal, lineWidth: 1, title: "Signal", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-                s.setData(sigPoints);
-              }
-            });
+            if (sigPoints.length) {
+              const s = macdPane.addSeries(LineSeries, { color: C.macdSignal, lineWidth: 1, title: "Signal", priceLineVisible: false, lastValueVisible: true });
+              s.setData(sigPoints);
+            }
           }
         }
 
-        // ── CVD Candlestick Sub-Pane ──────────────────────────────────────────
+        // 7. CVD Candlestick Pane Fizikal Terasing
         if (!mini && config.showCvd) {
           const cvdCandles = data.indicators.cvd as unknown as Array<{
             open: number;
@@ -211,48 +192,41 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           }>;
 
           if (cvdCandles && cvdCandles.length) {
-            addSubIndicator("cvd_scale", (scaleId) => {
-              chart.priceScale(scaleId).applyOptions({
-                autoScale: true,
-              });
-
-              const cvdSeries = chart.addSeries(CandlestickSeries, {
-                upColor: C.up,
-                downColor: C.down,
-                borderUpColor: C.up,
-                borderDownColor: C.down,
-                wickUpColor: C.up,
-                wickDownColor: C.down,
-                priceScaleId: scaleId,
-                priceLineVisible: false,
-                lastValueVisible: true,
-                title: "CVD",
-              });
-
-              const formattedData = cvdCandles.map((c, i) => ({
-                time: times[i] as unknown as import("lightweight-charts").Time,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-              }));
-
-              cvdSeries.setData(formattedData);
+            const cvdPane = chart.addPane();
+            const cvdSeries = cvdPane.addSeries(CandlestickSeries, {
+              upColor: C.up,
+              downColor: C.down,
+              borderUpColor: C.up,
+              borderDownColor: C.down,
+              wickUpColor: C.up,
+              wickDownColor: C.down,
+              priceLineVisible: false,
+              lastValueVisible: true,
+              title: "CVD",
             });
+
+            const formattedData = cvdCandles.map((c, i) => ({
+              time: times[i] as unknown as import("lightweight-charts").Time,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            }));
+
+            cvdSeries.setData(formattedData);
           }
         }
 
-        // ── CMF ──────────────────────────────────────────────────────────────
+        // 8. CMF Pane Fizikal Terasing
         if (!mini && config.showCmf) {
           const cmfPoints = data.indicators.cmf
             .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
 
           if (cmfPoints.length) {
-            addSubIndicator("cmf_scale", (scaleId) => {
-              const cmf = chart.addSeries(LineSeries, { color: C.cmf, lineWidth: 1, title: "CMF(20)", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-              cmf.setData(cmfPoints);
-            });
+            const cmfPane = chart.addPane();
+            const cmf = cmfPane.addSeries(LineSeries, { color: C.cmf, lineWidth: 1, title: "CMF(20)", priceLineVisible: false, lastValueVisible: true });
+            cmf.setData(cmfPoints);
           }
         }
 
@@ -267,5 +241,5 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
     };
   }, [data, config, mini]);
 
-  return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: mini ? 200 : 420 }} />;
+  return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: mini ? 200 : 550 }} />;
 });

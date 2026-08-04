@@ -80,12 +80,10 @@ def calc_cvd_candles(opens: list[float], highs: list[float], lows: list[float], 
     running_close = 0.0
 
     for o, h, l, c, v in zip(opens, highs, lows, closes, volumes):
-        if c > o:
-            delta = v
-        elif c < o:
-            delta = -v
-        else:
-            delta = 0.0
+        hl = h - l
+        # Guna Money Flow Multiplier (MFM) untuk anggar % Buying/Selling Volume
+        mfm = ((c - l) - (h - c)) / hl if hl > 0 else (1.0 if c >= o else -1.0)
+        delta = v * mfm
 
         cvd_open = running_close
         cvd_close = running_close + delta
@@ -93,10 +91,10 @@ def calc_cvd_candles(opens: list[float], highs: list[float], lows: list[float], 
         cvd_low = min(cvd_open, cvd_close)
 
         cvd_candles.append({
-            "open": cvd_open,
-            "high": cvd_high,
-            "low": cvd_low,
-            "close": cvd_close
+            "open": round(cvd_open, 2),
+            "high": round(cvd_high, 2),
+            "low": round(cvd_low, 2),
+            "close": round(cvd_close, 2)
         })
 
         running_close = cvd_close
