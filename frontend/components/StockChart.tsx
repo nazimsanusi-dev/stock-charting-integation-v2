@@ -23,9 +23,10 @@ interface Props {
   data: ChartData;
   config: ChartConfig;
   ticker: string;
+  mini?: boolean;
 }
 
-export const StockChart = memo(function StockChart({ data, config, ticker }: Props) {
+export const StockChart = memo(function StockChart({ data, config, ticker, mini = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof import("lightweight-charts")["createChart"]> | null>(null);
 
@@ -45,7 +46,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
             background: { type: ColorType.Solid, color: C.bg },
             textColor: C.text,
             fontFamily: "Inter, system-ui, sans-serif",
-            fontSize: 11,
+            fontSize: mini ? 9 : 11,
           },
           grid: {
             vertLines: { color: C.grid },
@@ -53,7 +54,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
           },
           crosshair: { mode: CrosshairMode.Normal },
           rightPriceScale: { borderColor: C.grid },
-          timeScale: { borderColor: C.grid, timeVisible: true },
+          timeScale: { borderColor: C.grid, timeVisible: !mini },
           autoSize: true,
         });
         chartRef.current = chart;
@@ -79,6 +80,27 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
             close: b.close,
           })),
         );
+
+        // ── Volume overlay ────────────────────────────────────────────────────
+        if (config.showVolume) {
+          const volSeries = chart.addSeries(HistogramSeries, {
+            priceFormat: { type: "volume" },
+            priceScaleId: "vol",
+            lastValueVisible: false,
+            priceLineVisible: false,
+          });
+          chart.priceScale("vol").applyOptions({
+            scaleMargins: { top: 0.78, bottom: 0 },
+            borderVisible: false,
+          });
+          volSeries.setData(
+            data.ohlcv.map((b) => ({
+              time: b.time as unknown as import("lightweight-charts").Time,
+              value: b.volume,
+              color: b.close >= b.open ? `${C.up}99` : `${C.down}99`,
+            })),
+          );
+        }
 
         // ── EMA overlays ─────────────────────────────────────────────────────
         Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
@@ -154,7 +176,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
         }
 
         // ── RSI ──────────────────────────────────────────────────────────────
-        if (config.showRsi) {
+        if (!mini && config.showRsi) {
           const rsiPane = chart.addPane();
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
@@ -173,7 +195,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
         }
 
         // ── MACD ─────────────────────────────────────────────────────────────
-        if (config.showMacd) {
+        if (!mini && config.showMacd) {
           const macdPane = chart.addPane();
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
@@ -191,12 +213,12 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
         }
 
         // ── CVD ──────────────────────────────────────────────────────────────
-        if (config.showCvd) {
+        if (!mini && config.showCvd) {
           subPane(data.indicators.cvd, C.cvd, "CVD", "line", [], true);
         }
 
         // ── CMF ──────────────────────────────────────────────────────────────
-        if (config.showCmf) {
+        if (!mini && config.showCmf) {
           subPane(data.indicators.cmf, C.cmf, "CMF(20)", "line", [], true);
         }
 
@@ -209,7 +231,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker }: Pro
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [data, config]);
+  }, [data, config, mini]);
 
-  return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: 420 }} />;
+  return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: mini ? 200 : 420 }} />;
 });

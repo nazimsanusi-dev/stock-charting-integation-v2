@@ -86,7 +86,36 @@ async def get_worksheet_names(spreadsheet_url: str, sa: dict) -> list[str]:
     return [s["properties"]["title"] for s in data.get("sheets", [])]
 
 
-async def get_stock_list(spreadsheet_url: str, worksheet: str, sa: dict) -> list[dict]:
+async def get_table_data(spreadsheet_url: str, worksheet: str, sa: dict) -> dict:
+    from js import fetch, Headers  # type: ignore[import]
+
+    sheet_id = _extract_sheet_id(spreadsheet_url)
+    token = await _get_access_token(sa)
+    headers_js = Headers.new({"Authorization": f"Bearer {token}"}.items())
+
+    safe_worksheet = worksheet.replace("'", "''")
+    range_param = quote(f"'{safe_worksheet}'")
+
+    resp = await fetch(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_param}",
+        method="GET",
+        headers=headers_js,
+    )
+    if not resp.ok:
+        err_msg = await resp.text()
+        raise Exception(f"Sheets API error {resp.status}: {err_msg}")
+
+    all_rows = (await resp.json()).to_py().get("values", [])
+    if not all_rows:
+        return {"headers": [], "rows": []}
+
+    col_headers = all_rows[0]
+    data_rows = all_rows[1:]
+    padded = [r + [""] * (len(col_headers) - len(r)) for r in data_rows]
+    return {"headers": col_headers, "rows": padded}
+
+
+
     from js import fetch, Headers  # type: ignore[import]
 
     sheet_id = _extract_sheet_id(spreadsheet_url)

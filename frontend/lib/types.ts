@@ -35,17 +35,25 @@ export interface ChartData {
 
 export interface ChartConfig {
   emaPeriods: number[];
+  showVolume: boolean;
   showRsi: boolean;
   showMacd: boolean;
   showCvd: boolean;
   showCmf: boolean;
 }
 
+export interface TableData {
+  headers: string[];
+  rows: string[][];
+}
+
 export interface SidebarParams {
   selectedSheet: SheetEntry | null;
   worksheet: string;
+  allStocks: Stock[];
   selectedStocks: Stock[];
-  viewMode: "single" | "grid";
+  viewMode: "single" | "grid" | "table";
+  gridColumns: 1 | 2 | 3 | 4;
   timeframe: "1d" | "1wk" | "1mo";
   period: string;
   chartConfig: ChartConfig;

@@ -1,4 +1,4 @@
-import type { ChartData, SheetEntry, Stock } from "./types";
+import type { ChartData, SheetEntry, Stock, TableData } from "./types";
 
 // Matches NEXT_PUBLIC_API_URL in .env.example / .env.local
 const API_BASE_URL =
@@ -16,6 +16,11 @@ export interface StocksResponse {
 
 export interface WorksheetsResponse {
   worksheets: string[];
+}
+
+export interface TableDataResponse {
+  headers: string[];
+  rows: string[][];
 }
 
 async function apiFetch(url: string): Promise<Response> {
@@ -71,6 +76,15 @@ export const api = {
     const res = await apiFetch(`${API_BASE_URL}/api/chart?${query}`);
     const data: ChartData = await res.json();
     console.log("[api] chart:", ticker, "→", data.ohlcv.length, "bars");
+    return data;
+  },
+
+  // GET /api/table?sheet_url=...&worksheet=... → { headers: [...], rows: [[...]] }
+  async tableData(sheetUrl: string, worksheet: string): Promise<TableData> {
+    const query = new URLSearchParams({ sheet_url: sheetUrl, worksheet });
+    const res = await apiFetch(`${API_BASE_URL}/api/table?${query}`);
+    const data: TableData = await res.json();
+    console.log("[api] table:", data.headers.length, "cols,", data.rows.length, "rows");
     return data;
   },
 };

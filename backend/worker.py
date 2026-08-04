@@ -101,6 +101,18 @@ async def _route(request, env):
 
             return _json({"stocks": stocks})
 
+    if path == "/api/table":
+        from src.services.sheets_service import get_table_data
+        sheet_url = q("sheet_url")
+        worksheet = q("worksheet", "Sheet1")
+        if not sheet_url:
+            return _json({"error": "sheet_url required"}, 400)
+        sa = settings.gcp_service_account
+        if not sa:
+            return _json({"error": "GCP credentials not configured"}, 503)
+        table = await get_table_data(sheet_url, worksheet, sa)
+        return _json(table)
+
     if path == "/api/chart":
         from src.services import yahoo_service
         from src.services import indicators as ind

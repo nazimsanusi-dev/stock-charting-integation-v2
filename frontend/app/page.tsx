@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
+import { TableView } from "@/components/TableView";
 import { OHLCSummary } from "@/components/OHLCSummary";
 import { useChartData } from "@/hooks/useChartData";
 import type { SidebarParams } from "@/lib/types";
@@ -11,15 +12,18 @@ import type { SidebarParams } from "@/lib/types";
 const DEFAULT_PARAMS: SidebarParams = {
   selectedSheet: null,
   worksheet: "Sheet1",
+  allStocks: [],
   selectedStocks: [],
   viewMode: "single",
+  gridColumns: 2,
   timeframe: "1d",
   period: "1y",
   chartConfig: {
     emaPeriods: [10, 20, 50],
+    showVolume: true,
     showRsi: false,
-    showMacd: false,
-    showCvd: false,
+    showMacd: true,
+    showCvd: true,
     showCmf: false,
   },
 };
@@ -82,19 +86,25 @@ export default function Home() {
       <main className="flex flex-col flex-1 min-w-0 overflow-y-auto">
         {params.viewMode === "single" ? (
           <SingleView params={params} />
-        ) : (
+        ) : params.viewMode === "grid" ? (
           <div className="p-4">
             <GridView
-              stocks={params.selectedStocks}
+              stocks={params.allStocks}
               period={params.period}
               interval={params.timeframe}
               config={params.chartConfig}
-              columns={2}
+              columns={params.gridColumns}
             />
           </div>
+        ) : (
+          <TableView
+            selectedSheet={params.selectedSheet}
+            worksheet={params.worksheet}
+          />
         )}
       </main>
     </div>
   );
 }
+
 

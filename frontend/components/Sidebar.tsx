@@ -21,6 +21,7 @@ interface Props {
 }
 
 export function Sidebar({ params, onChange }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
   const [sheets, setSheets] = useState<SheetEntry[]>([]);
   const [worksheets, setWorksheets] = useState<string[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -30,25 +31,18 @@ export function Sidebar({ params, onChange }: Props) {
   const [sheetsError, setSheetsError] = useState<string | null>(null);
   const [stocksError, setStocksError] = useState<string | null>(null);
 
-  // Load sheets on mount
   useEffect(() => {
-    console.log("[Sidebar] fetching sheets…");
     api.sheets()
       .then((r) => {
-        console.log("[Sidebar] sheets loaded:", r.sheets);
         setSheets(r.sheets);
         setSheetsError(null);
         if (r.sheets.length > 0 && !params.selectedSheet) {
           onChange({ ...params, selectedSheet: r.sheets[0] });
         }
       })
-      .catch((err) => {
-        console.error("[Sidebar] sheets error:", err);
-        setSheetsError(String(err));
-      });
+      .catch((err) => setSheetsError(String(err)));
   }, []); // eslint-disable-line
 
-  // Auto-detect worksheets when sheet changes
   useEffect(() => {
     if (!params.selectedSheet) return;
     api.worksheets(params.selectedSheet.url)
@@ -61,23 +55,18 @@ export function Sidebar({ params, onChange }: Props) {
       .catch(() => setWorksheets([]));
   }, [params.selectedSheet?.url]); // eslint-disable-line
 
-  // Load stocks when sheet or worksheet changes
   useEffect(() => {
     if (!params.selectedSheet) return;
-    console.log("[Sidebar] fetching stocks for", params.selectedSheet.url, "worksheet:", params.worksheet);
     setLoadingStocks(true);
     setStocksError(null);
     api.stocks(params.selectedSheet.url, params.worksheet)
       .then((r) => {
-        console.log("[Sidebar] stocks loaded:", r.stocks.length);
         setStocks(r.stocks);
+        onChange({ ...params, allStocks: r.stocks });
       })
-      .catch((err) => {
-        console.error("[Sidebar] stocks error:", err);
-        setStocksError(String(err));
-      })
+      .catch((err) => setStocksError(String(err)))
       .finally(() => setLoadingStocks(false));
-  }, [params.selectedSheet?.url, params.worksheet]);
+  }, [params.selectedSheet?.url, params.worksheet]); // eslint-disable-line
 
   const filteredStocks = stocks.filter(
     (s) =>
@@ -85,14 +74,15 @@ export function Sidebar({ params, onChange }: Props) {
       s.ticker.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const isSelected = (s: Stock) =>
-    params.selectedStocks.some((sel) => sel.ticker === s.ticker);
+  const selectedTicker = params.selectedStocks[0]?.ticker ?? null;
 
-  const toggleStock = (s: Stock) => {
-    const next = isSelected(s)
-      ? params.selectedStocks.filter((sel) => sel.ticker !== s.ticker)
-      : [...params.selectedStocks, s];
-    onChange({ ...params, selectedStocks: next });
+  // Radio: only 1 stock at a time
+  const selectStock = (s: Stock) => {
+    const isAlreadySelected = selectedTicker === s.ticker;
+    onChange({
+      ...params,
+      selectedStocks: isAlreadySelected ? [] : [s],
+    });
   };
 
   const set = (patch: Partial<SidebarParams>) => onChange({ ...params, ...patch });
@@ -107,10 +97,34 @@ export function Sidebar({ params, onChange }: Props) {
     if (periods.length) setCfg({ emaPeriods: periods });
   };
 
+  if (collapsed) {
+    return (
+      <aside className="w-10 shrink-0 flex flex-col items-center py-3 gap-3 bg-[#FAFAFA] border-r border-gray-100 h-screen sticky top-0">
+        <button
+          onClick={() => setCollapsed(false)}
+          className="p-1.5 rounded hover:bg-gray-200 text-gray-500 transition-colors"
+          title="Expand sidebar"
+        >
+          ▶
+        </button>
+        <span className="text-gray-300 text-xs rotate-90 mt-4 tracking-widest select-none">STOCKS</span>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] border-r border-gray-100 h-screen sticky top-0">
       {/* Header */}
-      <div className="font-semibold text-gray-700 text-sm tracking-wide">📈 Stock Monitor</div>
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-gray-700 text-sm tracking-wide">📈 Stock Monitor</span>
+        <button
+          onClick={() => setCollapsed(true)}
+          className="p-1 rounded hover:bg-gray-200 text-gray-400 transition-colors text-xs"
+          title="Collapse sidebar"
+        >
+          ◀
+        </button>
+      </div>
 
       {/* Sheet selector */}
       {sheetsError && (
@@ -124,7 +138,7 @@ export function Sidebar({ params, onChange }: Props) {
             value={params.selectedSheet?.url ?? ""}
             onChange={(e) => {
               const sheet = sheets.find((s) => s.url === e.target.value) ?? null;
-              onChange({ ...params, selectedSheet: sheet, selectedStocks: [] });
+              onChange({ ...params, selectedSheet: sheet, selectedStocks: [], allStocks: [] });
             }}
           >
             {sheets.map((s) => (
@@ -143,12 +157,21 @@ export function Sidebar({ params, onChange }: Props) {
           <select
             className="select"
             value={params.worksheet}
-            onChange={(e) => onChange({ ...params, worksheet: e.target.value, selectedStocks: [] })}
+            onChange={(e) => onChange({ ...params, worksheet: e.target.value, selectedStocks: [], allStocks: [] })}
           >
             {worksheets.map((w) => (
               <option key={w} value={w}>{w}</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Selected stock badge */}
+      {params.selectedStocks[0] && (
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#26A69A]/10 border border-[#26A69A]/30">
+          <span className="w-2 h-2 rounded-full bg-[#26A69A] shrink-0" />
+          <span className="text-xs font-medium text-[#1a7a72] truncate">{params.selectedStocks[0].name}</span>
+          <span className="ml-auto text-xs text-[#26A69A] shrink-0">{params.selectedStocks[0].ticker}</span>
         </div>
       )}
 
@@ -164,18 +187,30 @@ export function Sidebar({ params, onChange }: Props) {
         <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
           {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
           {stocksError && <p className="text-xs text-red-400 break-all py-1">⚠ {stocksError}</p>}
-          {filteredStocks.map((s) => (
-            <label key={s.ticker} className="flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded hover:bg-gray-100 text-xs">
-              <input
-                type="checkbox"
-                className="accent-[#26A69A]"
-                checked={isSelected(s)}
-                onChange={() => toggleStock(s)}
-              />
-              <span className="truncate text-gray-700">{s.name}</span>
-              <span className="ml-auto text-gray-400 shrink-0">{s.ticker}</span>
-            </label>
-          ))}
+          {filteredStocks.map((s) => {
+            const selected = selectedTicker === s.ticker;
+            return (
+              <label
+                key={s.ticker}
+                className={`flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded text-xs transition-colors ${
+                  selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="stock-select"
+                  className="accent-[#26A69A] shrink-0"
+                  checked={selected}
+                  onChange={() => selectStock(s)}
+                  onClick={() => selected && selectStock(s)}
+                />
+                <span className={`truncate ${selected ? "text-[#1a7a72] font-medium" : "text-gray-700"}`}>
+                  {s.name}
+                </span>
+                <span className="ml-auto text-gray-400 shrink-0">{s.ticker}</span>
+              </label>
+            );
+          })}
           {!loadingStocks && filteredStocks.length === 0 && (
             <p className="text-xs text-gray-400 py-1">
               {stocks.length ? "No matches" : "No stocks loaded"}
@@ -189,8 +224,8 @@ export function Sidebar({ params, onChange }: Props) {
       {/* View mode */}
       <div>
         <label className="label">View</label>
-        <div className="flex gap-2">
-          {(["single", "grid"] as const).map((m) => (
+        <div className="flex gap-1">
+          {(["single", "grid", "table"] as const).map((m) => (
             <button
               key={m}
               onClick={() => set({ viewMode: m })}
@@ -200,87 +235,113 @@ export function Sidebar({ params, onChange }: Props) {
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
               }`}
             >
-              {m === "single" ? "Single" : "Grid"}
+              {m === "single" ? "Single" : m === "grid" ? "Grid" : "Table"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Timeframe */}
-      <div>
-        <label className="label">Timeframe</label>
-        <div className="flex gap-1">
-          {TIMEFRAMES.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => set({ timeframe: t.value })}
-              className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                params.timeframe === t.value
-                  ? "bg-[#26A69A] text-white border-[#26A69A]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
-            >
-              {t.label.slice(0, 1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Period */}
-      <div>
-        <label className="label">Period</label>
-        <select
-          className="select"
-          value={params.period}
-          onChange={(e) => set({ period: e.target.value })}
-        >
-          {PERIODS.map((p) => (
-            <option key={p} value={p}>
-              {PERIOD_LABELS[p]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <hr className="border-gray-100" />
-
-      {/* Indicators */}
-      <div className="flex flex-col gap-2">
-        <label className="label">Indicators</label>
-
+      {/* Grid columns selector */}
+      {params.viewMode === "grid" && (
         <div>
-          <span className="text-xs text-gray-500">EMA periods</span>
-          <div className="flex gap-1 mt-0.5">
-            <input
-              className="input flex-1 text-xs"
-              value={emaInput}
-              onChange={(e) => setEmaInput(e.target.value)}
-              onBlur={applyEma}
-              onKeyDown={(e) => e.key === "Enter" && applyEma()}
-              placeholder="10, 20, 50"
-            />
+          <label className="label">Columns</label>
+          <div className="flex gap-1">
+            {([1, 2, 3, 4] as const).map((n) => (
+              <button
+                key={n}
+                onClick={() => set({ gridColumns: n })}
+                className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                  params.gridColumns === n
+                    ? "bg-[#26A69A] text-white border-[#26A69A]"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
           </div>
         </div>
+      )}
 
-        {(
-          [
-            ["showRsi", "RSI (14)"],
-            ["showMacd", "MACD"],
-            ["showCvd", "CVD"],
-            ["showCmf", "CMF (20)"],
-          ] as [keyof SidebarParams["chartConfig"], string][]
-        ).map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
-            <input
-              type="checkbox"
-              className="accent-[#26A69A]"
-              checked={params.chartConfig[key] as boolean}
-              onChange={(e) => setCfg({ [key]: e.target.checked })}
-            />
-            {label}
-          </label>
-        ))}
-      </div>
+      {/* Timeframe — hidden in table mode */}
+      {params.viewMode !== "table" && (
+        <>
+          <div>
+            <label className="label">Timeframe</label>
+            <div className="flex gap-1">
+              {TIMEFRAMES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => set({ timeframe: t.value })}
+                  className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                    params.timeframe === t.value
+                      ? "bg-[#26A69A] text-white border-[#26A69A]"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  {t.label.slice(0, 1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Period</label>
+            <select
+              className="select"
+              value={params.period}
+              onChange={(e) => set({ period: e.target.value })}
+            >
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {PERIOD_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <hr className="border-gray-100" />
+
+          {/* Indicators */}
+          <div className="flex flex-col gap-2">
+            <label className="label">Indicators</label>
+
+            <div>
+              <span className="text-xs text-gray-500">EMA periods</span>
+              <div className="flex gap-1 mt-0.5">
+                <input
+                  className="input flex-1 text-xs"
+                  value={emaInput}
+                  onChange={(e) => setEmaInput(e.target.value)}
+                  onBlur={applyEma}
+                  onKeyDown={(e) => e.key === "Enter" && applyEma()}
+                  placeholder="10, 20, 50"
+                />
+              </div>
+            </div>
+
+            {(
+              [
+                ["showVolume", "Volume"],
+                ["showRsi", "RSI (14)"],
+                ["showMacd", "MACD"],
+                ["showCvd", "CVD"],
+                ["showCmf", "CMF (20)"],
+              ] as [keyof SidebarParams["chartConfig"], string][]
+            ).map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  className="accent-[#26A69A]"
+                  checked={params.chartConfig[key] as boolean}
+                  onChange={(e) => setCfg({ [key]: e.target.checked })}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="mt-auto text-xs text-gray-400 space-y-0.5">
         <p>Data: Yahoo Finance</p>
@@ -289,3 +350,4 @@ export function Sidebar({ params, onChange }: Props) {
     </aside>
   );
 }
+
