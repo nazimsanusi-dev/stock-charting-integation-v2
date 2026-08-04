@@ -21,7 +21,7 @@ function StockCard({
   secondaryTimeframe,
   isCombine,
   config,
-  theme = "light",
+  theme = "dark",
 }: StockCardProps) {
   // Fetch Data Timeframe Utama (Primary)
   const primaryData = useChartData(stock.ticker, period, timeframe, config.emaPeriods);
@@ -107,7 +107,7 @@ export function GridView({
   isCombine,
   config,
   columns,
-  theme = "light",
+  theme = "dark",
 }: GridViewProps) {
   if (!stocks.length) {
     return (

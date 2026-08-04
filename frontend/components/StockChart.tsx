@@ -50,7 +50,7 @@ export const StockChart = memo(function StockChart({
   config,
   ticker,
   mini = false,
-  theme = "light",
+  theme = "dark",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof import("lightweight-charts")["createChart"]> | null>(null);
