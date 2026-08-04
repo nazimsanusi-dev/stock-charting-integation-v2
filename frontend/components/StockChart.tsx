@@ -225,8 +225,29 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
 
           if (cmfPoints.length) {
             const cmfPane = chart.addPane();
-            const cmf = cmfPane.addSeries(LineSeries, { color: C.cmf, lineWidth: 1, title: "CMF(20)", priceLineVisible: false, lastValueVisible: true });
+
+            // 1. Garisan CMF utama
+            const cmf = cmfPane.addSeries(LineSeries, { 
+              color: C.cmf, 
+              lineWidth: 1, 
+              title: "CMF(20)", 
+              priceLineVisible: false, 
+              lastValueVisible: true 
+            });
             cmf.setData(cmfPoints);
+
+            // 2. Garisan horizontal 0.00 warna hitam (putus-putus)
+            const zeroLine = cmfPane.addSeries(LineSeries, {
+              color: "#000000",        // Warna hitam
+              lineWidth: 1,
+              lineStyle: 0,            // 2 = LineStyle.Dashed (garisan putus-putus)
+              priceLineVisible: false,
+              lastValueVisible: false,
+            });
+            
+            zeroLine.setData(
+              cmfPoints.map((p) => ({ time: p.time, value: 0 }))
+            );
           }
         }
 
