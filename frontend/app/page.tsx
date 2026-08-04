@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
@@ -113,8 +113,12 @@ function SingleView({ params }: { params: SidebarParams }) {
 export default function Home() {
   const [params, setParams] = useState<SidebarParams>(DEFAULT_PARAMS);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", params.theme === "dark");
+  }, [params.theme]);
+
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
       <Sidebar params={params} onChange={setParams} />
 
       <main className="flex flex-col flex-1 min-w-0 overflow-y-auto">

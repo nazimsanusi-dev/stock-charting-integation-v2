@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Shared form element styles */
 .label {
-  @apply block text-xs font-medium text-gray-500 mb-1;
+  @apply block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1;
 }
 .input {
-  @apply w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700 outline-none focus:border-[#26A69A] transition-colors;
+  @apply w-full text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 outline-none focus:border-[#26A69A] transition-colors;
 }
 .select {
-  @apply w-full text-xs border border-gray-200 rounded px-2 py-1.5 bg-white text-gray-700 outline-none focus:border-[#26A69A] transition-colors appearance-none;
+  @apply w-full text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 outline-none focus:border-[#26A69A] transition-colors appearance-none;
 }
 
 :root {
@@ -28,6 +30,11 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
