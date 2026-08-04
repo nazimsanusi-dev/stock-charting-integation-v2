@@ -141,6 +141,6 @@ def calculate_all(bars: list[dict], ema_periods: list[int] | None = None) -> dic
         "macd":           _nan_list(macd),
         "macd_signal":    _nan_list(sig),
         "macd_histogram": _nan_list(hist),
-        "cvd":            [round(v, 2) for v in calc_cvd(opens, closes, vols)],
+        "cvd":            calc_cvd_candles(opens, highs, lows, closes, vols), # <-- Guna CVD Candles
         "cmf":            _nan_list(calc_cmf(highs, lows, closes, vols)),
     }

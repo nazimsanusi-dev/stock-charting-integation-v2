@@ -102,7 +102,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           );
         }
 
-        // ── EMA overlays (Title/Badge Dibuang) ────────────────────────────────
+        // ── EMA overlays ─────────────────────────────────────────────────────
         Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
           const points = values
             .map((v, i) =>
@@ -114,30 +114,70 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
           const s = chart.addSeries(LineSeries, {
             color: EMA_COLORS[idx % EMA_COLORS.length],
             lineWidth: 1,
-            title: "", // Kosongkan title supaya tak semak kat axis
+            title: ``, //EMA(${period}) untuk tahu nama line
             priceLineVisible: false,
             lastValueVisible: false,
           });
           s.setData(points);
         });
 
-        // ── Sub-indicator Helper (RSI, MACD, CVD, CMF) ────────────────────────
-        let currentMarginTop = 0.65;
-
-        function addSubIndicator(
-          scaleId: string,
-          setup: (scaleId: string) => void
+        // Helper: create a sub-pane and populate it
+        function subPane(
+          values: (number | null)[],
+          color: string,
+          title: string,
+          kind: "line" | "histogram" = "line",
+          extraLines?: { values: (number | null)[]; color: string; title: string }[],
+          zeroLine = false,
         ) {
-          chart.priceScale(scaleId).applyOptions({
-            scaleMargins: { top: currentMarginTop, bottom: 0 },
-            borderVisible: false,
+          const pane = chart.addPane();
+          const points = values
+            .map((v, i) =>
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+            )
+            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+
+          if (!points.length) return;
+
+          if (kind === "histogram") {
+            const histPoints = points.map((p) => ({
+              ...p,
+              color: p.value >= 0 ? C.up : C.down,
+            }));
+            pane.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }).setData(histPoints);
+          }
+
+          const mainSeries = pane.addSeries(LineSeries, {
+            color,
+            lineWidth: 1,
+            title,
+            priceLineVisible: false,
+            lastValueVisible: true,
           });
-          currentMarginTop += 0.15;
-          setup(scaleId);
+          mainSeries.setData(kind === "histogram" ? points : points);
+
+          extraLines?.forEach((l) => {
+            const lp = l.values
+              .map((v, i) =>
+                v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+              )
+              .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
+            if (!lp.length) return;
+            pane.addSeries(LineSeries, { color: l.color, lineWidth: 1, title: l.title, priceLineVisible: false, lastValueVisible: true }).setData(lp);
+          });
+
+          if (zeroLine) {
+            pane.addSeries(LineSeries, { color: C.level, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(
+              points.map((p) => ({ time: p.time, value: 0 })),
+            );
+          }
+
+          return pane;
         }
 
         // ── RSI ──────────────────────────────────────────────────────────────
         if (!mini && config.showRsi) {
+          const rsiPane = chart.addPane();
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
               v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
@@ -145,34 +185,18 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
 
           if (rsiPoints.length) {
-            addSubIndicator("rsi", (scaleId) => {
-              const rsiSeries = chart.addSeries(LineSeries, {
-                color: C.rsi,
-                lineWidth: 1,
-                title: "RSI(14)",
-                priceScaleId: scaleId,
-                priceLineVisible: false,
-                lastValueVisible: true,
-              });
-              rsiSeries.setData(rsiPoints);
-
-              [70, 30].forEach((lvl) => {
-                const line = chart.addSeries(LineSeries, {
-                  color: C.level,
-                  lineWidth: 1,
-                  lineStyle: 2,
-                  priceScaleId: scaleId,
-                  priceLineVisible: false,
-                  lastValueVisible: false,
-                });
-                line.setData(rsiPoints.map((p) => ({ time: p.time, value: lvl })));
-              });
+            rsiPane.addSeries(LineSeries, { color: C.rsi, lineWidth: 1, title: "RSI(14)", priceLineVisible: false, lastValueVisible: true }).setData(rsiPoints);
+            [70, 30].forEach((lvl) => {
+              rsiPane.addSeries(LineSeries, { color: C.level, lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false }).setData(
+                rsiPoints.map((p) => ({ time: p.time, value: lvl })),
+              );
             });
           }
         }
 
         // ── MACD ─────────────────────────────────────────────────────────────
         if (!mini && config.showMacd) {
+          const macdPane = chart.addPane();
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
@@ -183,49 +207,19 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v, color: v >= 0 ? C.up : C.down } : null))
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number; color: string }[];
 
-          if (macdPoints.length) {
-            addSubIndicator("macd", (scaleId) => {
-              if (histPoints.length) {
-                const h = chart.addSeries(HistogramSeries, { priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: false });
-                h.setData(histPoints);
-              }
-              const m = chart.addSeries(LineSeries, { color: C.macd, lineWidth: 1, title: "MACD", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-              m.setData(macdPoints);
-
-              if (sigPoints.length) {
-                const s = chart.addSeries(LineSeries, { color: C.macdSignal, lineWidth: 1, title: "Signal", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-                s.setData(sigPoints);
-              }
-            });
-          }
+          if (histPoints.length) macdPane.addSeries(HistogramSeries, { priceLineVisible: false, lastValueVisible: false }).setData(histPoints);
+          if (macdPoints.length) macdPane.addSeries(LineSeries, { color: C.macd, lineWidth: 1, title: "MACD", priceLineVisible: false, lastValueVisible: true }).setData(macdPoints);
+          if (sigPoints.length) macdPane.addSeries(LineSeries, { color: C.macdSignal, lineWidth: 1, title: "Signal", priceLineVisible: false, lastValueVisible: true }).setData(sigPoints);
         }
 
         // ── CVD ──────────────────────────────────────────────────────────────
         if (!mini && config.showCvd) {
-          const cvdPoints = data.indicators.cvd
-            .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
-            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
-
-          if (cvdPoints.length) {
-            addSubIndicator("cvd", (scaleId) => {
-              const cvd = chart.addSeries(LineSeries, { color: C.cvd, lineWidth: 1, title: "CVD", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-              cvd.setData(cvdPoints);
-            });
-          }
+          subPane(data.indicators.cvd, C.cvd, "CVD", "line", [], true);
         }
 
         // ── CMF ──────────────────────────────────────────────────────────────
         if (!mini && config.showCmf) {
-          const cmfPoints = data.indicators.cmf
-            .map((v, i) => (v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null))
-            .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
-
-          if (cmfPoints.length) {
-            addSubIndicator("cmf", (scaleId) => {
-              const cmf = chart.addSeries(LineSeries, { color: C.cmf, lineWidth: 1, title: "CMF(20)", priceScaleId: scaleId, priceLineVisible: false, lastValueVisible: true });
-              cmf.setData(cmfPoints);
-            });
-          }
+          subPane(data.indicators.cmf, C.cmf, "CMF(20)", "line", [], true);
         }
 
         chart.timeScale().fitContent();
