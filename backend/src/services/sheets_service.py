@@ -33,7 +33,7 @@ async def _make_jwt(payload: dict, private_key_pem: str) -> str:
 
     # Import PKCS#8 private key
     key_view = Uint8Array.new(key_der)
-    key_usages = to_js(["sign"])  # Convert Python list to native JS Array
+    key_usages = to_js(["sign"])
 
     crypto_key = await crypto.subtle.importKey("pkcs8", key_view, algo, False, key_usages)
 
@@ -45,8 +45,12 @@ async def _make_jwt(payload: dict, private_key_pem: str) -> str:
     return f"{header}.{body}.{_b64url(sig_bytes)}"
 
 
-async def _get_access_token(sa: dict) -> str:
+async def _get_access_token(sa) -> str:
     from js import fetch, Headers  # type: ignore[import]
+
+    # Parse JSON string ke dict jika sa dihantar sebagai string
+    if isinstance(sa, str):
+        sa = json.loads(sa)
 
     now = int(time.time())
     token = await _make_jwt({
@@ -66,13 +70,22 @@ async def _get_access_token(sa: dict) -> str:
 
 
 def _extract_sheet_id(url: str) -> str:
+    # Bersihkan jika URL dibalut dalam format JSON Array e.g. ["http..."]
+    if isinstance(url, str) and url.startswith("["):
+        try:
+            parsed = json.loads(url)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                url = parsed[0]
+        except Exception:
+            pass
+
     try:
         return url.split("/d/")[1].split("/")[0]
-    except IndexError:
+    except (IndexError, AttributeError):
         raise ValueError(f"Cannot extract spreadsheet ID from URL: {url}")
 
 
-async def get_worksheet_names(spreadsheet_url: str, sa: dict) -> list[str]:
+async def get_worksheet_names(spreadsheet_url: str, sa) -> list[str]:
     from js import fetch, Headers  # type: ignore[import]
 
     sheet_id = _extract_sheet_id(spreadsheet_url)
@@ -86,7 +99,7 @@ async def get_worksheet_names(spreadsheet_url: str, sa: dict) -> list[str]:
     return [s["properties"]["title"] for s in data.get("sheets", [])]
 
 
-async def get_table_data(spreadsheet_url: str, worksheet: str, sa: dict) -> dict:
+async def get_table_data(spreadsheet_url: str, worksheet: str, sa) -> dict:
     from js import fetch, Headers  # type: ignore[import]
 
     sheet_id = _extract_sheet_id(spreadsheet_url)
@@ -115,14 +128,13 @@ async def get_table_data(spreadsheet_url: str, worksheet: str, sa: dict) -> dict
     return {"headers": col_headers, "rows": padded}
 
 
-async def get_stock_list(spreadsheet_url: str, worksheet: str, sa: dict) -> list[dict]:
+async def get_stock_list(spreadsheet_url: str, worksheet: str, sa) -> list[dict]:
     from js import fetch, Headers  # type: ignore[import]
 
     sheet_id = _extract_sheet_id(spreadsheet_url)
     token = await _get_access_token(sa)
     headers = Headers.new({"Authorization": f"Bearer {token}"}.items())
 
-    # Format & URL-encode worksheet range (e.g. 'Sheet1'!A:B)
     safe_worksheet = worksheet.replace("'", "''")
     range_param = quote(f"'{safe_worksheet}'!A:B")
 
@@ -137,7 +149,6 @@ async def get_stock_list(spreadsheet_url: str, worksheet: str, sa: dict) -> list
 
     rows = (await resp.json()).to_py().get("values", [])
 
-    # Column A = Name (r[0]), Column B = Symbol/Ticker (r[1])
     return [
         {"name": str(r[0]).strip(), "ticker": str(r[1]).strip()}
         for r in rows[1:]
