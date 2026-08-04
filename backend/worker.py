@@ -79,16 +79,27 @@ async def _route(request, env):
         return _json({"worksheets": names})
 
     if path == "/api/stocks":
-        from src.services.sheets_service import get_stock_list
-        sheet_url = q("sheet_url")
-        worksheet = q("worksheet", "Name")
-        if not sheet_url:
-            return _json({"error": "sheet_url required"}, 400)
-        sa = settings.gcp_service_account
-        if not sa:
-            return _json({"error": "GCP credentials not configured"}, 503)
-        stocks = await get_stock_list(sheet_url, worksheet, sa)
-        return _json({"stocks": stocks})
+            from src.services.sheets_service import get_stock_list, get_worksheet_names
+            sheet_url = q("sheet_url")
+            worksheet = q("worksheet")
+            if not sheet_url:
+                return _json({"error": "sheet_url required"}, 400)
+            sa = settings.gcp_service_account
+            if not sa:
+                return _json({"error": "GCP credentials not configured"}, 503)
+
+            # Jika tiada worksheet diberi atau ingin elak error tab tak wujud:
+            try:
+                stocks = await get_stock_list(sheet_url, worksheet or "Sheet1", sa)
+            except Exception as e:
+                # Jika tab spesifik gagal, ambil tab pertama secara automatik
+                all_sheets = await get_worksheet_names(sheet_url, sa)
+                if all_sheets:
+                    stocks = await get_stock_list(sheet_url, all_sheets[0], sa)
+                else:
+                    raise e
+
+            return _json({"stocks": stocks})
 
     if path == "/api/chart":
         from src.services import yahoo_service
