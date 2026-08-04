@@ -122,7 +122,7 @@ export default function Home() {
         ) : (
           <div className="p-4">
             <GridView
-              stocks={params.selectedStocks}
+              stocks={params.allStocks ?? []} // <-- Tukar ke allStocks supaya semua stok keluar
               period={params.period}
               timeframe={params.timeframe}
               secondaryTimeframe={params.secondaryTimeframe}
