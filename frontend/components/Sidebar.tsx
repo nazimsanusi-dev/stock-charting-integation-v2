@@ -35,6 +35,7 @@ export function Sidebar({ params, onChange }: Props) {
   const [sheetsError, setSheetsError] = useState<string | null>(null);
   const [stocksError, setStocksError] = useState<string | null>(null);
 
+  // 1. Fetch senarai Sheets bila component mount
   useEffect(() => {
     api
       .sheets()
@@ -48,30 +49,45 @@ export function Sidebar({ params, onChange }: Props) {
       .catch((err) => setSheetsError(String(err)));
   }, []); // eslint-disable-line
 
+  // 2. Fetch Worksheets bila selectedSheet.url bertukar
   useEffect(() => {
-    if (!params.selectedSheet) return;
+    if (!params.selectedSheet?.url) return;
+
     api
       .worksheets(params.selectedSheet.url)
       .then((r) => {
         setWorksheets(r.worksheets);
         if (r.worksheets.length > 0) {
-          onChange({ ...params, worksheet: r.worksheets[0] });
+          // Auto select tab pertama & reset stok
+          onChange({
+            ...params,
+            worksheet: r.worksheets[0],
+            selectedStocks: [],
+            allStocks: [],
+          });
         }
       })
       .catch(() => setWorksheets([]));
   }, [params.selectedSheet?.url]); // eslint-disable-line
 
+  // 3. Fetch Stocks bila url ATAU worksheet bertukar
   useEffect(() => {
-    if (!params.selectedSheet) return;
+    if (!params.selectedSheet?.url || !params.worksheet) return;
+
     setLoadingStocks(true);
     setStocksError(null);
+
     api
       .stocks(params.selectedSheet.url, params.worksheet)
       .then((r) => {
         setStocks(r.stocks);
         onChange({ ...params, allStocks: r.stocks });
       })
-      .catch((err) => setStocksError(String(err)))
+      .catch((err) => {
+        setStocksError(String(err));
+        setStocks([]);
+        onChange({ ...params, allStocks: [] });
+      })
       .finally(() => setLoadingStocks(false));
   }, [params.selectedSheet?.url, params.worksheet]); // eslint-disable-line
 
@@ -133,8 +149,7 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
-      {/* Sheet selector */}
-      {sheetsError && <p className="text-xs text-red-400 break-all">⚠ Sheets: {sheetsError}</p>}
+      {/* Gantikan sheets.length > 0 dengan sheets.length > 1 kalau nak sorok bila ada 1 sheet, atau kekalkan kalau nak tayang jugak */}
       {sheets.length > 0 && (
         <div>
           <label className="label">Sheet</label>
@@ -142,8 +157,16 @@ export function Sidebar({ params, onChange }: Props) {
             className="select"
             value={params.selectedSheet?.url ?? ""}
             onChange={(e) => {
-              const sheet = sheets.find((s) => s.url === e.target.value) ?? null;
-              onChange({ ...params, selectedSheet: sheet, selectedStocks: [], allStocks: [] });
+              const newSheet = sheets.find((s) => s.url === e.target.value) ?? null;
+              if (newSheet) {
+                onChange({
+                  ...params,
+                  selectedSheet: newSheet,
+                  worksheet: "",         // Reset worksheet
+                  allStocks: [],         // Reset stok lama
+                  selectedStocks: [],    // Reset pilihan stok
+                });
+              }
             }}
           >
             {sheets.map((s) => (
