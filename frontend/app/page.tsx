@@ -22,12 +22,12 @@ const DEFAULT_PARAMS: SidebarParams = {
   secondaryTimeframe: "1w",
   gridColumns: 2,
   chartConfig: {
-    emaPeriods: [10, 20, 50],
+    emaPeriods: [5, 10, 20, 50, 100, 200],
     showVolume: true,
     showRsi: false,
-    showMacd: false,
+    showMacd: true,
     showCvd: false,
-    showCmf: false,
+    showCmf: true,
   },
 };
 

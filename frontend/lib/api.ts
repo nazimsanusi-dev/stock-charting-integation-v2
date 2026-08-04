@@ -65,7 +65,7 @@ export const api = {
     ticker: string,
     period: string = "1y",
     interval: string = "1d",
-    emaPeriods: number[] = [10, 20, 50],
+    emaPeriods: number[] = [5, 5, 10, 20, 50, 100, 200, 100, 200],
   ): Promise<ChartData> {
     const query = new URLSearchParams({
       ticker,

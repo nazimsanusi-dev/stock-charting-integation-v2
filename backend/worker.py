@@ -147,7 +147,7 @@ async def _route(request, env):
         bars = await yahoo_service.fetch_ohlcv(ticker, period, interval)
         if not bars:
             return _json({"error": f"No data for '{ticker}'"}, 404)
-        ema_periods = [int(p) for p in ema_str.split(",") if p.strip().isdigit()] or [10, 20, 50]
+        ema_periods = [int(p) for p in ema_str.split(",") if p.strip().isdigit()] or [5, 10, 20, 50, 100, 200]
         
         # Tambah cache selama 60 saat untuk tingkatkan kelajuan muatan carta
         return _json({

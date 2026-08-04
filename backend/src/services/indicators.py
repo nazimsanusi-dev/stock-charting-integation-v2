@@ -123,7 +123,7 @@ def calculate_all(bars: list[dict], ema_periods: list[int] | None = None) -> dic
     if not bars:
         return {}
     if ema_periods is None:
-        ema_periods = [10, 20, 50]
+        ema_periods = [5, 10, 20, 50, 100, 200]
 
     opens  = _clean([b["open"]   for b in bars])
     highs  = _clean([b["high"]   for b in bars])
