@@ -67,12 +67,36 @@ def calc_macd(closes: list[float], fast: int = 12, slow: int = 26, signal: int =
     return macd, signal_line, hist
 
 
-def calc_cvd(opens: list[float], closes: list[float], volumes: list[float]) -> list[float]:
-    cvd, total = [], 0.0
-    for o, c, v in zip(opens, closes, volumes):
-        total += v if c > o else (-v if c < o else 0.0)
-        cvd.append(total)
-    return cvd
+def calc_cvd_candles(opens: list[float], highs: list[float], lows: list[float], closes: list[float], volumes: list[float]) -> list[dict]:
+    cvd_candles = []
+    running_close = 0.0
+
+    for o, h, l, c, v in zip(opens, highs, lows, closes, volumes):
+        # Anggaran Delta berasaskan bar
+        if c > o:
+            delta = v
+        elif c < o:
+            delta = -v
+        else:
+            delta = 0.0
+
+        cvd_open = running_close
+        cvd_close = running_close + delta
+        
+        # Anggaran High & Low CVD berdasarkan pergerakan bar
+        cvd_high = max(cvd_open, cvd_close)
+        cvd_low = min(cvd_open, cvd_close)
+
+        cvd_candles.append({
+            "open": cvd_open,
+            "high": cvd_high,
+            "low": cvd_low,
+            "close": cvd_close
+        })
+
+        running_close = cvd_close
+
+    return cvd_candles
 
 
 def calc_cmf(highs, lows, closes, volumes, period: int = 20) -> list[float]:
