@@ -61,8 +61,8 @@ function SingleView({ params }: { params: SidebarParams }) {
     <div className="flex flex-col flex-1 min-w-0 h-full">
       <div className="px-4 pt-3 flex justify-between items-center">
         <div>
-          <span className="text-base font-semibold text-gray-800">{stock.name}</span>
-          <span className="ml-2 text-sm text-gray-400">{stock.ticker}</span>
+          <span className="text-base font-semibold text-gray-800 dark:text-gray-100">{stock.name}</span>
+          <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">{stock.ticker}</span>
         </div>
       </div>
 
@@ -75,7 +75,7 @@ function SingleView({ params }: { params: SidebarParams }) {
               {primary.loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
               ) : primary.data ? (
-                <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} />
+                <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
               ) : null}
             </div>
 
@@ -84,7 +84,7 @@ function SingleView({ params }: { params: SidebarParams }) {
               {secondary.loading ? (
                 <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
               ) : secondary.data ? (
-                <StockChart data={secondary.data} config={params.chartConfig} ticker={stock.ticker} />
+                <StockChart data={secondary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
               ) : null}
             </div>
           </div>
@@ -94,7 +94,7 @@ function SingleView({ params }: { params: SidebarParams }) {
             {primary.loading ? (
               <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
             ) : primary.data ? (
-              <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} />
+              <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
             ) : null}
           </div>
         )}
@@ -121,7 +121,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
       <Sidebar params={params} onChange={setParams} />
 
-      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto">
+      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950">
         {params.viewMode === "single" ? (
           <SingleView params={params} />
         ) : (
@@ -134,6 +134,7 @@ export default function Home() {
               isCombine={params.isCombineTimeframe}
               config={params.chartConfig}
               columns={params.gridColumns}
+              theme={params.theme}
             />
           </div>
         )}

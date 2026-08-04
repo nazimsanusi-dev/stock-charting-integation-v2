@@ -26,23 +26,23 @@ export function OHLCSummary({ bar, ticker }: Props) {
   const isUp = change >= 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-      <span className="font-semibold text-gray-700">{ticker}</span>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800">
+      <span className="font-semibold text-gray-700 dark:text-gray-200">{ticker}</span>
 
       <span>
-        <span className="text-gray-400 mr-1">O</span>
+        <span className="text-gray-400 dark:text-gray-500 mr-1">O</span>
         {fmt(bar.open)}
       </span>
       <span>
-        <span className="text-gray-400 mr-1">H</span>
+        <span className="text-gray-400 dark:text-gray-500 mr-1">H</span>
         {fmt(bar.high)}
       </span>
       <span>
-        <span className="text-gray-400 mr-1">L</span>
+        <span className="text-gray-400 dark:text-gray-500 mr-1">L</span>
         {fmt(bar.low)}
       </span>
       <span>
-        <span className="text-gray-400 mr-1">C</span>
+        <span className="text-gray-400 dark:text-gray-500 mr-1">C</span>
         <span className={isUp ? "text-[#26A69A] font-medium" : "text-[#EF5350] font-medium"}>
           {fmt(bar.close)}
         </span>
@@ -54,7 +54,7 @@ export function OHLCSummary({ bar, ticker }: Props) {
       </span>
 
       <span>
-        <span className="text-gray-400 mr-1">Vol</span>
+        <span className="text-gray-400 dark:text-gray-500 mr-1">Vol</span>
         {fmtVolume(bar.volume)}
       </span>
     </div>

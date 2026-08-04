@@ -122,27 +122,27 @@ export function Sidebar({ params, onChange }: Props) {
 
   if (collapsed) {
     return (
-      <aside className="w-10 shrink-0 flex flex-col items-center py-3 gap-3 bg-[#FAFAFA] border-r border-gray-100 h-screen sticky top-0">
+      <aside className="w-10 shrink-0 flex flex-col items-center py-3 gap-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0">
         <button
           onClick={() => setCollapsed(false)}
-          className="p-1.5 rounded hover:bg-gray-200 text-gray-500 transition-colors"
+          className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
           title="Expand sidebar"
         >
           ▶
         </button>
-        <span className="text-gray-300 text-xs rotate-90 mt-4 tracking-widest select-none">STOCKS</span>
+        <span className="text-gray-300 dark:text-gray-600 text-xs rotate-90 mt-4 tracking-widest select-none">STOCKS</span>
       </aside>
     );
   }
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] border-r border-gray-100 h-screen sticky top-0">
+    <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-gray-700 text-sm tracking-wide">📈 Stock Monitor</span>
+        <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">📈 Stock Monitor</span>
         <button
           onClick={() => setCollapsed(true)}
-          className="p-1 rounded hover:bg-gray-200 text-gray-400 transition-colors text-xs"
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 transition-colors text-xs"
           title="Collapse sidebar"
         >
           ◀
@@ -234,7 +234,7 @@ export function Sidebar({ params, onChange }: Props) {
               <label
                 key={s.ticker}
                 className={`flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded text-xs transition-colors ${
-                  selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100"
+                  selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 <input
@@ -245,10 +245,10 @@ export function Sidebar({ params, onChange }: Props) {
                   onChange={() => selectStock(s)}
                   onClick={() => selected && selectStock(s)}
                 />
-                <span className={`truncate ${selected ? "text-[#1a7a72] font-medium" : "text-gray-700"}`}>
+                <span className={`truncate ${selected ? "text-[#1a7a72] font-medium" : "text-gray-700 dark:text-gray-300"}`}>
                   {s.name}
                 </span>
-                <span className="ml-auto text-gray-400 shrink-0">{s.ticker}</span>
+                <span className="ml-auto text-gray-400 dark:text-gray-500 shrink-0">{s.ticker}</span>
               </label>
             );
           })}
@@ -260,7 +260,7 @@ export function Sidebar({ params, onChange }: Props) {
         </div>
       </div>
 
-      <hr className="border-gray-100" />
+      <hr className="border-gray-100 dark:border-gray-800" />
 
       {/* View mode */}
       <div>
@@ -273,7 +273,7 @@ export function Sidebar({ params, onChange }: Props) {
               className={`flex-1 py-1 text-xs rounded border transition-colors ${
                 params.viewMode === m
                   ? "bg-[#26A69A] text-white border-[#26A69A]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
               }`}
             >
               {m === "single" ? "Single" : m === "grid" ? "Grid" : "Table"}
@@ -297,10 +297,10 @@ export function Sidebar({ params, onChange }: Props) {
                   title={disabled ? "Combine mode supports up to 2 columns" : undefined}
                   className={`flex-1 py-1 text-xs rounded border transition-colors ${
                     disabled
-                      ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed"
+                      ? "bg-gray-100 dark:bg-gray-800 text-gray-300 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed"
                       : params.gridColumns === n
                       ? "bg-[#26A69A] text-white border-[#26A69A]"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
                   }`}
                 >
                   {n}
@@ -315,9 +315,9 @@ export function Sidebar({ params, onChange }: Props) {
       {params.viewMode !== "table" && (
         <>
           {/* Combine Timeframe Toggle & Selectors */}
-          <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 border border-gray-100">
+          <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-xs font-medium text-gray-700">Combine Timeframes</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Combine Timeframes</span>
               <input
                 type="checkbox"
                 className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
@@ -333,9 +333,9 @@ export function Sidebar({ params, onChange }: Props) {
             </label>
 
             {params.isCombineTimeframe && (
-              <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <div>
-                  <span className="text-[10px] font-medium text-gray-500">TF 1 (Left)</span>
+                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">TF 1 (Left)</span>
                   <select
                     className="select text-xs mt-0.5 py-1 px-1.5"
                     value={params.timeframe}
@@ -349,7 +349,7 @@ export function Sidebar({ params, onChange }: Props) {
                   </select>
                 </div>
                 <div>
-                  <span className="text-[10px] font-medium text-gray-500">TF 2 (Right)</span>
+                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">TF 2 (Right)</span>
                   <select
                     className="select text-xs mt-0.5 py-1 px-1.5"
                     value={params.secondaryTimeframe}
@@ -378,7 +378,7 @@ export function Sidebar({ params, onChange }: Props) {
                     className={`flex-1 py-1 text-xs rounded border transition-colors ${
                       params.timeframe === t.value
                         ? "bg-[#26A69A] text-white border-[#26A69A]"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
                     }`}
                   >
                     {t.label.slice(0, 1)}
@@ -403,14 +403,14 @@ export function Sidebar({ params, onChange }: Props) {
             </select>
           </div>
 
-          <hr className="border-gray-100" />
+          <hr className="border-gray-100 dark:border-gray-800" />
 
           {/* Indicators */}
           <div className="flex flex-col gap-2">
             <label className="label">Indicators</label>
 
             <div>
-              <span className="text-xs text-gray-500">EMA periods</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
               <div className="flex gap-1 mt-0.5">
                 <input
                   className="input flex-1 text-xs"
@@ -432,7 +432,7 @@ export function Sidebar({ params, onChange }: Props) {
                 ["showCmf", "CMF (20)"],
               ] as [keyof SidebarParams["chartConfig"], string][]
             ).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-700">
+              <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
                 <input
                   type="checkbox"
                   className="accent-[#26A69A]"
@@ -446,7 +446,7 @@ export function Sidebar({ params, onChange }: Props) {
         </>
       )}
 
-      <div className="mt-auto text-xs text-gray-400 space-y-0.5">
+      <div className="mt-auto text-xs text-gray-400 dark:text-gray-600 space-y-0.5">
         <p>Data: Yahoo Finance</p>
         <p>List: Google Sheets</p>
       </div>
