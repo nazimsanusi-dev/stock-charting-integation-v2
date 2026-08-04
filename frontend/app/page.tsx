@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
+import { TableView } from "@/components/TableView";
 import { OHLCSummary } from "@/components/OHLCSummary";
 import { useChartData } from "@/hooks/useChartData";
 import type { SidebarParams } from "@/lib/types";
@@ -124,10 +125,10 @@ export default function Home() {
       <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950">
         {params.viewMode === "single" ? (
           <SingleView params={params} />
-        ) : (
+        ) : params.viewMode === "grid" ? (
           <div className="p-4">
             <GridView
-              stocks={params.allStocks ?? []} // <-- Tukar ke allStocks supaya semua stok keluar
+              stocks={params.allStocks ?? []}
               period={params.period}
               timeframe={params.timeframe}
               secondaryTimeframe={params.secondaryTimeframe}
@@ -135,6 +136,14 @@ export default function Home() {
               config={params.chartConfig}
               columns={params.gridColumns}
               theme={params.theme}
+            />
+          </div>
+        ) : (
+          /* Mod Table */
+          <div className="p-4">
+            <TableView
+              selectedSheet={params.selectedSheet}
+              worksheet={params.worksheet}
             />
           </div>
         )}
