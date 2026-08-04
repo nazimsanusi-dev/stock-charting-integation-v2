@@ -3,18 +3,36 @@
 import { useEffect, useRef, memo } from "react";
 import type { ChartData, ChartConfig } from "@/lib/types";
 
-const C = {
-  up: "#26A69A",
-  down: "#EF5350",
-  bg: "#FFFFFF",
-  grid: "#F0F0F0",
-  text: "#424242",
-  rsi: "#9C27B0",
-  macd: "#2196F3",
-  macdSignal: "#FF9800",
-  cvd: "#00BCD4",
-  cmf: "#4CAF50",
-  level: "#BDBDBD",
+// Palette Warna Light & Dark
+const COLOR_PALETTES = {
+  light: {
+    up: "#26A69A",
+    down: "#EF5350",
+    bg: "#FFFFFF",
+    grid: "#F0F0F0",
+    text: "#424242",
+    rsi: "#9C27B0",
+    macd: "#2196F3",
+    macdSignal: "#FF9800",
+    cvd: "#00BCD4",
+    cmf: "#4CAF50",
+    level: "#BDBDBD",
+    zeroLine: "#000000",
+  },
+  dark: {
+    up: "#26A69A",
+    down: "#EF5350",
+    bg: "#111827",
+    grid: "#1F2937",
+    text: "#D1D5DB",
+    rsi: "#AB47BC",
+    macd: "#42A5F5",
+    macdSignal: "#FFA726",
+    cvd: "#26C6DA",
+    cmf: "#66BB6A",
+    level: "#4B5563",
+    zeroLine: "#FFFFFF",
+  },
 };
 
 const EMA_COLORS = ["#2196F3", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#8BC34A"];
@@ -24,11 +42,20 @@ interface Props {
   config: ChartConfig;
   ticker: string;
   mini?: boolean;
+  theme?: "light" | "dark";
 }
 
-export const StockChart = memo(function StockChart({ data, config, ticker, mini = false }: Props) {
+export const StockChart = memo(function StockChart({
+  data,
+  config,
+  ticker,
+  mini = false,
+  theme = "light",
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof import("lightweight-charts")["createChart"]> | null>(null);
+
+  const C = COLOR_PALETTES[theme];
 
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv.length) return;
@@ -79,7 +106,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             high: b.high,
             low: b.low,
             close: b.close,
-          })),
+          }))
         );
 
         // 3. Volume Overlay pada Main Chart
@@ -99,7 +126,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
               time: b.time as unknown as import("lightweight-charts").Time,
               value: b.volume,
               color: b.close >= b.open ? `${C.up}99` : `${C.down}99`,
-            })),
+            }))
           );
         }
 
@@ -107,7 +134,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
         Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
           const points = values
             .map((v, i) =>
-              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null
             )
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
 
@@ -126,7 +153,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
         if (!mini && config.showRsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
-              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null,
+              v !== null ? { time: times[i] as unknown as import("lightweight-charts").Time, value: v } : null
             )
             .filter(Boolean) as { time: import("lightweight-charts").Time; value: number }[];
 
@@ -227,24 +254,24 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
             const cmfPane = chart.addPane();
 
             // 1. Garisan CMF utama
-            const cmf = cmfPane.addSeries(LineSeries, { 
-              color: C.cmf, 
-              lineWidth: 1, 
-              title: "CMF(20)", 
-              priceLineVisible: false, 
-              lastValueVisible: true 
+            const cmf = cmfPane.addSeries(LineSeries, {
+              color: C.cmf,
+              lineWidth: 1,
+              title: "CMF(20)",
+              priceLineVisible: false,
+              lastValueVisible: true,
             });
             cmf.setData(cmfPoints);
 
-            // 2. Garisan horizontal 0.00 warna hitam (putus-putus)
+            // 2. Garisan horizontal 0.00 (Putus-putus)
             const zeroLine = cmfPane.addSeries(LineSeries, {
-              color: "#000000",        // Warna hitam
+              color: C.zeroLine,
               lineWidth: 1,
-              lineStyle: 0,            // 2 = LineStyle.Dashed (garisan putus-putus)
+              lineStyle: 2,
               priceLineVisible: false,
               lastValueVisible: false,
             });
-            
+
             zeroLine.setData(
               cmfPoints.map((p) => ({ time: p.time, value: 0 }))
             );
@@ -252,7 +279,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
         }
 
         chart.timeScale().fitContent();
-      },
+      }
     );
 
     return () => {
@@ -260,7 +287,7 @@ export const StockChart = memo(function StockChart({ data, config, ticker, mini 
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [data, config, mini]);
+  }, [data, config, mini, theme]);
 
   return <div ref={containerRef} className="w-full" style={{ height: "100%", minHeight: mini ? 200 : 550 }} />;
 });

@@ -149,6 +149,17 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
+      {/* Theme Toggle Button */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
+        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Theme</span>
+        <button
+          onClick={() => set({ theme: params.theme === "dark" ? "light" : "dark" })}
+          className="px-2 py-1 text-xs rounded border bg-gray-100 dark:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          {params.theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+        </button>
+      </div>
+
       {/* Gantikan sheets.length > 0 dengan sheets.length > 1 kalau nak sorok bila ada 1 sheet, atau kekalkan kalau nak tayang jugak */}
       {sheets.length > 0 && (
         <div>
