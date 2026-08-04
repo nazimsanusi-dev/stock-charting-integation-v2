@@ -115,7 +115,7 @@ async def get_table_data(spreadsheet_url: str, worksheet: str, sa: dict) -> dict
     return {"headers": col_headers, "rows": padded}
 
 
-
+async def get_stock_list(spreadsheet_url: str, worksheet: str, sa: dict) -> list[dict]:
     from js import fetch, Headers  # type: ignore[import]
 
     sheet_id = _extract_sheet_id(spreadsheet_url)
@@ -137,7 +137,7 @@ async def get_table_data(spreadsheet_url: str, worksheet: str, sa: dict) -> dict
 
     rows = (await resp.json()).to_py().get("values", [])
 
-    # Column A = Nama (r[0]), Column B = Symbol (r[1])
+    # Column A = Name (r[0]), Column B = Symbol/Ticker (r[1])
     return [
         {"name": str(r[0]).strip(), "ticker": str(r[1]).strip()}
         for r in rows[1:]
