@@ -53,8 +53,10 @@ export interface SidebarParams {
   allStocks: Stock[];
   selectedStocks: Stock[];
   viewMode: "single" | "grid" | "table";
-  gridColumns: 1 | 2 | 3 | 4;
-  timeframe: "1d" | "1wk" | "1mo";
+  gridColumns: number;// 1 | 2 | 3 | 4;
+  timeframe: string;//"1d" | "1wk" | "1mo";
   period: string;
+  isCombineTimeframe: boolean;       // Status Feature Combine Timeframe
+  secondaryTimeframe: string;        // Timeframe Kedua (cth: "1w" atau "1m")
   chartConfig: ChartConfig;
 }

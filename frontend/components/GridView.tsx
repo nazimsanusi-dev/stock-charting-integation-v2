@@ -1,93 +1,123 @@
 "use client";
 
-import { memo } from "react";
+import { StockChart } from "@/components/StockChart";
 import { useChartData } from "@/hooks/useChartData";
-import { StockChart } from "./StockChart";
-import { OHLCSummary } from "./OHLCSummary";
-import type { Stock, ChartConfig } from "@/lib/types";
+import type { ChartConfig } from "@/lib/types";
 
-interface SingleChartProps {
-  stock: Stock;
+interface StockCardProps {
+  stock: { name: string; ticker: string };
   period: string;
-  interval: string;
+  timeframe: string;
+  secondaryTimeframe: string;
+  isCombine: boolean;
   config: ChartConfig;
 }
 
-const SingleChart = memo(function SingleChart({ stock, period, interval, config }: SingleChartProps) {
-  const { data, loading, error } = useChartData(stock.ticker, period, interval, config.emaPeriods);
+function StockCard({ stock, period, timeframe, secondaryTimeframe, isCombine, config }: StockCardProps) {
+  // Fetch Data Timeframe Utama (Primary)
+  const primaryData = useChartData(stock.ticker, period, timeframe, config.emaPeriods);
 
-  if (loading) {
-    return (
-      <div className="border border-gray-100 rounded-lg overflow-hidden bg-white">
-        <div className="px-3 pt-2 pb-1">
-          <span className="text-sm font-semibold text-gray-700">{stock.name}</span>
-          <span className="ml-2 text-xs text-gray-400">{stock.ticker}</span>
-        </div>
-        <div className="flex items-center justify-center h-[200px] text-gray-400 text-sm animate-pulse">
-          Loading…
-        </div>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="border border-gray-100 rounded-lg overflow-hidden bg-white">
-        <div className="px-3 pt-2 pb-1">
-          <span className="text-sm font-semibold text-gray-700">{stock.name}</span>
-          <span className="ml-2 text-xs text-gray-400">{stock.ticker}</span>
-        </div>
-        <div className="flex items-center justify-center h-[200px] text-red-400 text-xs px-4 text-center">
-          {error}
-        </div>
-      </div>
-    );
-  }
-  if (!data) return null;
-
-  const lastBar = data.ohlcv[data.ohlcv.length - 1] ?? null;
+  // Fetch Data Timeframe Kedua (Secondary) jika Combine Mode ON
+  const secondaryData = useChartData(
+    isCombine ? stock.ticker : null,
+    period,
+    secondaryTimeframe,
+    config.emaPeriods
+  );
 
   return (
-    <div className="border border-gray-100 rounded-lg overflow-hidden bg-white">
-      <div className="px-3 pt-2 pb-0">
-        <span className="text-sm font-semibold text-gray-700">{stock.name}</span>
-        <span className="ml-2 text-xs text-gray-400">{stock.ticker}</span>
+    <div className="flex flex-col border border-gray-200 rounded-lg p-3 bg-white shadow-sm h-[480px]">
+      <div className="flex justify-between items-center mb-2 px-1">
+        <span className="font-bold text-gray-800 text-sm truncate">{stock.name}</span>
+        <span className="text-xs font-mono text-gray-500">{stock.ticker}</span>
       </div>
-      <div style={{ height: 200 }}>
-        <StockChart data={data} config={config} ticker={stock.ticker} mini />
+
+      <div className="flex-1 min-h-0">
+        {isCombine ? (
+          /* Side-by-Side View untuk 2 Timeframe */
+          <div className="grid grid-cols-2 gap-2 h-full">
+            <div className="flex flex-col h-full border-r border-gray-100 pr-1">
+              <span className="text-xs font-semibold text-blue-600 mb-1">TF 1: {timeframe.toUpperCase()}</span>
+              {primaryData.loading ? (
+                <div className="flex-1 flex items-center justify-center text-xs text-gray-400">Loading...</div>
+              ) : primaryData.data ? (
+                <StockChart data={primaryData.data} config={config} ticker={stock.ticker} mini />
+              ) : null}
+            </div>
+
+            <div className="flex flex-col h-full pl-1">
+              <span className="text-xs font-semibold text-purple-600 mb-1">TF 2: {secondaryTimeframe.toUpperCase()}</span>
+              {secondaryData.loading ? (
+                <div className="flex-1 flex items-center justify-center text-xs text-gray-400">Loading...</div>
+              ) : secondaryData.data ? (
+                <StockChart data={secondaryData.data} config={config} ticker={stock.ticker} mini />
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          /* Standard Single Chart View */
+          <div className="h-full">
+            {primaryData.loading ? (
+              <div className="flex-1 flex items-center justify-center text-xs text-gray-400">Loading...</div>
+            ) : primaryData.data ? (
+              <StockChart data={primaryData.data} config={config} ticker={stock.ticker} mini />
+            ) : null}
+          </div>
+        )}
       </div>
-      <OHLCSummary bar={lastBar} ticker={stock.ticker} />
     </div>
   );
-});
-
-interface GridViewProps {
-  stocks: Stock[];
-  period: string;
-  interval: string;
-  config: ChartConfig;
-  columns: 1 | 2 | 3 | 4;
 }
 
-export function GridView({ stocks, period, interval, config, columns }: GridViewProps) {
-  const colClass: Record<number, string> = {
-    1: "grid-cols-1",
-    2: "grid-cols-1 sm:grid-cols-2",
-    3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-    4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-  };
+interface GridViewProps {
+  stocks: Array<{ name: string; ticker: string }>;
+  period: string;
+  timeframe: string;
+  secondaryTimeframe: string;
+  isCombine: boolean;
+  config: ChartConfig;
+  columns: number;
+}
 
+export function GridView({
+  stocks,
+  period,
+  timeframe,
+  secondaryTimeframe,
+  isCombine,
+  config,
+  columns,
+}: GridViewProps) {
   if (!stocks.length) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
-        No stocks available
+      <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">
+        No stocks selected for grid view.
       </div>
     );
   }
 
+  // Hadkan maksima 2 kolum jika Combine Timeframe di-ON-kan
+  const activeColumns = isCombine ? Math.min(columns, 2) : columns;
+
+  const gridClass = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+  }[activeColumns] || "grid-cols-2";
+
   return (
-    <div className={`grid ${colClass[columns]} gap-3`}>
-      {stocks.map((s) => (
-        <SingleChart key={s.ticker} stock={s} period={period} interval={interval} config={config} />
+    <div className={`grid ${gridClass} gap-4 w-full`}>
+      {stocks.map((stock) => (
+        <StockCard
+          key={stock.ticker}
+          stock={stock}
+          period={period}
+          timeframe={timeframe}
+          secondaryTimeframe={secondaryTimeframe}
+          isCombine={isCombine}
+          config={config}
+        />
       ))}
     </div>
   );

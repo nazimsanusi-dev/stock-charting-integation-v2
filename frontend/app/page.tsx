@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
-import { TableView } from "@/components/TableView";
 import { OHLCSummary } from "@/components/OHLCSummary";
 import { useChartData } from "@/hooks/useChartData";
 import type { SidebarParams } from "@/lib/types";
@@ -15,26 +14,38 @@ const DEFAULT_PARAMS: SidebarParams = {
   allStocks: [],
   selectedStocks: [],
   viewMode: "single",
-  gridColumns: 2,
   timeframe: "1d",
   period: "1y",
+  isCombineTimeframe: false,
+  secondaryTimeframe: "1w",
+  gridColumns: 2,
   chartConfig: {
-    emaPeriods: [5, 10, 20, 50, 100, 200],
+    emaPeriods: [10, 20, 50],
     showVolume: true,
     showRsi: false,
-    showMacd: true,
+    showMacd: false,
     showCvd: false,
-    showCmf: true,
+    showCmf: false,
   },
 };
 
 function SingleView({ params }: { params: SidebarParams }) {
   const stock = params.selectedStocks[0] ?? null;
-  const { data, loading, error } = useChartData(
+
+  // Primary Timeframe Data
+  const primary = useChartData(
     stock?.ticker ?? null,
     params.period,
     params.timeframe,
-    params.chartConfig.emaPeriods,
+    params.chartConfig.emaPeriods
+  );
+
+  // Secondary Timeframe Data (jika Combine ON)
+  const secondary = useChartData(
+    params.isCombineTimeframe && stock?.ticker ? stock.ticker : null,
+    params.period,
+    params.secondaryTimeframe,
+    params.chartConfig.emaPeriods
   );
 
   if (!stock) {
@@ -44,34 +55,56 @@ function SingleView({ params }: { params: SidebarParams }) {
       </div>
     );
   }
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-gray-400 text-sm animate-pulse">
-        Loading {stock.ticker}…
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-red-400 text-sm px-8 text-center">
-        {error}
-      </div>
-    );
-  }
-  if (!data) return null;
-
-  const lastBar = data.ohlcv[data.ohlcv.length - 1] ?? null;
 
   return (
-    <div className="flex flex-col flex-1 min-w-0">
-      <div className="px-4 pt-3">
-        <span className="text-base font-semibold text-gray-800">{stock.name}</span>
-        <span className="ml-2 text-sm text-gray-400">{stock.ticker}</span>
+    <div className="flex flex-col flex-1 min-w-0 h-full">
+      <div className="px-4 pt-3 flex justify-between items-center">
+        <div>
+          <span className="text-base font-semibold text-gray-800">{stock.name}</span>
+          <span className="ml-2 text-sm text-gray-400">{stock.ticker}</span>
+        </div>
       </div>
-      <div className="flex-1 px-2 pt-1">
-        <StockChart data={data} config={params.chartConfig} ticker={stock.ticker} />
+
+      <div className="flex-1 px-2 pt-1 min-h-0">
+        {params.isCombineTimeframe ? (
+          /* Single View: Gabungan 2 Timeframe Kiri-Kanan */
+          <div className="grid grid-cols-2 gap-3 h-full">
+            <div className="flex flex-col h-full">
+              <span className="text-xs font-bold text-blue-600 mb-1">TF 1: {params.timeframe.toUpperCase()}</span>
+              {primary.loading ? (
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+              ) : primary.data ? (
+                <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} />
+              ) : null}
+            </div>
+
+            <div className="flex flex-col h-full">
+              <span className="text-xs font-bold text-purple-600 mb-1">TF 2: {params.secondaryTimeframe.toUpperCase()}</span>
+              {secondary.loading ? (
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+              ) : secondary.data ? (
+                <StockChart data={secondary.data} config={params.chartConfig} ticker={stock.ticker} />
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          /* Single View Biasa */
+          <div className="h-full">
+            {primary.loading ? (
+              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+            ) : primary.data ? (
+              <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} />
+            ) : null}
+          </div>
+        )}
       </div>
-      <OHLCSummary bar={lastBar} ticker={stock.ticker} />
+
+      {primary.data && (
+        <OHLCSummary
+          bar={primary.data.ohlcv[primary.data.ohlcv.length - 1] ?? null}
+          ticker={stock.ticker}
+        />
+      )}
     </div>
   );
 }
@@ -86,25 +119,20 @@ export default function Home() {
       <main className="flex flex-col flex-1 min-w-0 overflow-y-auto">
         {params.viewMode === "single" ? (
           <SingleView params={params} />
-        ) : params.viewMode === "grid" ? (
+        ) : (
           <div className="p-4">
             <GridView
-              stocks={params.allStocks}
+              stocks={params.selectedStocks}
               period={params.period}
-              interval={params.timeframe}
+              timeframe={params.timeframe}
+              secondaryTimeframe={params.secondaryTimeframe}
+              isCombine={params.isCombineTimeframe}
               config={params.chartConfig}
               columns={params.gridColumns}
             />
           </div>
-        ) : (
-          <TableView
-            selectedSheet={params.selectedSheet}
-            worksheet={params.worksheet}
-          />
         )}
       </main>
     </div>
   );
 }
-
-

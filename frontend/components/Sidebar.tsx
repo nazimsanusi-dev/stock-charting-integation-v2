@@ -6,8 +6,12 @@ import type { SheetEntry, Stock, SidebarParams } from "@/lib/types";
 
 const PERIODS = ["3mo", "6mo", "1y", "2y", "5y", "max"] as const;
 const PERIOD_LABELS: Record<string, string> = {
-  "3mo": "3 Months", "6mo": "6 Months", "1y": "1 Year",
-  "2y": "2 Years", "5y": "5 Years", "max": "Max",
+  "3mo": "3 Months",
+  "6mo": "6 Months",
+  "1y": "1 Year",
+  "2y": "2 Years",
+  "5y": "5 Years",
+  max: "Max",
 };
 const TIMEFRAMES = [
   { value: "1d", label: "Daily" },
@@ -32,7 +36,8 @@ export function Sidebar({ params, onChange }: Props) {
   const [stocksError, setStocksError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.sheets()
+    api
+      .sheets()
       .then((r) => {
         setSheets(r.sheets);
         setSheetsError(null);
@@ -45,7 +50,8 @@ export function Sidebar({ params, onChange }: Props) {
 
   useEffect(() => {
     if (!params.selectedSheet) return;
-    api.worksheets(params.selectedSheet.url)
+    api
+      .worksheets(params.selectedSheet.url)
       .then((r) => {
         setWorksheets(r.worksheets);
         if (r.worksheets.length > 0) {
@@ -59,7 +65,8 @@ export function Sidebar({ params, onChange }: Props) {
     if (!params.selectedSheet) return;
     setLoadingStocks(true);
     setStocksError(null);
-    api.stocks(params.selectedSheet.url, params.worksheet)
+    api
+      .stocks(params.selectedSheet.url, params.worksheet)
       .then((r) => {
         setStocks(r.stocks);
         onChange({ ...params, allStocks: r.stocks });
@@ -71,7 +78,7 @@ export function Sidebar({ params, onChange }: Props) {
   const filteredStocks = stocks.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.ticker.toLowerCase().includes(search.toLowerCase()),
+      s.ticker.toLowerCase().includes(search.toLowerCase())
   );
 
   const selectedTicker = params.selectedStocks[0]?.ticker ?? null;
@@ -127,9 +134,7 @@ export function Sidebar({ params, onChange }: Props) {
       </div>
 
       {/* Sheet selector */}
-      {sheetsError && (
-        <p className="text-xs text-red-400 break-all">⚠ Sheets: {sheetsError}</p>
-      )}
+      {sheetsError && <p className="text-xs text-red-400 break-all">⚠ Sheets: {sheetsError}</p>}
       {sheets.length > 0 && (
         <div>
           <label className="label">Sheet</label>
@@ -160,7 +165,9 @@ export function Sidebar({ params, onChange }: Props) {
             onChange={(e) => onChange({ ...params, worksheet: e.target.value, selectedStocks: [], allStocks: [] })}
           >
             {worksheets.map((w) => (
-              <option key={w} value={w}>{w}</option>
+              <option key={w} value={w}>
+                {w}
+              </option>
             ))}
           </select>
         </div>
@@ -246,44 +253,106 @@ export function Sidebar({ params, onChange }: Props) {
         <div>
           <label className="label">Columns</label>
           <div className="flex gap-1">
-            {([1, 2, 3, 4] as const).map((n) => (
-              <button
-                key={n}
-                onClick={() => set({ gridColumns: n })}
-                className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                  params.gridColumns === n
-                    ? "bg-[#26A69A] text-white border-[#26A69A]"
-                    : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Timeframe — hidden in table mode */}
-      {params.viewMode !== "table" && (
-        <>
-          <div>
-            <label className="label">Timeframe</label>
-            <div className="flex gap-1">
-              {TIMEFRAMES.map((t) => (
+            {([1, 2, 3, 4] as const).map((n) => {
+              const disabled = params.isCombineTimeframe && n > 2;
+              return (
                 <button
-                  key={t.value}
-                  onClick={() => set({ timeframe: t.value })}
+                  key={n}
+                  disabled={disabled}
+                  onClick={() => set({ gridColumns: n })}
+                  title={disabled ? "Combine mode supports up to 2 columns" : undefined}
                   className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                    params.timeframe === t.value
+                    disabled
+                      ? "bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed"
+                      : params.gridColumns === n
                       ? "bg-[#26A69A] text-white border-[#26A69A]"
                       : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
                   }`}
                 >
-                  {t.label.slice(0, 1)}
+                  {n}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      {/* Timeframe & Combine Timeframe — hidden in table mode */}
+      {params.viewMode !== "table" && (
+        <>
+          {/* Combine Timeframe Toggle & Selectors */}
+          <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 border border-gray-100">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-xs font-medium text-gray-700">Combine Timeframes</span>
+              <input
+                type="checkbox"
+                className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
+                checked={params.isCombineTimeframe}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  set({
+                    isCombineTimeframe: isChecked,
+                    gridColumns: isChecked ? Math.min(params.gridColumns, 2) : params.gridColumns,
+                  });
+                }}
+              />
+            </label>
+
+            {params.isCombineTimeframe && (
+              <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200">
+                <div>
+                  <span className="text-[10px] font-medium text-gray-500">TF 1 (Left)</span>
+                  <select
+                    className="select text-xs mt-0.5 py-1 px-1.5"
+                    value={params.timeframe}
+                    onChange={(e) => set({ timeframe: e.target.value })}
+                  >
+                    {TIMEFRAMES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span className="text-[10px] font-medium text-gray-500">TF 2 (Right)</span>
+                  <select
+                    className="select text-xs mt-0.5 py-1 px-1.5"
+                    value={params.secondaryTimeframe}
+                    onChange={(e) => set({ secondaryTimeframe: e.target.value })}
+                  >
+                    {TIMEFRAMES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Single Timeframe Selector (hanya bila Combine OFF) */}
+          {!params.isCombineTimeframe && (
+            <div>
+              <label className="label">Timeframe</label>
+              <div className="flex gap-1">
+                {TIMEFRAMES.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => set({ timeframe: t.value })}
+                    className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                      params.timeframe === t.value
+                        ? "bg-[#26A69A] text-white border-[#26A69A]"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                    }`}
+                  >
+                    {t.label.slice(0, 1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="label">Period</label>
@@ -350,4 +419,3 @@ export function Sidebar({ params, onChange }: Props) {
     </aside>
   );
 }
-
