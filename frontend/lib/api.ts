@@ -47,7 +47,7 @@ export const api = {
   },
 
   // GET /api/stocks?sheet_url=...&worksheet=... → { stocks: [{name, ticker}] }
-  async stocks(sheetUrl: string, worksheet: string = "Stock_List"): Promise<StocksResponse> {
+  async stocks(sheetUrl: string, worksheet: string = "Name"): Promise<StocksResponse> {
     const query = new URLSearchParams({ sheet_url: sheetUrl, worksheet });
     const res = await apiFetch(`${API_BASE_URL}/api/stocks?${query}`);
     const data: StocksResponse = await res.json();

@@ -10,7 +10,7 @@ import type { SidebarParams } from "@/lib/types";
 
 const DEFAULT_PARAMS: SidebarParams = {
   selectedSheet: null,
-  worksheet: "Stock_List",
+  worksheet: "Name",
   selectedStocks: [],
   viewMode: "single",
   timeframe: "1d",

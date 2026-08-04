@@ -81,7 +81,7 @@ async def _route(request, env):
     if path == "/api/stocks":
         from src.services.sheets_service import get_stock_list
         sheet_url = q("sheet_url")
-        worksheet = q("worksheet", "Stock_List")
+        worksheet = q("worksheet", "Name")
         if not sheet_url:
             return _json({"error": "sheet_url required"}, 400)
         sa = settings.gcp_service_account
