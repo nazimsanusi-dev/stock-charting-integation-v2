@@ -19,12 +19,12 @@ const DEFAULT_PARAMS: SidebarParams = {
   timeframe: "1d",
   period: "1y",
   chartConfig: {
-    emaPeriods: [10, 20, 50],
+    emaPeriods: [5, 10, 20, 50, 100, 200],
     showVolume: true,
     showRsi: false,
     showMacd: true,
-    showCvd: true,
-    showCmf: false,
+    showCvd: false,
+    showCmf: true,
   },
 };
 

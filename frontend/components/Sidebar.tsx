@@ -315,7 +315,7 @@ export function Sidebar({ params, onChange }: Props) {
                   onChange={(e) => setEmaInput(e.target.value)}
                   onBlur={applyEma}
                   onKeyDown={(e) => e.key === "Enter" && applyEma()}
-                  placeholder="10, 20, 50"
+                  placeholder="5, 10, 20, 50, 100, 200"
                 />
               </div>
             </div>
