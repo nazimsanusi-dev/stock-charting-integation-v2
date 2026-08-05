@@ -11,11 +11,11 @@ import type { SidebarParams } from "@/lib/types";
 
 const DEFAULT_PARAMS: SidebarParams = {
   selectedSheet: null,
-  worksheet: "Sheet1",
+  worksheet: "LatestUpdateList",
   allStocks: [],
   theme: "dark",
   selectedStocks: [],
-  viewMode: "single",
+  viewMode: "table",
   timeframe: "1d",
   period: "1y",
   isCombineTimeframe: false,

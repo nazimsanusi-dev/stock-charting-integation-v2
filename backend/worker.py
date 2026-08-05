@@ -112,7 +112,7 @@ async def _route(request, env):
             return _json({"error": "GCP credentials not configured"}, 503)
 
         try:
-            stocks = await get_stock_list(sheet_url, worksheet or "Sheet1", sa)
+            stocks = await get_stock_list(sheet_url, worksheet or "LatestUpdateList", sa)
         except Exception as e:
             # Fallback ke tab pertama sekiranya nama worksheet asal tiada
             all_sheets = await get_worksheet_names(sheet_url, sa)
@@ -126,7 +126,7 @@ async def _route(request, env):
     if path == "/api/table":
         from src.services.sheets_service import get_table_data
         sheet_url = _clean_url(q("sheet_url"))
-        worksheet = q("worksheet", "Sheet1")
+        worksheet = q("worksheet", "LatestUpdateList")
         if not sheet_url:
             return _json({"error": "sheet_url required"}, 400)
         sa = settings.gcp_service_account
