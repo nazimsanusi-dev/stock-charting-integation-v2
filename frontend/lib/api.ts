@@ -4,7 +4,7 @@ import type { ChartData, SheetEntry, Stock, TableData } from "./types";
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-console.log("[api] API_BASE_URL =", API_BASE_URL);
+// console.log("[api] API_BASE_URL =", API_BASE_URL);
 
 export interface SheetsResponse {
   sheets: SheetEntry[];
@@ -24,9 +24,9 @@ export interface TableDataResponse {
 }
 
 async function apiFetch(url: string): Promise<Response> {
-  console.log("[api] →", url);
+  // console.log("[api] →", url);
   const res = await fetch(url);
-  console.log("[api] ←", res.status, res.statusText, url);
+  // console.log("[api] ←", res.status, res.statusText, url);
   if (!res.ok) {
     const body = await res.text().catch(() => "(no body)");
     console.error("[api] error body:", body);
@@ -40,7 +40,7 @@ export const api = {
   async sheets(): Promise<SheetsResponse> {
     const res = await apiFetch(`${API_BASE_URL}/api/sheets`);
     const data: SheetsResponse = await res.json();
-    console.log("[api] sheets:", data.sheets.length, "entries", data.sheets);
+    // console.log("[api] sheets:", data.sheets.length, "entries", data.sheets);
     return data;
   },
 
@@ -56,7 +56,7 @@ export const api = {
     const query = new URLSearchParams({ sheet_url: sheetUrl, worksheet });
     const res = await apiFetch(`${API_BASE_URL}/api/stocks?${query}`);
     const data: StocksResponse = await res.json();
-    console.log("[api] stocks:", data.stocks.length, "entries");
+    // console.log("[api] stocks:", data.stocks.length, "entries");
     return data;
   },
 
@@ -75,7 +75,7 @@ export const api = {
     });
     const res = await apiFetch(`${API_BASE_URL}/api/chart?${query}`);
     const data: ChartData = await res.json();
-    console.log("[api] chart:", ticker, "→", data.ohlcv.length, "bars");
+    // console.log("[api] chart:", ticker, "→", data.ohlcv.length, "bars");
     return data;
   },
 
@@ -84,7 +84,7 @@ export const api = {
     const query = new URLSearchParams({ sheet_url: sheetUrl, worksheet });
     const res = await apiFetch(`${API_BASE_URL}/api/table?${query}`);
     const data: TableData = await res.json();
-    console.log("[api] table:", data.headers.length, "cols,", data.rows.length, "rows");
+    // console.log("[api] table:", data.headers.length, "cols,", data.rows.length, "rows");
     return data;
   },
 };
