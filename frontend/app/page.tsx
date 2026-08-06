@@ -11,7 +11,7 @@ import type { SidebarParams } from "@/lib/types";
 
 const DEFAULT_PARAMS: SidebarParams = {
   selectedSheet: null,
-  worksheet: "LatestUpdateList",
+  worksheet: "Sheet1",
   allStocks: [],
   theme: "dark",
   selectedStocks: [],
