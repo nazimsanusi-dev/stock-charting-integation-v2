@@ -97,10 +97,16 @@ async def _route(request, env):
         return _json({"status": "ok"})
 
     if path == "/api/sheets":
+        try:
+            urls = getattr(settings, "sheet_urls", []) or []
+            labels = getattr(settings, "sheet_labels", []) or []
+        except Exception:
+            urls, labels = [], []
+
         return _json({
             "sheets": [
                 {"url": url, "label": label}
-                for url, label in zip(settings.sheet_urls, settings.sheet_labels)
+                for url, label in zip(urls, labels)
             ]
         })
 
