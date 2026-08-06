@@ -3,6 +3,22 @@ import os
 import json
 
 
+def _create_headers(extra_headers: dict | None = None):
+    """Pembantu untuk membina objek JS Headers yang sah dengan CORS lengkap."""
+    from js import Headers  # type: ignore[import]
+    
+    headers = Headers.new()
+    headers.set("access-control-allow-origin", "*")
+    headers.set("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS")
+    headers.set("access-control-allow-headers", "*")
+    
+    if extra_headers:
+        for k, v in extra_headers.items():
+            headers.set(k, str(v))
+            
+    return headers
+
+
 def _load_env(env) -> None:
     mapping = {
         "SHEET_URLS": lambda: env.SHEET_URLS,
@@ -35,19 +51,17 @@ def _clean_url(raw_url: str | None) -> str | None:
 
 
 def _json(data, status=200, cache_seconds=0):
-    from js import Response, Headers  # type: ignore[import]
+    from js import Response  # type: ignore[import]
     
-    headers_dict = {
+    extra = {
         "content-type": "application/json",
-        "access-control-allow-origin": "*",
     }
-    
     if cache_seconds > 0:
-        headers_dict["cache-control"] = f"public, max-age={cache_seconds}"
+        extra["cache-control"] = f"public, max-age={cache_seconds}"
     else:
-        headers_dict["cache-control"] = "no-store"
+        extra["cache-control"] = "no-store"
         
-    headers = Headers.new(headers_dict.items())
+    headers = _create_headers(extra)
     return Response.new(json.dumps(data), status=status, headers=headers)
 
 
@@ -149,7 +163,6 @@ async def _route(request, env):
             return _json({"error": f"No data for '{ticker}'"}, 404)
         ema_periods = [int(p) for p in ema_str.split(",") if p.strip().isdigit()] or [5, 10, 20, 50, 100, 200]
         
-        # Tambah cache selama 60 saat untuk tingkatkan kelajuan muatan carta
         return _json({
             "ticker": ticker,
             "ohlcv": bars,
@@ -160,15 +173,11 @@ async def _route(request, env):
 
 
 async def on_fetch(request, env):
-    from js import Response, Headers  # type: ignore[import]
-    cors_headers = Headers.new({
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET, OPTIONS",
-        "access-control-allow-headers": "*",
-    }.items())
+    from js import Response  # type: ignore[import]
 
+    # Kendali preflight request (OPTIONS)
     if str(request.method).upper() == "OPTIONS":
-        return Response.new("", status=204, headers=cors_headers)
+        return Response.new("", status=204, headers=_create_headers())
 
     try:
         _load_env(env)
@@ -178,5 +187,5 @@ async def on_fetch(request, env):
         return Response.new(
             json.dumps({"error": traceback.format_exc()}),
             status=500,
-            headers=cors_headers,
+            headers=_create_headers({"content-type": "application/json"}),
         )
