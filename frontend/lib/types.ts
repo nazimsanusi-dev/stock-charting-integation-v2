@@ -6,6 +6,7 @@ export interface SheetEntry {
 export interface Stock {
   name: string;
   ticker: string;
+  change: number | string;
 }
 
 export interface OHLCVBar {

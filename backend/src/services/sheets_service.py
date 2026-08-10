@@ -136,7 +136,7 @@ async def get_stock_list(spreadsheet_url: str, worksheet: str, sa) -> list[dict]
     headers = Headers.new({"Authorization": f"Bearer {token}"}.items())
 
     safe_worksheet = worksheet.replace("'", "''")
-    range_param = quote(f"'{safe_worksheet}'!A:B")
+    range_param = quote(f"'{safe_worksheet}'!A:E")
 
     resp = await fetch(
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_param}",
@@ -150,7 +150,11 @@ async def get_stock_list(spreadsheet_url: str, worksheet: str, sa) -> list[dict]
     rows = (await resp.json()).to_py().get("values", [])
 
     return [
-        {"name": str(r[0]).strip(), "ticker": str(r[1]).strip()}
+        {
+            "name": str(r[0]).strip(),
+            "ticker": str(r[1]).strip(),
+            "change": str(r[4]).strip() if len(r) > 4 and r[4] else "-",
+        }
         for r in rows[1:]
         if len(r) >= 2 and r[0] and r[1]
     ]

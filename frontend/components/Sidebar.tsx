@@ -74,6 +74,8 @@ export function Sidebar({ params, onChange }: Props) {
   useEffect(() => {
     if (!params.selectedSheet?.url || !params.worksheet) return;
 
+    // Clear stale stocks before fetching new sheet/worksheet data
+    setStocks([]);
     setLoadingStocks(true);
     setStocksError(null);
 
@@ -130,7 +132,9 @@ export function Sidebar({ params, onChange }: Props) {
         >
           ▶
         </button>
-        <span className="text-gray-300 dark:text-gray-600 text-xs rotate-90 mt-4 tracking-widest select-none">STOCKS</span>
+        <span className="text-gray-300 dark:text-gray-600 text-xs rotate-90 mt-4 tracking-widest select-none">
+          STOCKS
+        </span>
       </aside>
     );
   }
@@ -139,7 +143,9 @@ export function Sidebar({ params, onChange }: Props) {
     <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">📈 Stock Monitor</span>
+        <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">
+          📈 Stock Monitor
+        </span>
         <button
           onClick={() => setCollapsed(true)}
           className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 transition-colors text-xs"
@@ -160,7 +166,6 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
-      {/* Gantikan sheets.length > 0 dengan sheets.length > 1 kalau nak sorok bila ada 1 sheet, atau kekalkan kalau nak tayang jugak */}
       {sheets.length > 0 && (
         <div>
           <label className="label">Sheet</label>
@@ -170,12 +175,13 @@ export function Sidebar({ params, onChange }: Props) {
             onChange={(e) => {
               const newSheet = sheets.find((s) => s.url === e.target.value) ?? null;
               if (newSheet) {
+                setStocks([]); // Clear state immediately
                 onChange({
                   ...params,
                   selectedSheet: newSheet,
-                  worksheet: "",         // Reset worksheet
-                  allStocks: [],         // Reset stok lama
-                  selectedStocks: [],    // Reset pilihan stok
+                  worksheet: "",
+                  allStocks: [],
+                  selectedStocks: [],
                 });
               }
             }}
@@ -196,7 +202,15 @@ export function Sidebar({ params, onChange }: Props) {
           <select
             className="select"
             value={params.worksheet}
-            onChange={(e) => onChange({ ...params, worksheet: e.target.value, selectedStocks: [], allStocks: [] })}
+            onChange={(e) => {
+              setStocks([]); // Clear state immediately
+              onChange({
+                ...params,
+                worksheet: e.target.value,
+                selectedStocks: [],
+                allStocks: [],
+              });
+            }}
           >
             {worksheets.map((w) => (
               <option key={w} value={w}>
@@ -211,8 +225,12 @@ export function Sidebar({ params, onChange }: Props) {
       {params.selectedStocks[0] && (
         <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#26A69A]/10 border border-[#26A69A]/30">
           <span className="w-2 h-2 rounded-full bg-[#26A69A] shrink-0" />
-          <span className="text-xs font-medium text-[#1a7a72] truncate">{params.selectedStocks[0].name}</span>
-          <span className="ml-auto text-xs text-[#26A69A] shrink-0">{params.selectedStocks[0].ticker}</span>
+          <span className="text-xs font-medium text-[#1a7a72] truncate">
+            {params.selectedStocks[0].name}
+          </span>
+          <span className="ml-auto text-xs text-[#26A69A] shrink-0">
+            {params.selectedStocks[0].ticker}
+          </span>
         </div>
       )}
 
@@ -233,22 +251,46 @@ export function Sidebar({ params, onChange }: Props) {
             return (
               <label
                 key={s.ticker}
-                className={`flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded text-xs transition-colors ${
+                className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1 rounded text-xs transition-colors ${
                   selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                <input
-                  type="radio"
-                  name="stock-select"
-                  className="accent-[#26A69A] shrink-0"
-                  checked={selected}
-                  onChange={() => selectStock(s)}
-                  onClick={() => selected && selectStock(s)}
-                />
-                <span className={`truncate ${selected ? "text-[#1a7a72] font-medium" : "text-gray-700 dark:text-gray-300"}`}>
-                  {s.name}
-                </span>
-                <span className="ml-auto text-gray-400 dark:text-gray-500 shrink-0">{s.ticker}</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <input
+                    type="radio"
+                    name="stock-select"
+                    className="accent-[#26A69A] shrink-0"
+                    checked={selected}
+                    onChange={() => selectStock(s)}
+                    onClick={() => selected && selectStock(s)}
+                  />
+                  <span
+                    className={`truncate ${
+                      selected ? "text-[#1a7a72] font-semibold" : "text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    {s.name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
+                    {s.ticker}
+                  </span>
+                  {s.change !== undefined && s.change !== null && (
+                    <span
+                      className={`text-[11px] font-mono font-medium ${
+                        Number(s.change) > 0
+                          ? "text-emerald-500"
+                          : Number(s.change) < 0
+                          ? "text-red-500"
+                          : "text-gray-400 dark:text-gray-500"
+                      }`}
+                    >
+                      {Number(s.change) > 0 ? `+${s.change}%` : `${s.change}%`}
+                    </span>
+                  )}
+                </div>
               </label>
             );
           })}
@@ -317,7 +359,9 @@ export function Sidebar({ params, onChange }: Props) {
           {/* Combine Timeframe Toggle & Selectors */}
           <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Combine Timeframes</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                Combine Timeframes
+              </span>
               <input
                 type="checkbox"
                 className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
@@ -335,7 +379,9 @@ export function Sidebar({ params, onChange }: Props) {
             {params.isCombineTimeframe && (
               <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <div>
-                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">TF 1 (Left)</span>
+                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                    TF 1 (Left)
+                  </span>
                   <select
                     className="select text-xs mt-0.5 py-1 px-1.5"
                     value={params.timeframe}
@@ -349,7 +395,9 @@ export function Sidebar({ params, onChange }: Props) {
                   </select>
                 </div>
                 <div>
-                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">TF 2 (Right)</span>
+                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                    TF 2 (Right)
+                  </span>
                   <select
                     className="select text-xs mt-0.5 py-1 px-1.5"
                     value={params.secondaryTimeframe}
@@ -378,7 +426,7 @@ export function Sidebar({ params, onChange }: Props) {
                     className={`flex-1 py-1 text-xs rounded border transition-colors ${
                       params.timeframe === t.value
                         ? "bg-[#26A69A] text-white border-[#26A69A]"
-                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
                     }`}
                   >
                     {t.label.slice(0, 1)}
@@ -432,7 +480,10 @@ export function Sidebar({ params, onChange }: Props) {
                 ["showCmf", "CMF (20)"],
               ] as [keyof SidebarParams["chartConfig"], string][]
             ).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+              <label
+                key={key}
+                className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
+              >
                 <input
                   type="checkbox"
                   className="accent-[#26A69A]"
