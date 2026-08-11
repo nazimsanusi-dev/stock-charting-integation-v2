@@ -53,5 +53,22 @@ async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> 
             "close": round(float(c), 4),
             "volume": float(v or 0),
         })
-    return bars
 
+    # Fix incomplete current candle for 1wk / 1mo timeframe
+    if interval_p in ["1wk", "1mo"] and bars:
+        last_bar = bars[-1]
+        if last_bar["open"] == 0 or last_bar["high"] == 0 or last_bar["low"] == 0:
+            daily_bars = await fetch_ohlcv(ticker, period=period, interval="1d")
+            matching_daily = [d for d in daily_bars if d["time"] >= last_bar["time"]]
+
+            if matching_daily:
+                bars[-1] = {
+                    "time": last_bar["time"],
+                    "open": matching_daily[0]["open"],
+                    "high": round(max(d["high"] for d in matching_daily), 4),
+                    "low": round(min(d["low"] for d in matching_daily), 4),
+                    "close": matching_daily[-1]["close"],
+                    "volume": float(sum(d["volume"] for d in matching_daily)),
+                }
+
+    return bars
