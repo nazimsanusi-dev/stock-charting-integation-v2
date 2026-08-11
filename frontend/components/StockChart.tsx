@@ -278,10 +278,10 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-       // 9. Zoom lalai (Default zoom ke 4 bulan ~ 85 candle terakhir)
+       // 9. Zoom lalai (Default zoom ke 5 bulan ~ 105 candle terakhir)
         if (data.ohlcv.length > 0) {
           const totalBars = data.ohlcv.length;
-          const visibleBars = 85; // Anggaran 85 hari dagangan = 4 bulan
+          const visibleBars = 105; // Anggaran 105 hari dagangan = 5 bulan
 
           chart.timeScale().setVisibleLogicalRange({
             from: Math.max(0, totalBars - visibleBars),
