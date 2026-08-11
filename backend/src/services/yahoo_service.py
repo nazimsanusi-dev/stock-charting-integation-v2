@@ -55,41 +55,10 @@ async def fetch_ohlcv(ticker: str, period: str = "1y", interval: str = "1d") -> 
             "volume": float(v or 0),
         })
 
-    # Fix incomplete current candle for 1wk / 1mo timeframe
+    # Buang candle terakhir jika open/low bernilai 0 untuk 1wk / 1mo
     if interval_p in ["1wk", "1mo"] and bars:
         last_bar = bars[-1]
         if last_bar["open"] == 0 or last_bar["high"] == 0 or last_bar["low"] == 0:
-            daily_bars = await fetch_ohlcv(ticker, period=period, interval="1d")
-            last_dt = datetime.fromtimestamp(last_bar["time"], tz=timezone.utc)
-
-            matching_daily = []
-            for d in daily_bars:
-                d_dt = datetime.fromtimestamp(d["time"], tz=timezone.utc)
-                if interval_p == "1wk":
-                    # Padankan minggu & tahun ISO yang sama
-                    if d_dt.isocalendar()[:2] == last_dt.isocalendar()[:2]:
-                        matching_daily.append(d)
-                elif interval_p == "1mo":
-                    # Padankan bulan & tahun yang sama
-                    if d_dt.year == last_dt.year and d_dt.month == last_dt.month:
-                        matching_daily.append(d)
-
-            if matching_daily:
-                bars[-1] = {
-                    "time": last_bar["time"],
-                    "open": matching_daily[0]["open"],
-                    "high": round(max(d["high"] for d in matching_daily), 4),
-                    "low": round(min(d["low"] for d in matching_daily), 4),
-                    "close": matching_daily[-1]["close"],
-                    "volume": float(sum(d["volume"] for d in matching_daily)),
-                }
-            else:
-                # Fallback: jika tiada data harian sepadan, samakan dengan harga close (elak nilai 0.0)
-                c = last_bar["close"]
-                bars[-1] = {
-                    "time": last_bar["time"],
-                    "open": c, "high": c, "low": c, "close": c,
-                    "volume": last_bar["volume"]
-                }
+            bars.pop()  # Buang bar terakhir dari list
 
     return bars
