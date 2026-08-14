@@ -63,7 +63,7 @@ function calculateMACD(data: { time: string; value: number }[]) {
 
 function SubsectorCard({
   rank,
-  ohlcList,
+  ohlcList = [],
   theme = "dark",
 }: {
   rank: SubsectorRank;
@@ -137,7 +137,7 @@ function SubsectorCard({
         wickUpColor: "#10b981",
         wickDownColor: "#f43f5e",
       },
-      0 // Pane 0 (Top Row)
+      0
     );
     mainSeries.setData(candleData);
 
@@ -165,33 +165,33 @@ function SubsectorCard({
         priceLineVisible: false,
         lastValueVisible: true,
       },
-      1 // Pane 1 (Middle Row)
+      1
     );
     macdHistSeries.setData(histogram);
 
     const macdLineSeries = chart.addSeries(
       LineSeries,
       {
-        color: "#38bdf8", // Sky Blue
+        color: "#38bdf8",
         lineWidth: 1,
         priceFormat: { type: "price", precision: 2, minMove: 0.01 },
         priceLineVisible: false,
         lastValueVisible: false,
       },
-      1 // Pane 1
+      1
     );
     macdLineSeries.setData(macdLine);
 
     const signalLineSeries = chart.addSeries(
       LineSeries,
       {
-        color: "#fbbf24", // Amber
+        color: "#fbbf24",
         lineWidth: 1,
         priceFormat: { type: "price", precision: 2, minMove: 0.01 },
         priceLineVisible: false,
         lastValueVisible: false,
       },
-      1 // Pane 1
+      1
     );
     signalLineSeries.setData(signalLine);
 
@@ -204,11 +204,10 @@ function SubsectorCard({
         priceLineVisible: false,
         lastValueVisible: false,
       },
-      1 // Pane 1
+      1
     );
     zeroLineSeries.setData(closePoints.map((p) => ({ time: p.time, value: 0 })));
 
-    // Laraskan saiz ketinggian TR 1 (Price) dan TR 2 (MACD)
     try {
       const panes = chart.panes();
       if (panes && panes.length >= 2) {
@@ -216,11 +215,11 @@ function SubsectorCard({
         panes[1].setHeight(85);
       }
     } catch {
-      // Fallback jika versi lwc menggunakan stretch factor
+      // Fallback untuk versi tanpa setHeight
     }
 
     // =========================================================================
-    // 3. TR 3: DATE TIMESCALE (Terpaut terus ke data terkini)
+    // 3. TR 3: DATE TIMESCALE
     // =========================================================================
     const totalBars = candleData.length;
     if (totalBars > 0) {
@@ -308,26 +307,42 @@ function SubsectorCard({
 }
 
 interface SubsectorChartGridProps {
-  ranks: SubsectorRank[];
-  ohlcData: SubsectorBulkOHLC;
+  ranks?: SubsectorRank[];
+  ohlcData?: SubsectorBulkOHLC | null;
   theme?: string;
 }
 
-export function SubsectorChartGrid({ ranks = [], ohlcData = {}, theme = "dark" }: SubsectorChartGridProps) {
+export function SubsectorChartGrid({
+  ranks = [],
+  ohlcData = {},
+  theme = "dark",
+}: SubsectorChartGridProps) {
   if (!ranks || ranks.length === 0) {
-    return <div className="text-center py-8 text-gray-400 text-sm">Tiada carta subsektor untuk dipaparkan.</div>;
+    return (
+      <div className="text-center py-8 text-gray-400 text-sm">
+        Tiada carta subsektor untuk dipaparkan.
+      </div>
+    );
   }
+
+  // Lindungi jika ohlcData adalah null / undefined
+  const safeData = ohlcData || {};
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
-      {ranks.map((rank) => (
-        <SubsectorCard
-          key={rank.subsector_id}
-          rank={rank}
-          ohlcList={ohlcData[rank.subsector_id] || []}
-          theme={theme}
-        />
-      ))}
+      {ranks.map((rank) => {
+        const subId = rank.subsector_id;
+        const ohlcList = safeData[subId] || safeData[String(subId)] || [];
+
+        return (
+          <SubsectorCard
+            key={subId}
+            rank={rank}
+            ohlcList={ohlcList}
+            theme={theme}
+          />
+        );
+      })}
     </div>
   );
 }

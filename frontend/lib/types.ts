@@ -89,9 +89,7 @@ export interface SubsectorOHLC {
   close: number;
 }
 
-export interface SubsectorBulkOHLC {
-  [subsector_id: number]: SubsectorOHLC[];
-}
+export type SubsectorBulkOHLC = Record<string | number, SubsectorOHLC[]>;
 
 export interface SubsectorHeatmapItem {
   subsector_id: number;

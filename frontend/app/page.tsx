@@ -184,9 +184,11 @@ export default function Home() {
         api.subsectorHeatmap(),
         api.subsectorBulkOHLC(),
       ]);
-      setRanksData(ranks);
-      setHeatmapData(heatmap);
-      setOhlcBulkData(ohlcBulk);
+
+      // Fallback selamat bagi mengelakkan error null
+      setRanksData(Array.isArray(ranks) ? ranks : []);
+      setHeatmapData(Array.isArray(heatmap) ? heatmap : []);
+      setOhlcBulkData(ohlcBulk && typeof ohlcBulk === "object" ? ohlcBulk : {});
     } catch (err: any) {
       console.error("Failed to fetch subsector data:", err);
       setSubsectorError(
