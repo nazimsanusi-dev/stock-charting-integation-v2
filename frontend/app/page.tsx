@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
@@ -171,28 +171,35 @@ export default function Home() {
 
   const activeTab = params.activeTab ?? "subsector";
 
-  useEffect(() => {
-    if (activeTab !== "subsector") return;
-
+  // Fungsi Panggilan API yang boleh dipanggil semula (Retry / Refresh)
+  const fetchSubsectorData = useCallback(async () => {
     setLoadingSubsector(true);
     setSubsectorError(null);
 
-    Promise.all([
-      api.subsectorRanks(),
-      api.subsectorHeatmap(),
-      api.subsectorBulkOHLC(),
-    ])
-      .then(([ranks, heatmap, ohlcBulk]) => {
-        setRanksData(ranks);
-        setHeatmapData(heatmap);
-        setOhlcBulkData(ohlcBulk);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch subsector data:", err);
-        setSubsectorError("Gagal mengambil data subsektor dari server.");
-      })
-      .finally(() => setLoadingSubsector(false));
-  }, [activeTab]);
+    try {
+      const [ranks, heatmap, ohlcBulk] = await Promise.all([
+        api.subsectorRanks(),
+        api.subsectorHeatmap(),
+        api.subsectorBulkOHLC(),
+      ]);
+      setRanksData(ranks);
+      setHeatmapData(heatmap);
+      setOhlcBulkData(ohlcBulk);
+    } catch (err: any) {
+      console.error("Failed to fetch subsector data:", err);
+      setSubsectorError(
+        err?.message || "Gagal mengambil data subsektor dari server. Sila semak sambungan API."
+      );
+    } finally {
+      setLoadingSubsector(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "subsector") {
+      fetchSubsectorData();
+    }
+  }, [activeTab, fetchSubsectorData]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
@@ -204,23 +211,76 @@ export default function Home() {
              MAIN PAGE: SUBSECTOR ANALYSIS (END-TO-END FULL WIDTH)
              ================================================================ */
           <div className="space-y-6 w-full">
-            <header className="border-b border-gray-200 dark:border-gray-800 pb-4">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Analisis & Ranking Subsektor Pasaran
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Data dikemas kini secara automatik dari BigQuery
-              </p>
+            <header className="border-b border-gray-200 dark:border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  Analisis & Ranking Subsektor Pasaran
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Data dikemas kini secara automatik dari BigQuery
+                </p>
+              </div>
+
+              {/* Butang Refresh Top Header */}
+              <button
+                onClick={fetchSubsectorData}
+                disabled={loadingSubsector}
+                title="Segarkan data terkini"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-700 transition disabled:opacity-50 w-fit"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`h-4 w-4 ${loadingSubsector ? "animate-spin text-blue-500" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                <span>{loadingSubsector ? "Memuatkan..." : "Refresh Data"}</span>
+              </button>
             </header>
 
             {loadingSubsector ? (
-              <div className="flex flex-col items-center justify-center p-12 text-gray-400 gap-2">
-                <span className="animate-spin text-2xl">⏳</span>
-                <p className="text-sm">Memuatkan data subsektor...</p>
+              <div className="flex flex-col items-center justify-center p-16 text-gray-400 gap-3">
+                <span className="animate-spin text-3xl">⏳</span>
+                <p className="text-sm font-medium">Memuatkan data subsektor...</p>
               </div>
             ) : subsectorError ? (
-              <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-500 text-sm text-center">
-                ⚠ {subsectorError}
+              /* Inline Error Card dengan Butang Retry */
+              <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
+                <div className="text-3xl">⚠️</div>
+                <div className="text-rose-600 dark:text-rose-400 font-semibold text-base">
+                  Ralat Memuatkan Data Subsektor
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-md">
+                  {subsectorError}
+                </p>
+                <button
+                  onClick={fetchSubsectorData}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium rounded-lg shadow-sm transition"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span>Cuba Semula (Retry)</span>
+                </button>
               </div>
             ) : (
               <>

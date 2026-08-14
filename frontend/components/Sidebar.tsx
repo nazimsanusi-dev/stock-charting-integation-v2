@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { SheetEntry, Stock, SidebarParams } from "@/lib/types";
 
@@ -35,68 +35,100 @@ export function Sidebar({ params, onChange }: Props) {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [search, setSearch] = useState("");
   const [emaInput, setEmaInput] = useState(params.chartConfig.emaPeriods.join(", "));
-  const [loadingStocks, setLoadingStocks] = useState(false);
+
+  // Loading & Error States
+  const [loadingSheets, setLoadingSheets] = useState(false);
   const [sheetsError, setSheetsError] = useState<string | null>(null);
+
+  const [loadingWorksheets, setLoadingWorksheets] = useState(false);
+  const [worksheetsError, setWorksheetsError] = useState<string | null>(null);
+
+  const [loadingStocks, setLoadingStocks] = useState(false);
   const [stocksError, setStocksError] = useState<string | null>(null);
 
   const activeTab = params.activeTab ?? "subsector";
 
-  // 1. Fetch senarai Sheets bila component mount
-  useEffect(() => {
-    api
-      .sheets()
-      .then((r) => {
-        setSheets(r.sheets);
-        setSheetsError(null);
-        if (r.sheets.length > 0 && !params.selectedSheet) {
-          onChange({ ...params, selectedSheet: r.sheets[0] });
-        }
-      })
-      .catch((err) => setSheetsError(String(err)));
-  }, []); // eslint-disable-line
+  // 1. Fetch Senarai Sheets (Boleh dipanggil semula)
+  const fetchSheets = useCallback(async () => {
+    setLoadingSheets(true);
+    setSheetsError(null);
+    try {
+      const r = await api.sheets();
+      setSheets(r.sheets);
+      if (r.sheets.length > 0 && !params.selectedSheet) {
+        onChange({ ...params, selectedSheet: r.sheets[0] });
+      }
+    } catch (err: any) {
+      setSheetsError(err?.message || "Gagal memuatkan senarai sheet.");
+    } finally {
+      setLoadingSheets(false);
+    }
+  }, [params, onChange]);
 
-  // 2. Fetch Worksheets bila selectedSheet.url bertukar
-  useEffect(() => {
-    if (!params.selectedSheet?.url) return;
+  // 2. Fetch Worksheets (Boleh dipanggil semula)
+  const fetchWorksheets = useCallback(async (targetUrl?: string) => {
+    const url = targetUrl || params.selectedSheet?.url;
+    if (!url) return;
 
-    api
-      .worksheets(params.selectedSheet.url)
-      .then((r) => {
-        setWorksheets(r.worksheets);
-        if (r.worksheets.length > 0) {
-          // Auto select tab pertama & reset stok
-          onChange({
-            ...params,
-            worksheet: r.worksheets[0],
-            selectedStocks: [],
-            allStocks: [],
-          });
-        }
-      })
-      .catch(() => setWorksheets([]));
-  }, [params.selectedSheet?.url]); // eslint-disable-line
+    setLoadingWorksheets(true);
+    setWorksheetsError(null);
+    try {
+      const r = await api.worksheets(url);
+      setWorksheets(r.worksheets);
+      if (r.worksheets.length > 0) {
+        onChange({
+          ...params,
+          worksheet: r.worksheets[0],
+          selectedStocks: [],
+          allStocks: [],
+        });
+      }
+    } catch (err: any) {
+      setWorksheetsError(err?.message || "Gagal memuatkan worksheet.");
+      setWorksheets([]);
+    } finally {
+      setLoadingWorksheets(false);
+    }
+  }, [params, onChange]);
 
-  // 3. Fetch Stocks bila url ATAU worksheet bertukar
-  useEffect(() => {
-    if (!params.selectedSheet?.url || !params.worksheet) return;
+  // 3. Fetch Stocks (Boleh dipanggil semula)
+  const fetchStocks = useCallback(async (targetUrl?: string, targetWs?: string) => {
+    const url = targetUrl || params.selectedSheet?.url;
+    const ws = targetWs || params.worksheet;
+    if (!url || !ws) return;
 
-    // Clear stale stocks before fetching new sheet/worksheet data
     setStocks([]);
     setLoadingStocks(true);
     setStocksError(null);
 
-    api
-      .stocks(params.selectedSheet.url, params.worksheet)
-      .then((r) => {
-        setStocks(r.stocks);
-        onChange({ ...params, allStocks: r.stocks });
-      })
-      .catch((err) => {
-        setStocksError(String(err));
-        setStocks([]);
-        onChange({ ...params, allStocks: [] });
-      })
-      .finally(() => setLoadingStocks(false));
+    try {
+      const r = await api.stocks(url, ws);
+      setStocks(r.stocks);
+      onChange({ ...params, allStocks: r.stocks });
+    } catch (err: any) {
+      setStocksError(err?.message || "Gagal memuatkan senarai stok.");
+      setStocks([]);
+      onChange({ ...params, allStocks: [] });
+    } finally {
+      setLoadingStocks(false);
+    }
+  }, [params, onChange]);
+
+  // Effects permulaan
+  useEffect(() => {
+    fetchSheets();
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    if (params.selectedSheet?.url) {
+      fetchWorksheets(params.selectedSheet.url);
+    }
+  }, [params.selectedSheet?.url]); // eslint-disable-line
+
+  useEffect(() => {
+    if (params.selectedSheet?.url && params.worksheet) {
+      fetchStocks(params.selectedSheet.url, params.worksheet);
+    }
   }, [params.selectedSheet?.url, params.worksheet]); // eslint-disable-line
 
   const filteredStocks = stocks.filter(
@@ -107,7 +139,6 @@ export function Sidebar({ params, onChange }: Props) {
 
   const selectedTicker = params.selectedStocks[0]?.ticker ?? null;
 
-  // Radio: only 1 stock at a time
   const selectStock = (s: Stock) => {
     const isAlreadySelected = selectedTicker === s.ticker;
     onChange({
@@ -196,14 +227,38 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
-      {/* KAWALAN GOOGLE SHEETS TRACKER (HANYA APABILA TAB SHEETS DIPILIH) */}
+      {/* KAWALAN GOOGLE SHEETS TRACKER */}
       {activeTab === "sheets" && (
         <>
-          {sheets.length > 0 && (
-            <div>
-              <label className="label">Sheet</label>
+          {/* 1. Sheet Selector */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Sheet</label>
+              <button
+                type="button"
+                onClick={fetchSheets}
+                disabled={loadingSheets}
+                title="Muat semula senarai Sheet"
+                className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
+              >
+                <span className={loadingSheets ? "animate-spin inline-block" : ""}>🔄</span>
+              </button>
+            </div>
+
+            {sheetsError ? (
+              <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1">
+                <span>{sheetsError}</span>
+                <button
+                  onClick={fetchSheets}
+                  className="text-left underline font-medium hover:text-rose-600"
+                >
+                  Cuba lagi
+                </button>
+              </div>
+            ) : (
               <select
                 className="select"
+                disabled={loadingSheets || sheets.length === 0}
                 value={params.selectedSheet?.url ?? ""}
                 onChange={(e) => {
                   const newSheet = sheets.find((s) => s.url === e.target.value) ?? null;
@@ -225,15 +280,40 @@ export function Sidebar({ params, onChange }: Props) {
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Worksheet selector */}
-          {worksheets.length > 1 && (
-            <div>
-              <label className="label">Worksheet</label>
+          {/* 2. Worksheet Selector */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Worksheet</label>
+              {params.selectedSheet?.url && (
+                <button
+                  type="button"
+                  onClick={() => fetchWorksheets()}
+                  disabled={loadingWorksheets}
+                  title="Muat semula Worksheet"
+                  className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
+                >
+                  <span className={loadingWorksheets ? "animate-spin inline-block" : ""}>🔄</span>
+                </button>
+              )}
+            </div>
+
+            {worksheetsError ? (
+              <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1">
+                <span>{worksheetsError}</span>
+                <button
+                  onClick={() => fetchWorksheets()}
+                  className="text-left underline font-medium hover:text-rose-600"
+                >
+                  Cuba lagi
+                </button>
+              </div>
+            ) : (
               <select
                 className="select"
+                disabled={loadingWorksheets || worksheets.length === 0}
                 value={params.worksheet}
                 onChange={(e) => {
                   setStocks([]);
@@ -251,10 +331,10 @@ export function Sidebar({ params, onChange }: Props) {
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Selected stock badge */}
+          {/* Selected Stock Badge */}
           {params.selectedStocks[0] && (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#26A69A]/10 border border-[#26A69A]/30">
               <span className="w-2 h-2 rounded-full bg-[#26A69A] shrink-0" />
@@ -267,9 +347,23 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           )}
 
-          {/* Stock list */}
+          {/* 3. Stock List */}
           <div className="flex flex-col gap-1">
-            <label className="label">Stocks</label>
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Stocks</label>
+              {params.worksheet && (
+                <button
+                  type="button"
+                  onClick={() => fetchStocks()}
+                  disabled={loadingStocks}
+                  title="Muat semula senarai Stocks"
+                  className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
+                >
+                  <span className={loadingStocks ? "animate-spin inline-block" : ""}>🔄</span>
+                </button>
+              )}
+            </div>
+
             <input
               className="input"
               placeholder="Search…"
@@ -278,7 +372,17 @@ export function Sidebar({ params, onChange }: Props) {
             />
             <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
               {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
-              {stocksError && <p className="text-xs text-red-400 break-all py-1">⚠ {stocksError}</p>}
+              {stocksError && (
+                <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1 my-1">
+                  <span>⚠ {stocksError}</span>
+                  <button
+                    onClick={() => fetchStocks()}
+                    className="text-left underline font-medium hover:text-rose-600"
+                  >
+                    Cuba lagi
+                  </button>
+                </div>
+              )}
               {filteredStocks.map((s) => {
                 const selected = selectedTicker === s.ticker;
                 return (
@@ -327,7 +431,7 @@ export function Sidebar({ params, onChange }: Props) {
                   </label>
                 );
               })}
-              {!loadingStocks && filteredStocks.length === 0 && (
+              {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
                 <p className="text-xs text-gray-400 py-1">
                   {stocks.length ? "No matches" : "No stocks loaded"}
                 </p>
@@ -337,7 +441,7 @@ export function Sidebar({ params, onChange }: Props) {
 
           <hr className="border-gray-100 dark:border-gray-800" />
 
-          {/* View mode */}
+          {/* View Mode */}
           <div>
             <label className="label">View</label>
             <div className="flex gap-1">
@@ -357,7 +461,7 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           </div>
 
-          {/* Grid columns selector */}
+          {/* Grid Columns */}
           {params.viewMode === "grid" && (
             <div>
               <label className="label">Columns</label>
@@ -386,10 +490,9 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           )}
 
-          {/* Timeframe & Combine Timeframe — hidden in table mode */}
+          {/* Timeframe & Combine Timeframe */}
           {params.viewMode !== "table" && (
             <>
-              {/* Combine Timeframe Toggle & Selectors */}
               <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -447,7 +550,6 @@ export function Sidebar({ params, onChange }: Props) {
                 )}
               </div>
 
-              {/* Single Timeframe Selector (hanya bila Combine OFF) */}
               {!params.isCombineTimeframe && (
                 <div>
                   <label className="label">Timeframe</label>
@@ -489,7 +591,6 @@ export function Sidebar({ params, onChange }: Props) {
               {/* Indicators */}
               <div className="flex flex-col gap-2">
                 <label className="label">Indicators</label>
-
                 <div>
                   <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
                   <div className="flex gap-1 mt-0.5">
@@ -534,7 +635,7 @@ export function Sidebar({ params, onChange }: Props) {
 
       <div className="mt-auto text-xs text-gray-400 dark:text-gray-600 space-y-0.5">
         <p>Data: Yahoo Finance</p>
-        <p>List:BigQuery & Google Sheets</p>
+        <p>List: BigQuery & Google Sheets</p>
       </div>
     </aside>
   );
