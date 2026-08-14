@@ -397,7 +397,7 @@ export default function Home() {
 
                   {showStocksTable && (
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                      <SubsectorStocksTable subsectors={ranksData} />
+                      <SubsectorStocksTable subsectors={ranksData} theme={params.theme} />
                     </div>
                   )}
                 </section>

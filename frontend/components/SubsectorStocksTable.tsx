@@ -2,26 +2,43 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { StockChart } from "@/components/StockChart";
+import { useChartData } from "@/hooks/useChartData";
 import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
 
 interface Props {
   subsectors: SubsectorRank[];
+  theme?: string;
 }
 
-export function SubsectorStocksTable({ subsectors }: Props) {
+const DEFAULT_CHART_CONFIG = {
+  emaPeriods: [5, 10, 20, 50, 100, 200],
+  showVolume: true,
+  showRsi: false,
+  showMacd: true,
+  showCvd: false,
+  showCmf: true,
+};
+
+export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
+  const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Set default ke subsektor ranking #1 bila data subsectors sampai
+  // Pagination states (10 baris setiap page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  // Set default ke subsektor ranking #1
   useEffect(() => {
     if (subsectors.length > 0 && !selectedSubsector) {
       setSelectedSubsector(subsectors[0].subsector_name);
     }
   }, [subsectors, selectedSubsector]);
 
-  // Load senarai saham bila subsektor dipilih
+  // Load senarai saham dari API
   const loadStocks = async (subName: string) => {
     if (!subName) return;
     setLoading(true);
@@ -29,8 +46,16 @@ export function SubsectorStocksTable({ subsectors }: Props) {
     try {
       const data = await api.subsectorStocks(subName);
       setStocks(data);
+      setCurrentPage(1);
+      // Auto-select saham pertama bila data dimuatkan
+      if (data && data.length > 0) {
+        setSelectedStock(data[0]);
+      } else {
+        setSelectedStock(null);
+      }
     } catch (err: any) {
       setError("Gagal memuatkan senarai saham.");
+      setSelectedStock(null);
     } finally {
       setLoading(false);
     }
@@ -42,23 +67,43 @@ export function SubsectorStocksTable({ subsectors }: Props) {
     }
   }, [selectedSubsector]);
 
+  // Format ticker Yahoo Finance (cth: "5225.KL")
+  const activeTicker = selectedStock?.Code
+    ? selectedStock.Code.includes(".KL")
+      ? selectedStock.Code
+      : `${selectedStock.Code}.KL`
+    : null;
+
+  // Hook carta saham untuk bahagian kanan
+  const chart = useChartData(
+    activeTicker,
+    "1y",
+    "1d",
+    DEFAULT_CHART_CONFIG.emaPeriods
+  );
+
+  // Pengiraan Paging
+  const totalPages = Math.ceil(stocks.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
+
   return (
-    <div className="space-y-3">
-      {/* Dropdown Pemilihan Subsektor */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <div className="space-y-4">
+      {/* Header Bar: Dropdown Pemilihan Subsektor */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-            Pilih Subsektor:
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Subsektor:
           </label>
           <select
             value={selectedSubsector}
             onChange={(e) => setSelectedSubsector(e.target.value)}
             disabled={loading}
-            className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-medium"
+            className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
           >
             {subsectors.map((s) => (
               <option key={s.subsector_id} value={s.subsector_name}>
-                #{s.rank} {s.subsector_name} ({s.num_stocks} stocks)
+                #{s.rank} {s.subsector_name} ({s.num_stocks} saham)
               </option>
             ))}
           </select>
@@ -67,104 +112,224 @@ export function SubsectorStocksTable({ subsectors }: Props) {
         <button
           onClick={() => loadStocks(selectedSubsector)}
           disabled={loading || !selectedSubsector}
-          className="text-xs text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-200/50 dark:bg-gray-800"
+          className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition"
         >
-          <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh Saham
+          <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh Senarai
         </button>
       </div>
 
-      {/* Jadual Senarai Saham */}
-      {loading ? (
-        <div className="py-12 text-center text-xs text-gray-400">
-          <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan senarai saham...
-        </div>
-      ) : error ? (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-lg text-center">
-          {error} -{" "}
-          <button onClick={() => loadStocks(selectedSubsector)} className="underline font-bold">
-            Cuba Lagi
-          </button>
-        </div>
-      ) : stocks.length === 0 ? (
-        <div className="py-8 text-center text-xs text-gray-400">
-          Tiada saham dijumpai untuk subsektor ini.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold">
-              <tr>
-                <th className="py-2.5 px-3">Kod</th>
-                <th className="py-2.5 px-3">Nama Saham</th>
-                <th className="py-2.5 px-3 text-center">Shariah</th>
-                <th className="py-2.5 px-3 text-right">Harga (RM)</th>
-                <th className="py-2.5 px-3 text-right">Perubahan</th>
-                <th className="py-2.5 px-3 text-right">Change %</th>
-                <th className="py-2.5 px-3 text-right">Volume</th>
-                <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                <th className="py-2.5 px-3 text-right">P/E</th>
-                <th className="py-2.5 px-3 text-right">ROE %</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900/40">
-              {stocks.map((item, idx) => {
-                const changeVal = parseFloat(item.Change_Percent.replace("%", "").replace("+", ""));
-                const isPos = changeVal > 0;
-                const isNeg = changeVal < 0;
+      {/* 2-Column Split View: Kiri (Table) & Kanan (Chart) */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        {/* ===================================================================
+            BAHAGIAN KIRI: JADUAL SAHAM DENGAN SCROLL & PAGING
+           =================================================================== */}
+        <div className="xl:col-span-7 flex flex-col space-y-2">
+          {loading ? (
+            <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
+              <span className="animate-spin inline-block mr-2 text-base">⏳</span>
+              Memuatkan senarai saham...
+            </div>
+          ) : error ? (
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
+              {error} -{" "}
+              <button onClick={() => loadStocks(selectedSubsector)} className="underline font-bold">
+                Cuba Lagi
+              </button>
+            </div>
+          ) : stocks.length === 0 ? (
+            <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
+              Tiada data saham untuk subsektor ini.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
+                    <tr>
+                      <th className="py-2.5 px-3">Kod</th>
+                      <th className="py-2.5 px-3">Nama</th>
+                      <th className="py-2.5 px-2 text-center">Syariah</th>
+                      <th className="py-2.5 px-3 text-right">Harga</th>
+                      <th className="py-2.5 px-3 text-right">Perubahan</th>
+                      <th className="py-2.5 px-3 text-right">Change %</th>
+                      <th className="py-2.5 px-3 text-right">Volume</th>
+                      <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60 font-sans">
+                    {paginatedStocks.map((item, idx) => {
+                      const changeVal = parseFloat(
+                        item.Change_Percent.replace("%", "").replace("+", "")
+                      );
+                      const isPos = changeVal > 0;
+                      const isNeg = changeVal < 0;
+                      const isSelected = selectedStock?.Code === item.Code;
 
-                return (
-                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                    <td className="py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100">
-                      {item.Code}
-                    </td>
-                    <td className="py-2 px-3 font-medium text-gray-800 dark:text-gray-200">
-                      {item.Name}
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      {item.Shariah === "Yes" ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
-                          [S]
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-gray-700 dark:text-gray-300">
-                      {item.Price}
-                    </td>
-                    <td
-                      className={`py-2 px-3 text-right font-mono font-medium ${
-                        isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                      }`}
+                      return (
+                        <tr
+                          key={idx}
+                          onClick={() => setSelectedStock(item)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-amber-500/15 dark:bg-amber-500/20 font-semibold"
+                              : "hover:bg-gray-100/70 dark:hover:bg-gray-800/50"
+                          }`}
+                        >
+                          <td className="py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100">
+                            {isSelected && <span className="text-amber-500 mr-1">▶</span>}
+                            {item.Code}
+                          </td>
+                          <td className="py-2 px-3 text-gray-800 dark:text-gray-200 truncate max-w-[130px]">
+                            {item.Name}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            {item.Shariah === "Yes" ? (
+                              <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+                                [S]
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-gray-700 dark:text-gray-300">
+                            {item.Price}
+                          </td>
+                          <td
+                            className={`py-2 px-3 text-right font-mono font-medium ${
+                              isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                            }`}
+                          >
+                            {item.Change}
+                          </td>
+                          <td
+                            className={`py-2 px-3 text-right font-mono font-bold ${
+                              isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                            }`}
+                          >
+                            {item.Change_Percent}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
+                            {item.Volume}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                            {item.MCap_M}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bar Paging */}
+              {stocks.length > pageSize && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
+                  <div>
+                    {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {item.Change}
-                    </td>
-                    <td
-                      className={`py-2 px-3 text-right font-mono font-bold ${
-                        isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                      }`}
+                      ◀ Prev
+                    </button>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                      {currentPage}/{totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {item.Change_Percent}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                      {item.Volume}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                      {item.MCap_M}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                      {item.PE || "-"}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                      {item.ROE || "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      Next ▶
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ===================================================================
+            BAHAGIAN KANAN: CARTA SAHAM YANG DIPILIH
+           =================================================================== */}
+        <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[450px]">
+          {selectedStock ? (
+            <>
+              {/* Header Info Saham Terpilih */}
+              <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      {selectedStock.Name}
+                    </h3>
+                    <span className="text-xs font-mono font-bold text-amber-500 dark:text-amber-400">
+                      {selectedStock.Code}.KL
+                    </span>
+                    {selectedStock.Shariah === "Yes" && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/30">
+                        [S]
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    <span>Harga: <strong className="text-gray-800 dark:text-gray-200">RM{selectedStock.Price}</strong></span>
+                    <span>•</span>
+                    <span
+                      className={`font-semibold ${
+                        parseFloat(selectedStock.Change_Percent) >= 0 ? "text-emerald-500" : "text-rose-500"
+                      }`}
+                    >
+                      {selectedStock.Change_Percent} ({selectedStock.Change})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
+                  <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume}</span></div>
+                  <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">RM{selectedStock.MCap_M}M</span></div>
+                </div>
+              </div>
+
+              {/* Render StockChart */}
+              <div className="flex-1 p-2 min-h-[380px]">
+                {chart.loading ? (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                    <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
+                  </div>
+                ) : chart.error ? (
+                  <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-2">
+                    <p className="text-xs text-rose-500">{chart.error}</p>
+                    <button
+                      onClick={chart.refetch}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs"
+                    >
+                      🔄 Cuba Semula
+                    </button>
+                  </div>
+                ) : chart.data ? (
+                  <StockChart
+                    data={chart.data}
+                    config={DEFAULT_CHART_CONFIG}
+                    ticker={`${selectedStock.Code}.KL`}
+                    theme={theme === "light" ? "light" : "dark"}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                    Tiada data carta didapati.
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="h-full min-h-[400px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
+              Pilih mana-mana baris saham di sebelah kiri untuk melihat carta.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
