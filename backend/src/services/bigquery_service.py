@@ -1,7 +1,7 @@
 import json
 import time
 import base64
-from js import fetch, crypto, Uint8Array
+from js import fetch, Object, Headers
 from pyodide.ffi import to_js
 
 
@@ -87,46 +87,41 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
 
 class BigQueryService:
     def __init__(self, project_id: str, access_token: str):
-        # Clean sebarang spaces, quotes, newlines atau carriage returns
         raw_id = str(project_id or "etl-stock-screener-bursa")
         self.project_id = raw_id.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
         
         raw_token = str(access_token or "")
         self.access_token = raw_token.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
         
-        self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries" #
+        self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
 
     async def _execute_query(self, sql: str):
         payload = json.dumps({"query": sql, "useLegacySql": False})
 
-        init_opts = {
-            "method": "POST",
-            "headers": {
-                "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json",
-            },
-            "body": payload,
-        }
+        # Pembinaan JS Headers & Object yang sah untuk js.fetch
+        headers = Headers.new()
+        headers.set("Authorization", f"Bearer {self.access_token}")
+        headers.set("Content-Type", "application/json")
+
+        fetch_opts = Object.new()
+        fetch_opts.method = "POST"
+        fetch_opts.headers = headers
+        fetch_opts.body = payload
 
         try:
-            response = await fetch(self.endpoint, to_js(init_opts))
+            response = await fetch(self.endpoint, fetch_opts)
             text_data = await response.text()
         except Exception as e:
-            raise Exception(f"Ralat sambungan ke {self.endpoint}: {str(e)}")
+            raise Exception(f"Ralat sambungan: {str(e)}")
 
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
-            # Memaparkan URL endpoint untuk memudahkan pengesahan jika timbul 404
-            raise Exception(
-                f"URL: [{self.endpoint}] | Status: HTTP {response.status} | Output: {text_data[:200]}"
-            )
+            raise Exception(f"Status: HTTP {response.status} | Output: {text_data[:200]}")
 
         if response.status != 200:
             error_msg = data.get("error", {}).get("message", text_data)
-            raise Exception(
-                f"BigQuery API Error (HTTP {response.status}): {error_msg}"
-            )
+            raise Exception(f"BigQuery Error (HTTP {response.status}): {error_msg}")
 
         if "rows" not in data or "schema" not in data:
             return []
