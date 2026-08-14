@@ -1,6 +1,7 @@
 """Cloudflare Workers Python entry point — pure Python routing with BigQuery support."""
 import os
 import json
+import js
 from src.services.bigquery_service import BigQueryService, get_gcp_access_token
 
 
