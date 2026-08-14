@@ -147,7 +147,7 @@ function SubsectorCard({
     const ema10 = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false });
     const ema20 = chart.addSeries(LineSeries, { color: "#06b6d4", lineWidth: 1, priceLineVisible: false });
     const ema50 = chart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 1, priceLineVisible: false });
-    const ema100 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1.5, priceLineVisible: false });
+    const ema100 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false });
 
     ema10.setData(ema10Data);
     ema20.setData(ema20Data);
