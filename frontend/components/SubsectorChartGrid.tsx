@@ -70,119 +70,35 @@ function SubsectorCard({
   ohlcList: SubsectorOHLC[];
   theme?: string;
 }) {
-  const priceContainerRef = useRef<HTMLDivElement>(null);
-  const macdContainerRef = useRef<HTMLDivElement>(null);
-
-  const priceChartInstance = useRef<IChartApi | null>(null);
-  const macdChartInstance = useRef<IChartApi | null>(null);
-
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<IChartApi | null>(null);
   const isDark = theme === "dark";
 
   useEffect(() => {
-    if (
-      !priceContainerRef.current ||
-      !macdContainerRef.current ||
-      !ohlcList ||
-      ohlcList.length === 0
-    ) {
-      return;
+    if (!chartContainerRef.current || !ohlcList || ohlcList.length === 0) return;
+
+    if (chartInstance.current) {
+      chartInstance.current.remove();
     }
 
-    // Bersihkan instance lama jika wujud
-    if (priceChartInstance.current) priceChartInstance.current.remove();
-    if (macdChartInstance.current) macdChartInstance.current.remove();
-
-    const chartWidth = priceContainerRef.current.clientWidth;
-
-    // =========================================================================
-    // 1. CANVAS ATAS: PRICE & EMAs
-    // =========================================================================
-    const priceChart = createChart(priceContainerRef.current, {
-      width: chartWidth,
-      height: 200,
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: 310,
       layout: {
         background: { type: ColorType.Solid, color: isDark ? "#0d111a" : "#ffffff" },
         textColor: isDark ? "#94a3b8" : "#475569",
         fontSize: 10,
       },
       grid: {
-        vertLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
-        horzLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
+        vertLines: { color: isDark ? "rgba(30, 41, 59, 0.35)" : "rgba(226, 232, 240, 0.8)" },
+        horzLines: { color: isDark ? "rgba(30, 41, 59, 0.35)" : "rgba(226, 232, 240, 0.8)" },
       },
       rightPriceScale: {
         borderColor: isDark ? "#1e293b" : "#cbd5e1",
-        scaleMargins: { top: 0.1, bottom: 0.1 },
         autoScale: true,
       },
       timeScale: {
-        visible: false, // Disorokkan di atas supaya jimat ruang (tarikh ada di bawah)
-        fixLeftEdge: false,
-        fixRightEdge: false,
-        rightOffset: 6,
-        barSpacing: 7,
-        minBarSpacing: 2,
-      },
-      crosshair: {
-        vertLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
-        horzLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
-      },
-    });
-    priceChartInstance.current = priceChart;
-
-    const candleData = ohlcList
-      .map((d) => ({
-        time: typeof d.date === "string" ? d.date.split("T")[0] : d.date,
-        open: Number(d.open),
-        high: Number(d.high),
-        low: Number(d.low),
-        close: Number(d.close),
-      }))
-      .sort((a, b) => (a.time > b.time ? 1 : -1));
-
-    const mainSeries = priceChart.addSeries(CandlestickSeries, {
-      upColor: "#10b981",
-      downColor: "#f43f5e",
-      borderVisible: false,
-      wickUpColor: "#10b981",
-      wickDownColor: "#f43f5e",
-    });
-    mainSeries.setData(candleData);
-
-    const closePoints = candleData.map((d) => ({ time: d.time, value: d.close }));
-
-    // EMAs pada Canvas Harga
-    const ema10 = priceChart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false });
-    const ema20 = priceChart.addSeries(LineSeries, { color: "#06b6d4", lineWidth: 1, priceLineVisible: false });
-    const ema50 = priceChart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 1, priceLineVisible: false });
-    const ema100 = priceChart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false });
-
-    ema10.setData(calculateEMA(closePoints, 10));
-    ema20.setData(calculateEMA(closePoints, 20));
-    ema50.setData(calculateEMA(closePoints, 50));
-    ema100.setData(calculateEMA(closePoints, 100));
-
-    // =========================================================================
-    // 2. CANVAS BAWAH: MACD INDEPENDENT PANE
-    // =========================================================================
-    const macdChart = createChart(macdContainerRef.current, {
-      width: chartWidth,
-      height: 110,
-      layout: {
-        background: { type: ColorType.Solid, color: isDark ? "#0d111a" : "#ffffff" },
-        textColor: isDark ? "#94a3b8" : "#475569",
-        fontSize: 10,
-      },
-      grid: {
-        vertLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
-        horzLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
-      },
-      rightPriceScale: {
-        borderColor: isDark ? "#1e293b" : "#cbd5e1",
-        scaleMargins: { top: 0.15, bottom: 0.15 },
-        autoScale: true,
-      },
-      timeScale: {
-        visible: true, // Tarikh dipaparkan di sini
+        visible: true,
         borderColor: isDark ? "#1e293b" : "#cbd5e1",
         timeVisible: true,
         fixLeftEdge: false,
@@ -196,89 +112,136 @@ function SubsectorCard({
         horzLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
       },
     });
-    macdChartInstance.current = macdChart;
 
+    chartInstance.current = chart;
+
+    const candleData = ohlcList
+      .map((d) => ({
+        time: typeof d.date === "string" ? d.date.split("T")[0] : d.date,
+        open: Number(d.open),
+        high: Number(d.high),
+        low: Number(d.low),
+        close: Number(d.close),
+      }))
+      .sort((a, b) => (a.time > b.time ? 1 : -1));
+
+    // =========================================================================
+    // 1. TR 1 (PANE 0): PRICE CANDLESTICK & EMAs
+    // =========================================================================
+    const mainSeries = chart.addSeries(
+      CandlestickSeries,
+      {
+        upColor: "#10b981",
+        downColor: "#f43f5e",
+        borderVisible: false,
+        wickUpColor: "#10b981",
+        wickDownColor: "#f43f5e",
+      },
+      0 // Pane 0 (Top Row)
+    );
+    mainSeries.setData(candleData);
+
+    const closePoints = candleData.map((d) => ({ time: d.time, value: d.close }));
+
+    const ema10 = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false }, 0);
+    const ema20 = chart.addSeries(LineSeries, { color: "#06b6d4", lineWidth: 1, priceLineVisible: false }, 0);
+    const ema50 = chart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 1, priceLineVisible: false }, 0);
+    const ema100 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, priceLineVisible: false }, 0);
+
+    ema10.setData(calculateEMA(closePoints, 10));
+    ema20.setData(calculateEMA(closePoints, 20));
+    ema50.setData(calculateEMA(closePoints, 50));
+    ema100.setData(calculateEMA(closePoints, 100));
+
+    // =========================================================================
+    // 2. TR 2 (PANE 1): MACD INDICATOR (HISTOGRAM + LINES)
+    // =========================================================================
     const { histogram, macdLine, signalLine } = calculateMACD(closePoints);
 
-    // MACD Histogram
-    const macdHistSeries = macdChart.addSeries(HistogramSeries, {
-      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-      priceLineVisible: false,
-    });
+    const macdHistSeries = chart.addSeries(
+      HistogramSeries,
+      {
+        priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+        priceLineVisible: false,
+        lastValueVisible: true,
+      },
+      1 // Pane 1 (Middle Row)
+    );
     macdHistSeries.setData(histogram);
 
-    // MACD Line (Sky Blue)
-    const macdLineSeries = macdChart.addSeries(LineSeries, {
-      color: "#38bdf8",
-      lineWidth: 1,
-      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-      priceLineVisible: false,
-    });
+    const macdLineSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: "#38bdf8", // Sky Blue
+        lineWidth: 1,
+        priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane 1
+    );
     macdLineSeries.setData(macdLine);
 
-    // Signal Line (Amber)
-    const signalLineSeries = macdChart.addSeries(LineSeries, {
-      color: "#fbbf24",
-      lineWidth: 1,
-      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-      priceLineVisible: false,
-    });
+    const signalLineSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: "#fbbf24", // Amber
+        lineWidth: 1,
+        priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane 1
+    );
     signalLineSeries.setData(signalLine);
 
-    // Zero Baseline
-    const zeroLineSeries = macdChart.addSeries(LineSeries, {
-      color: isDark ? "rgba(148, 163, 184, 0.3)" : "rgba(100, 116, 139, 0.3)",
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
+    const zeroLineSeries = chart.addSeries(
+      LineSeries,
+      {
+        color: isDark ? "rgba(148, 163, 184, 0.3)" : "rgba(100, 116, 139, 0.3)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      },
+      1 // Pane 1
+    );
     zeroLineSeries.setData(closePoints.map((p) => ({ time: p.time, value: 0 })));
 
-    // =========================================================================
-    // 3. SYNCHRONIZATION ANTARA 2 CANVAS
-    // =========================================================================
-    let isSyncing = false;
-
-    priceChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (isSyncing || !range) return;
-      isSyncing = true;
-      macdChart.timeScale().setVisibleLogicalRange(range);
-      isSyncing = false;
-    });
-
-    macdChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (isSyncing || !range) return;
-      isSyncing = true;
-      priceChart.timeScale().setVisibleLogicalRange(range);
-      isSyncing = false;
-    });
-
-    // Tetapkan fokus lalai ke tarikh terkini (~65 bars)
-    const totalBars = candleData.length;
-    if (totalBars > 0) {
-      const defaultRange = {
-        from: Math.max(0, totalBars - 65),
-        to: totalBars + 6,
-      };
-      priceChart.timeScale().setVisibleLogicalRange(defaultRange);
-      macdChart.timeScale().setVisibleLogicalRange(defaultRange);
+    // Laraskan saiz ketinggian TR 1 (Price) dan TR 2 (MACD)
+    try {
+      const panes = chart.panes();
+      if (panes && panes.length >= 2) {
+        panes[0].setHeight(195);
+        panes[1].setHeight(85);
+      }
+    } catch {
+      // Fallback jika versi lwc menggunakan stretch factor
     }
 
-    // Auto Resize Handlers
+    // =========================================================================
+    // 3. TR 3: DATE TIMESCALE (Terpaut terus ke data terkini)
+    // =========================================================================
+    const totalBars = candleData.length;
+    if (totalBars > 0) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, totalBars - 65),
+        to: totalBars + 6,
+      });
+    }
+
     const handleResize = () => {
-      if (priceContainerRef.current && priceChartInstance.current && macdChartInstance.current) {
-        const newWidth = priceContainerRef.current.clientWidth;
-        priceChartInstance.current.applyOptions({ width: newWidth });
-        macdChartInstance.current.applyOptions({ width: newWidth });
+      if (chartContainerRef.current && chartInstance.current) {
+        chartInstance.current.applyOptions({ width: chartContainerRef.current.clientWidth });
       }
     };
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      if (priceChartInstance.current) priceChartInstance.current.remove();
-      if (macdChartInstance.current) macdChartInstance.current.remove();
+      if (chartInstance.current) {
+        chartInstance.current.remove();
+      }
     };
   }, [ohlcList, isDark]);
 
@@ -338,14 +301,8 @@ function SubsectorCard({
         </div>
       </div>
 
-      {/* 1. Price Canvas (Top) */}
-      <div ref={priceContainerRef} className="w-full relative" />
-
-      {/* Garisan Pembahagi Canvas */}
-      <div className="border-t border-gray-200 dark:border-slate-800/80" />
-
-      {/* 2. MACD Canvas (Bottom) */}
-      <div ref={macdContainerRef} className="w-full relative" />
+      {/* Single Multi-Pane Chart Canvas */}
+      <div ref={chartContainerRef} className="w-full relative" />
     </div>
   );
 }
