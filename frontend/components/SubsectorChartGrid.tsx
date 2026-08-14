@@ -1,114 +1,251 @@
 "use client";
 
-import type {
-  SubsectorRank,
-  SubsectorBulkOHLC,
-  ChartData,
-} from "@/lib/types";
-import { StockChart } from "@/components/StockChart";
+import React, { useEffect, useRef } from "react";
+import type { SubsectorRank, SubsectorBulkOHLC, SubsectorOHLC } from "@/lib/types";
+import {
+  createChart,
+  CandlestickSeries,
+  LineSeries,
+  HistogramSeries,
+  IChartApi,
+  ColorType,
+  LineStyle,
+} from "lightweight-charts";
 
-interface Props {
-  ranks: SubsectorRank[];
-  ohlcData: SubsectorBulkOHLC;
-  theme?: "light" | "dark"; // Ketatkan jenis theme
+// Helper Pengiraan EMA
+function calculateEMA(data: { time: string; value: number }[], period: number) {
+  if (data.length < period) return [];
+  const k = 2 / (period + 1);
+  const emaData = [];
+  let prevEMA = data.slice(0, period).reduce((acc, curr) => acc + curr.value, 0) / period;
+  emaData.push({ time: data[period - 1].time, value: prevEMA });
+
+  for (let i = period; i < data.length; i++) {
+    const currentVal = data[i].value;
+    prevEMA = currentVal * k + prevEMA * (1 - k);
+    emaData.push({ time: data[i].time, value: prevEMA });
+  }
+  return emaData;
 }
 
-export function SubsectorChartGrid({
-  ranks,
-  ohlcData,
+// Helper Pengiraan MACD (12, 26, 9)
+function calculateMACD(data: { time: string; value: number }[]) {
+  const ema12 = calculateEMA(data, 12);
+  const ema26 = calculateEMA(data, 26);
+  const macdMap = new Map<string, number>();
+
+  ema26.forEach((item) => {
+    const match12 = ema12.find((x) => x.time === item.time);
+    if (match12) {
+      macdMap.set(item.time, match12.value - item.value);
+    }
+  });
+
+  const macdLine = Array.from(macdMap.entries()).map(([time, value]) => ({ time, value }));
+  const signalLine = calculateEMA(macdLine, 9);
+
+  const histogram = signalLine.map((sig) => {
+    const macdVal = macdMap.get(sig.time) || 0;
+    return {
+      time: sig.time,
+      value: macdVal - sig.value,
+      color: macdVal >= sig.value ? "#10b981" : "#f43f5e",
+    };
+  });
+
+  return { histogram };
+}
+
+function SubsectorCard({
+  rank,
+  ohlcList,
   theme = "dark",
-}: Props) {
-  if (!ranks || ranks.length === 0) {
-    return (
-      <div className="p-8 text-center text-gray-400 text-sm">
-        Tiada data subsektor untuk dipaparkan.
-      </div>
-    );
-  }
+}: {
+  rank: SubsectorRank;
+  ohlcList: SubsectorOHLC[];
+  theme?: string;
+}) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<IChartApi | null>(null);
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    if (!chartContainerRef.current || !ohlcList || ohlcList.length === 0) return;
+
+    if (chartInstance.current) {
+      chartInstance.current.remove();
+    }
+
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: 280,
+      layout: {
+        background: { type: ColorType.Solid, color: isDark ? "#0d111a" : "#ffffff" },
+        textColor: isDark ? "#94a3b8" : "#475569",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
+        horzLines: { color: isDark ? "rgba(30, 41, 59, 0.4)" : "rgba(226, 232, 240, 0.8)" },
+      },
+      rightPriceScale: {
+        borderColor: isDark ? "#1e293b" : "#cbd5e1",
+        scaleMargins: { top: 0.12, bottom: 0.28 },
+        autoScale: true,
+      },
+      timeScale: {
+        visible: true,
+        borderColor: isDark ? "#1e293b" : "#cbd5e1",
+        timeVisible: true,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
+      crosshair: {
+        vertLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
+        horzLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
+      },
+    });
+
+    chartInstance.current = chart;
+
+    const candleData = ohlcList
+      .map((d) => ({
+        time: typeof d.date === "string" ? d.date.split("T")[0] : d.date,
+        open: Number(d.open),
+        high: Number(d.high),
+        low: Number(d.low),
+        close: Number(d.close),
+      }))
+      .sort((a, b) => (a.time > b.time ? 1 : -1));
+
+    // 1. Candlestick Series (v5 API)
+    const mainSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#10b981",
+      downColor: "#f43f5e",
+      borderVisible: false,
+      wickUpColor: "#10b981",
+      wickDownColor: "#f43f5e",
+    });
+    mainSeries.setData(candleData);
+
+    const closePoints = candleData.map((d) => ({ time: d.time, value: d.close }));
+
+    // 2. EMA Overlays (v5 API)
+    const ema10Data = calculateEMA(closePoints, 10);
+    const ema20Data = calculateEMA(closePoints, 20);
+    const ema50Data = calculateEMA(closePoints, 50);
+
+    const ema10 = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false });
+    const ema20 = chart.addSeries(LineSeries, { color: "#06b6d4", lineWidth: 1, priceLineVisible: false });
+    const ema50 = chart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 1, priceLineVisible: false });
+
+    ema10.setData(ema10Data);
+    ema20.setData(ema20Data);
+    ema50.setData(ema50Data);
+
+    // 3. MACD Histogram Sub-panel (v5 API)
+    const { histogram } = calculateMACD(closePoints);
+    const macdHistSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "macd",
+    });
+    chart.priceScale("macd").applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0.02 },
+    });
+    macdHistSeries.setData(histogram);
+
+    chart.timeScale().fitContent();
+
+    const handleResize = () => {
+      if (chartContainerRef.current && chartInstance.current) {
+        chartInstance.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (chartInstance.current) {
+        chartInstance.current.remove();
+      }
+    };
+  }, [ohlcList, isDark]);
+
+  const return5d = Number(rank.return_5d || 0);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {ranks.map((item) => {
-        const rawOhlc = ohlcData[item.subsector_id];
-
-        // Format data OHLC dan tentukan jenis sebagai ChartData
-        const formattedData: ChartData | null =
-        rawOhlc && rawOhlc.length > 0
-            ? {
-                ticker: item.subsector_name,
-                ohlcv: rawOhlc.map((d) => ({
-                time: Math.floor(new Date(d.date).getTime() / 1000),
-                open: Number(d.open),
-                high: Number(d.high),
-                low: Number(d.low),
-                close: Number(d.close),
-                volume: 0,
-                })),
-                indicators: {} as ChartData["indicators"], // Lakukan type assertion di sini
-            }
-            : null;
-
-        return (
-          <div
-            key={item.subsector_id}
-            id={`chart-${item.subsector_id}`}
-            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:border-teal-500/50 transition-colors"
+    <div className="bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+      {/* Header Info */}
+      <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800/80 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
+            #{rank.rank}
+          </span>
+          <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-slate-100 truncate max-w-[140px] sm:max-w-none">
+            {rank.subsector_name}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-gray-500 dark:text-slate-400">
+            Score: <strong className="text-gray-800 dark:text-slate-200">{rank.score}</strong>
+          </span>
+          <span
+            className={`font-semibold px-1.5 py-0.5 rounded ${
+              return5d >= 0
+                ? "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400"
+                : "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400"
+            }`}
           >
-            {/* Header Kad Carta */}
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-[#26A69A] bg-[#26A69A]/10 px-2 py-0.5 rounded">
-                  #{item.rank}
-                </span>
-                <h3 className="font-bold text-sm text-gray-800 dark:text-gray-100">
-                  {item.subsector_name}
-                </h3>
-              </div>
+            {return5d >= 0 ? `+${return5d.toFixed(2)}%` : `${return5d.toFixed(2)}%`}
+          </span>
+        </div>
+      </div>
 
-              <div className="flex items-center gap-3 text-xs font-mono">
-                <span className="text-gray-500 dark:text-gray-400">
-                  Score: <strong className="text-[#26A69A]">{item.score}</strong>
-                </span>
-                <span
-                  className={`font-semibold ${
-                    item.return_5d >= 0 ? "text-emerald-500" : "text-rose-500"
-                  }`}
-                >
-                  {item.return_5d >= 0 ? `+${item.return_5d}%` : `${item.return_5d}%`}
-                </span>
-              </div>
-            </div>
+      {/* Indicator Legend Bar */}
+      <div className="px-3 py-1 bg-gray-100/50 dark:bg-[#0b0e14] border-b border-gray-200 dark:border-slate-800/60 flex items-center justify-between text-[10px] text-gray-500 dark:text-slate-400">
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-0.5 bg-yellow-500"></span>EMA 10
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-0.5 bg-cyan-500"></span>EMA 20
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-0.5 bg-fuchsia-500"></span>EMA 50
+          </span>
+        </div>
+        <span className="text-gray-400 dark:text-slate-500 font-mono">MACD (12,26,9)</span>
+      </div>
 
-            {/* Tag Status Subsektor */}
-            <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-              {item.status}
-            </div>
-
-            {/* Kawasan Canvas Carta TradingView */}
-            <div className="h-64 w-full bg-gray-50 dark:bg-gray-950 rounded-lg overflow-hidden flex items-center justify-center border border-gray-100 dark:border-gray-800">
-              {formattedData ? (
-                <StockChart
-                  data={formattedData}
-                  config={{
-                    emaPeriods: [10, 20, 50, 100],
-                    showVolume: false,
-                    showRsi: false,
-                    showMacd: false,
-                    showCvd: false,
-                    showCmf: false,
-                  }}
-                  ticker={item.subsector_name}
-                  theme={theme}
-                />
-              ) : (
-                <span className="text-xs text-gray-400 animate-pulse">
-                  Memuatkan data carta...
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {/* Chart Canvas */}
+      <div ref={chartContainerRef} className="w-full relative" />
     </div>
   );
 }
+
+interface SubsectorChartGridProps {
+  ranks: SubsectorRank[];
+  ohlcData: SubsectorBulkOHLC;
+  theme?: string;
+}
+
+export function SubsectorChartGrid({ ranks = [], ohlcData = {}, theme = "dark" }: SubsectorChartGridProps) {
+  if (!ranks || ranks.length === 0) {
+    return <div className="text-center py-8 text-gray-400 text-sm">Tiada carta subsektor untuk dipaparkan.</div>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
+      {ranks.map((rank) => (
+        <SubsectorCard
+          key={rank.subsector_id}
+          rank={rank}
+          ohlcList={ohlcData[rank.subsector_id] || []}
+          theme={theme}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default SubsectorChartGrid;

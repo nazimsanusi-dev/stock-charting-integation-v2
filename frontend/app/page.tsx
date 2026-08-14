@@ -24,7 +24,7 @@ interface ExtendedSidebarParams extends SidebarParams {
 }
 
 const DEFAULT_PARAMS: ExtendedSidebarParams = {
-  activeTab: "subsector", // Dokumen utama sebagai Subsector Analysis
+  activeTab: "subsector",
   selectedSheet: null,
   worksheet: "Sheet1",
   allStocks: [],
@@ -49,7 +49,6 @@ const DEFAULT_PARAMS: ExtendedSidebarParams = {
 function SingleView({ params }: { params: ExtendedSidebarParams }) {
   const stock = params.selectedStocks[0] ?? null;
 
-  // Primary Timeframe Data
   const primary = useChartData(
     stock?.ticker ?? null,
     params.period,
@@ -57,7 +56,6 @@ function SingleView({ params }: { params: ExtendedSidebarParams }) {
     params.chartConfig.emaPeriods
   );
 
-  // Secondary Timeframe Data (jika Combine ON)
   const secondary = useChartData(
     params.isCombineTimeframe && stock?.ticker ? stock.ticker : null,
     params.period,
@@ -88,7 +86,6 @@ function SingleView({ params }: { params: ExtendedSidebarParams }) {
 
       <div className="flex-1 px-2 pt-1 min-h-0">
         {params.isCombineTimeframe ? (
-          /* Single View: Gabungan 2 Timeframe Kiri-Kanan */
           <div className="grid grid-cols-2 gap-3 h-full">
             <div className="flex flex-col h-full">
               <span className="text-xs font-bold text-blue-600 mb-1">
@@ -127,7 +124,6 @@ function SingleView({ params }: { params: ExtendedSidebarParams }) {
             </div>
           </div>
         ) : (
-          /* Single View Biasa */
           <div className="h-full">
             {primary.loading ? (
               <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
@@ -165,11 +161,14 @@ export default function Home() {
   const [loadingSubsector, setLoadingSubsector] = useState<boolean>(true);
   const [subsectorError, setSubsectorError] = useState<string | null>(null);
 
+  // States untuk Hide/Unhide Section (Default: Hidden / False)
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [showRanking, setShowRanking] = useState<boolean>(false);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", params.theme === "dark");
   }, [params.theme]);
 
-  // Tarik data Subsektor dari BigQuery bila tab 'subsector' aktif
   const activeTab = params.activeTab ?? "subsector";
 
   useEffect(() => {
@@ -199,12 +198,12 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
       <Sidebar params={params} onChange={setParams} />
 
-      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-6 space-y-8">
+      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-4 sm:p-6 space-y-6">
         {activeTab === "subsector" ? (
           /* ================================================================
-             MAIN PAGE: SUBSECTOR ANALYSIS
+             MAIN PAGE: SUBSECTOR ANALYSIS (END-TO-END FULL WIDTH)
              ================================================================ */
-          <div className="space-y-8 max-w-7xl mx-auto w-full">
+          <div className="space-y-6 w-full">
             <header className="border-b border-gray-200 dark:border-gray-800 pb-4">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 Analisis & Ranking Subsektor Pasaran
@@ -225,25 +224,86 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {/* 1. Heatmap Subsektor */}
-                <section className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
-                    Heatmap Subsektor
-                  </h2>
-                  <SubsectorHeatmap data={heatmapData} />
+                {/* 1. Heatmap Subsektor (Collapsible) */}
+                <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                  <div
+                    onClick={() => setShowHeatmap(!showHeatmap)}
+                    className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                      <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
+                        Heatmap Subsektor
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
+                    >
+                      <span>{showHeatmap ? "Tutup" : "Buka"}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          showHeatmap ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {showHeatmap && (
+                    <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+                      <SubsectorHeatmap data={heatmapData} />
+                    </div>
+                  )}
                 </section>
 
-                {/* 2. Table Ranking Subsektor */}
-                <section className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
-                    Ranking Subsektor
-                  </h2>
-                  <RankingTable data={ranksData} />
+                {/* 2. Table Ranking Subsektor (Collapsible) */}
+                <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                  <div
+                    onClick={() => setShowRanking(!showRanking)}
+                    className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
+                      <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
+                        Ranking Subsektor
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
+                    >
+                      <span>{showRanking ? "Tutup" : "Buka"}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          showRanking ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {showRanking && (
+                    <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+                      <RankingTable data={ranksData} />
+                    </div>
+                  )}
                 </section>
 
-                {/* 3. Grid 40+ Carta Subsektor */}
-                <section>
-                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
+                {/* 3. Grid Carta Subsektor (End-to-End) */}
+                <section className="w-full">
+                  <h2 className="text-base font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                     Carta Indeks Subsektor
                   </h2>
                   <SubsectorChartGrid
