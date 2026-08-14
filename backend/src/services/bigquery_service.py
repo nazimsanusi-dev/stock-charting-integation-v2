@@ -157,16 +157,27 @@ class BigQueryService:
         """)
 
     async def get_subsector_bulk_ohlc(self):
-        raw_rows = await self._execute_query("""
+        """Ambil data OHLC dan kelompokkan mengikut subsector_id"""
+        rows = await self._execute_query("""
             SELECT subsector_id, date, open, high, low, close
             FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
             ORDER BY date ASC
         """)
+        if not rows:
+            return {}
+
+        grouped = {}
+        for r in rows:
+            sid = str(r.get("subsector_id"))
+            if sid not in grouped:
+                grouped[sid] = []
+            grouped[sid].append(r)
+        return grouped
 
     async def get_stocks_by_subsector(self, subsector_name: str):
-        # Sanitize nama subsektor untuk elak ralat kueri
+        """Ambil senarai saham mengikut subsektor dan susun mengikut Change_Percent tertinggi"""
         clean_name = subsector_name.replace("'", "\\'").strip()
-        return await self._execute_query(f"""
+        rows = await self._execute_query(f"""
             SELECT 
                 Name, 
                 Code, 
@@ -184,12 +195,4 @@ class BigQueryService:
             WHERE Scraped_Subsector LIKE '%{clean_name}%'
             ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
         """)
-
-        result = {}
-        for row in raw_rows:
-            sub_id = row.get("subsector_id")
-            if sub_id is not None:
-                if sub_id not in result:
-                    result[sub_id] = []
-                result[sub_id].append(row)
-        return result
+        return rows or []

@@ -145,23 +145,32 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
+# -------------------------------------------------------------------------
+    # Route: Subsector Bulk OHLC
+    # -------------------------------------------------------------------------
     if path == "/api/subsector_ohlc/bulk":
         try:
             bq = await _get_bq_service(env)
-            bulk_ohlc = await bq.get_subsector_bulk_ohlc()  # Tambah await
-            return _json(bulk_ohlc, cache_seconds=300)
+            bulk_ohlc = await bq.get_subsector_bulk_ohlc()
+            return _json(bulk_ohlc or {}, cache_seconds=300)
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
-    # Route untuk ambil senarai saham mengikut subsektor
+    # -------------------------------------------------------------------------
+    # Route: Senarai Saham Mengikut Subsektor
+    # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
-        subsector_param = url.searchParams.get("subsector") or ""
-        if not subsector_param:
-            return json_response({"stocks": []})
-        
-        bq = await _get_bq_service(env)
-        stocks_data = await bq.get_stocks_by_subsector(subsector_param)
-        return json_response({"stocks": stocks_data})
+        try:
+            # Gunakan query.get() daripada urllib.parse, bukan url.searchParams
+            subsector_param = query.get("subsector", [""])[0]
+            if not subsector_param:
+                return _json({"stocks": []})
+
+            bq = await _get_bq_service(env)
+            stocks_data = await bq.get_stocks_by_subsector(subsector_param)
+            return _json({"stocks": stocks_data or []}, cache_seconds=60)
+        except Exception as e:
+            return _json({"error": str(e), "stocks": []}, status=500)
 
     # ==============================================================================
     # GOOGLE SHEETS & CHARTS ENDPOINTS
