@@ -142,8 +142,9 @@ class BigQueryService:
 
     async def get_subsector_heatmap(self):
         return await self._execute_query("""
-            SELECT subsector_id, subsector_name, name as sector_name, score, return_5d, return_20d, num_stocks
-            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks`
+            SELECT subsector_id, subsector_name, s.sector_name as sector_name, score, return_5d, return_20d, num_stocks
+            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks` sr
+            JOIN `etl-stock-screener-bursa.bursa_dataset.subsectors` s ON s.id = sr.subsector_id
         """)
 
     async def get_subsector_bulk_ohlc(self):
