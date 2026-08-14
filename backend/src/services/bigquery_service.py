@@ -38,20 +38,20 @@ class BigQueryService:
     async def get_subsector_ranks(self):
         return await self._execute_query("""
             SELECT date, rank, subsector_id, subsector_name, score, status, return_20d, return_5d, close_index, num_stocks
-            FROM `your_project.your_dataset.subsector_ranks`
+            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks`
             ORDER BY rank ASC
         """)
 
     async def get_subsector_heatmap(self):
         return await self._execute_query("""
             SELECT subsector_id, subsector_name, sector_name, score, return_5d, return_20d, num_stocks
-            FROM `your_project.your_dataset.subsector_heatmap`
+            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_heatmap`
         """)
 
     async def get_subsector_bulk_ohlc(self):
         raw_rows = await self._execute_query("""
             SELECT subsector_id, date, open, high, low, close
-            FROM `your_project.your_dataset.subsector_ohlc`
+            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
             ORDER BY date ASC
         """)
         
