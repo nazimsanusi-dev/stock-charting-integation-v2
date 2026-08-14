@@ -4,6 +4,9 @@ from pyodide.ffi import to_js
 
 class BigQueryService:
     def __init__(self, project_id: str, access_token: str):
+        if not project_id or not access_token:
+            raise ValueError("BIGQUERY_PROJECT_ID atau BIGQUERY_ACCESS_TOKEN tidak wujud dalam environment.")
+            
         self.project_id = project_id
         self.access_token = access_token
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
@@ -20,20 +23,42 @@ class BigQueryService:
             "body": payload
         }
         
-        # Guna js.fetch untuk Cloudflare Workers
-        response = await fetch(self.endpoint, to_js(init_opts))
-        text_data = await response.text()
-        data = json.loads(text_data)
+        # 1. Rangkaian / Fetch Error Handling
+        try:
+            response = await fetch(self.endpoint, to_js(init_opts))
+            text_data = await response.text()
+        except Exception as e:
+            raise Exception(f"Ralat sambungan rangkaian (Fetch error): {str(e)}")
 
-        if "rows" not in data:
+        # 2. JSON Parse Error Handling
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            raise Exception(f"Respons daripada BigQuery bukan JSON sah (HTTP {response.status}): {text_data[:200]}")
+
+        # 3. HTTP Status Error Handling
+        if response.status != 200:
+            error_msg = data.get("error", {}).get("message", text_data)
+            raise Exception(f"BigQuery API Error (HTTP {response.status}): {error_msg}")
+
+        # 4. BigQuery Internal Query Execution Error Handling
+        if "errorResult" in data:
+            raise Exception(f"BigQuery Execution Error: {data['errorResult'].get('message')}")
+
+        # Sekiranya tiada data dipulangkan (Empty Result)
+        if "rows" not in data or "schema" not in data:
             return []
             
-        fields = [f["name"] for f in data["schema"]["fields"]]
-        rows = []
-        for r in data["rows"]:
-            row_dict = {fields[i]: cell["v"] for i, cell in enumerate(r["f"])}
-            rows.append(row_dict)
-        return rows
+        # 5. Data Mapping Error Handling
+        try:
+            fields = [f["name"] for f in data["schema"]["fields"]]
+            rows = []
+            for r in data["rows"]:
+                row_dict = {fields[i]: cell["v"] for i, cell in enumerate(r["f"])}
+                rows.append(row_dict)
+            return rows
+        except Exception as e:
+            raise Exception(f"Ralat pemformatan data BigQuery: {str(e)}")
 
     async def get_subsector_ranks(self):
         return await self._execute_query("""
@@ -57,8 +82,9 @@ class BigQueryService:
         
         result = {}
         for row in raw_rows:
-            sub_id = row["subsector_id"]
-            if sub_id not in result:
-                result[sub_id] = []
-            result[sub_id].append(row)
+            sub_id = row.get("subsector_id")
+            if sub_id is not None:
+                if sub_id not in result:
+                    result[sub_id] = []
+                result[sub_id].append(row)
         return result
