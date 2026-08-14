@@ -1,64 +1,137 @@
 import json
-from js import fetch
+import time
+import base64
+from js import fetch, crypto, Uint8Array
 from pyodide.ffi import to_js
+
+
+async def get_gcp_access_token(sa_json_str: str) -> str:
+    """Tukar GCP Service Account JSON kepada Access Token yang sah secara dinamik."""
+    try:
+        sa_data = json.loads(sa_json_str)
+        client_email = sa_data["client_email"]
+        private_key_pem = sa_data["private_key"]
+
+        # 1. Bina Header & Payload JWT
+        now = int(time.time())
+        header = {"alg": "RS256", "typ": "JWT"}
+        payload = {
+            "iss": client_email,
+            "scope": "https://www.googleapis.com/auth/bigquery",
+            "aud": "https://oauth2.googleapis.com/token",
+            "exp": now + 3600,
+            "iat": now,
+        }
+
+        def b64url(data_bytes):
+            return base64.urlsafe_b64encode(data_bytes).decode("utf-8").rstrip("=")
+
+        header_b64 = b64url(json.dumps(header).encode("utf-8"))
+        payload_b64 = b64url(json.dumps(payload).encode("utf-8"))
+        unsigned_token = f"{header_b64}.{payload_b64}"
+
+        # 2. Extract Private Key DER
+        pem_body = (
+            private_key_pem.replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace("\n", "")
+            .strip()
+        )
+        key_der = base64.b64decode(pem_body)
+
+        js_key_buffer = Uint8Array.new(len(key_der))
+        for i, b in enumerate(key_der):
+            js_key_buffer[i] = b
+
+        key_algorithm = to_js({"name": "RSASSA-PKCS1-v1_5", "hash": {"name": "SHA-256"}})
+
+        imported_key = await crypto.subtle.importKey(
+            "pkcs8", js_key_buffer.buffer, key_algorithm, False, to_js(["sign"])
+        )
+
+        # 3. Sign JWT guna Web Crypto API
+        token_bytes = unsigned_token.encode("utf-8")
+        js_data_buffer = Uint8Array.new(len(token_bytes))
+        for i, b in enumerate(token_bytes):
+            js_data_buffer[i] = b
+
+        signature_buffer = await crypto.subtle.sign(
+            key_algorithm, imported_key, js_data_buffer.buffer
+        )
+
+        sig_bytes = bytes(Uint8Array.new(signature_buffer))
+        jwt_signed = f"{unsigned_token}.{b64url(sig_bytes)}"
+
+        # 4. Minta Access Token dari Google OAuth2
+        body_params = f"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion={jwt_signed}"
+
+        opts = to_js(
+            {
+                "method": "POST",
+                "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+                "body": body_params,
+            }
+        )
+
+        res = await fetch("https://oauth2.googleapis.com/token", opts)
+        text_res = await res.text()
+        data = json.loads(text_res)
+
+        if "access_token" in data:
+            return data["access_token"]
+        raise Exception(f"Google OAuth Failed: {text_res}")
+
+    except Exception as e:
+        raise Exception(f"Gagal menjana GCP Access Token: {str(e)}")
+
 
 class BigQueryService:
     def __init__(self, project_id: str, access_token: str):
-        if not project_id or not access_token:
-            raise ValueError("BIGQUERY_PROJECT_ID atau BIGQUERY_ACCESS_TOKEN tidak wujud dalam environment.")
-            
-        self.project_id = project_id or "etl-stock-screener-bursa"
-        self.access_token = access_token
+        raw_id = project_id or "etl-stock-screener-bursa"
+        self.project_id = raw_id.strip().strip('"').strip("'")
+        self.access_token = access_token.strip().strip('"').strip("'")
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
 
     async def _execute_query(self, sql: str):
         payload = json.dumps({"query": sql, "useLegacySql": False})
-        
+
         init_opts = {
             "method": "POST",
             "headers": {
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": "application/json",
             },
-            "body": payload
+            "body": payload,
         }
-        
-        # 1. Rangkaian / Fetch Error Handling
+
         try:
             response = await fetch(self.endpoint, to_js(init_opts))
             text_data = await response.text()
         except Exception as e:
-            raise Exception(f"Ralat sambungan rangkaian (Fetch error): {str(e)}")
+            raise Exception(f"Ralat sambungan rangkaian: {str(e)}")
 
-        # 2. JSON Parse Error Handling, sangkut kat sini kalau response bukan JSON
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
-            raise Exception(f"Respons daripada BigQuery bukan JSON sah (HTTP {response.status}): {text_data[:200]}")
+            raise Exception(
+                f"Respons daripada BigQuery bukan JSON sah (HTTP {response.status}): {text_data[:200]}"
+            )
 
-        # 3. HTTP Status Error Handling
         if response.status != 200:
             error_msg = data.get("error", {}).get("message", text_data)
-            raise Exception(f"BigQuery API Error (HTTP {response.status}): {error_msg}")
+            raise Exception(
+                f"BigQuery API Error (HTTP {response.status}): {error_msg}"
+            )
 
-        # 4. BigQuery Internal Query Execution Error Handling
-        if "errorResult" in data:
-            raise Exception(f"BigQuery Execution Error: {data['errorResult'].get('message')}")
-
-        # Sekiranya tiada data dipulangkan (Empty Result)
         if "rows" not in data or "schema" not in data:
             return []
-            
-        # 5. Data Mapping Error Handling
-        try:
-            fields = [f["name"] for f in data["schema"]["fields"]]
-            rows = []
-            for r in data["rows"]:
-                row_dict = {fields[i]: cell["v"] for i, cell in enumerate(r["f"])}
-                rows.append(row_dict)
-            return rows
-        except Exception as e:
-            raise Exception(f"Ralat pemformatan data BigQuery: {str(e)}")
+
+        fields = [f["name"] for f in data["schema"]["fields"]]
+        rows = []
+        for r in data["rows"]:
+            row_dict = {fields[i]: cell["v"] for i, cell in enumerate(r["f"])}
+            rows.append(row_dict)
+        return rows
 
     async def get_subsector_ranks(self):
         return await self._execute_query("""
@@ -79,7 +152,7 @@ class BigQueryService:
             FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
             ORDER BY date ASC
         """)
-        
+
         result = {}
         for row in raw_rows:
             sub_id = row.get("subsector_id")
