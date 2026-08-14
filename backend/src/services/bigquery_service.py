@@ -94,7 +94,7 @@ class BigQueryService:
         raw_token = str(access_token or "")
         self.access_token = raw_token.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
         
-        self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
+        self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries" #
 
     async def _execute_query(self, sql: str):
         payload = json.dumps({"query": sql, "useLegacySql": False})
