@@ -3,6 +3,7 @@ import os
 import json
 import js
 from src.services.bigquery_service import BigQueryService, get_gcp_access_token
+from urllib.parse import parse_qs, urlparse
 
 
 def _create_headers(extra_headers: dict | None = None):
@@ -161,14 +162,19 @@ async def _route(request, env):
     # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
         try:
-            # Gunakan query.get() daripada urllib.parse, bukan url.searchParams
-            subsector_param = query.get("subsector", [""])[0]
+            # 1. Parse query string daripada request.url
+            parsed_url = urlparse(request.url)
+            query_params = parse_qs(parsed_url.query)
+            subsector_param = query_params.get("subsector", [""])[0]
+
             if not subsector_param:
                 return _json({"stocks": []})
 
+            # 2. Ambil data dari BigQuery
             bq = await _get_bq_service(env)
             stocks_data = await bq.get_stocks_by_subsector(subsector_param)
             return _json({"stocks": stocks_data or []}, cache_seconds=60)
+
         except Exception as e:
             return _json({"error": str(e), "stocks": []}, status=500)
 
