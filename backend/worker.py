@@ -82,7 +82,7 @@ from src.services.bigquery_service import BigQueryService, get_gcp_access_token
 
 async def _get_bq_service(env):
     project_id = getattr(env, "BIGQUERY_PROJECT_ID", "etl-stock-screener-bursa")
-    sa_json = getattr(env, "GCP_SERVICE_ACCOUNT", "")
+    sa_json = getattr(env, "GCP_SERVICE_ACCOUNT_BQ", "")
     
     if not sa_json:
         raise ValueError("GCP_SERVICE_ACCOUNT tidak wujud dalam secret.")
