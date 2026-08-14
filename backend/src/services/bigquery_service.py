@@ -22,7 +22,7 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
         now = int(time.time())
         header = {"alg": "RS256", "typ": "JWT"}
         payload = {
-            "iss": client_email,
+            "iss": "nazimsanusi01@gmail.com" # client_email,
             "scope": "https://www.googleapis.com/auth/bigquery",
             "aud": "https://oauth2.googleapis.com/token",
             "exp": now + 3600,
