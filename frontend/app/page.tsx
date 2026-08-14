@@ -6,10 +6,25 @@ import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
 import { TableView } from "@/components/TableView";
 import { OHLCSummary } from "@/components/OHLCSummary";
-import { useChartData } from "@/hooks/useChartData";
-import type { SidebarParams } from "@/lib/types";
+import { RankingTable } from "@/components/RankingTable";
+import { SubsectorHeatmap } from "@/components/SubsectorHeatmap";
+import { SubsectorChartGrid } from "@/components/SubsectorChartGrid";
 
-const DEFAULT_PARAMS: SidebarParams = {
+import { api } from "@/lib/api";
+import { useChartData } from "@/hooks/useChartData";
+import type {
+  SidebarParams,
+  SubsectorRank,
+  SubsectorHeatmapItem,
+  SubsectorBulkOHLC,
+} from "@/lib/types";
+
+interface ExtendedSidebarParams extends SidebarParams {
+  activeTab?: "subsector" | "sheets";
+}
+
+const DEFAULT_PARAMS: ExtendedSidebarParams = {
+  activeTab: "subsector", // Dokumen utama sebagai Subsector Analysis
   selectedSheet: null,
   worksheet: "Sheet1",
   allStocks: [],
@@ -31,7 +46,7 @@ const DEFAULT_PARAMS: SidebarParams = {
   },
 };
 
-function SingleView({ params }: { params: SidebarParams }) {
+function SingleView({ params }: { params: ExtendedSidebarParams }) {
   const stock = params.selectedStocks[0] ?? null;
 
   // Primary Timeframe Data
@@ -62,8 +77,12 @@ function SingleView({ params }: { params: SidebarParams }) {
     <div className="flex flex-col flex-1 min-w-0 h-full">
       <div className="px-4 pt-3 flex justify-between items-center">
         <div>
-          <span className="text-base font-semibold text-gray-800 dark:text-gray-100">{stock.name}</span>
-          <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">{stock.ticker}</span>
+          <span className="text-base font-semibold text-gray-800 dark:text-gray-100">
+            {stock.name}
+          </span>
+          <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">
+            {stock.ticker}
+          </span>
         </div>
       </div>
 
@@ -72,20 +91,38 @@ function SingleView({ params }: { params: SidebarParams }) {
           /* Single View: Gabungan 2 Timeframe Kiri-Kanan */
           <div className="grid grid-cols-2 gap-3 h-full">
             <div className="flex flex-col h-full">
-              <span className="text-xs font-bold text-blue-600 mb-1">TF 1: {params.timeframe.toUpperCase()}</span>
+              <span className="text-xs font-bold text-blue-600 mb-1">
+                TF 1: {params.timeframe.toUpperCase()}
+              </span>
               {primary.loading ? (
-                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                  Loading...
+                </div>
               ) : primary.data ? (
-                <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
+                <StockChart
+                  data={primary.data}
+                  config={params.chartConfig}
+                  ticker={stock.ticker}
+                  theme={params.theme}
+                />
               ) : null}
             </div>
 
             <div className="flex flex-col h-full">
-              <span className="text-xs font-bold text-purple-600 mb-1">TF 2: {params.secondaryTimeframe.toUpperCase()}</span>
+              <span className="text-xs font-bold text-purple-600 mb-1">
+                TF 2: {params.secondaryTimeframe.toUpperCase()}
+              </span>
               {secondary.loading ? (
-                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                  Loading...
+                </div>
               ) : secondary.data ? (
-                <StockChart data={secondary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
+                <StockChart
+                  data={secondary.data}
+                  config={params.chartConfig}
+                  ticker={stock.ticker}
+                  theme={params.theme}
+                />
               ) : null}
             </div>
           </div>
@@ -93,9 +130,16 @@ function SingleView({ params }: { params: SidebarParams }) {
           /* Single View Biasa */
           <div className="h-full">
             {primary.loading ? (
-              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                Loading...
+              </div>
             ) : primary.data ? (
-              <StockChart data={primary.data} config={params.chartConfig} ticker={stock.ticker} theme={params.theme} />
+              <StockChart
+                data={primary.data}
+                config={params.chartConfig}
+                ticker={stock.ticker}
+                theme={params.theme}
+              />
             ) : null}
           </div>
         )}
@@ -112,39 +156,129 @@ function SingleView({ params }: { params: SidebarParams }) {
 }
 
 export default function Home() {
-  const [params, setParams] = useState<SidebarParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<ExtendedSidebarParams>(DEFAULT_PARAMS);
+
+  // States untuk Subsector Analysis (BigQuery)
+  const [ranksData, setRanksData] = useState<SubsectorRank[]>([]);
+  const [heatmapData, setHeatmapData] = useState<SubsectorHeatmapItem[]>([]);
+  const [ohlcBulkData, setOhlcBulkData] = useState<SubsectorBulkOHLC>({});
+  const [loadingSubsector, setLoadingSubsector] = useState<boolean>(true);
+  const [subsectorError, setSubsectorError] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", params.theme === "dark");
   }, [params.theme]);
 
+  // Tarik data Subsektor dari BigQuery bila tab 'subsector' aktif
+  const activeTab = params.activeTab ?? "subsector";
+
+  useEffect(() => {
+    if (activeTab !== "subsector") return;
+
+    setLoadingSubsector(true);
+    setSubsectorError(null);
+
+    Promise.all([
+      api.subsectorRanks(),
+      api.subsectorHeatmap(),
+      api.subsectorBulkOHLC(),
+    ])
+      .then(([ranks, heatmap, ohlcBulk]) => {
+        setRanksData(ranks);
+        setHeatmapData(heatmap);
+        setOhlcBulkData(ohlcBulk);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch subsector data:", err);
+        setSubsectorError("Gagal mengambil data subsektor dari server.");
+      })
+      .finally(() => setLoadingSubsector(false));
+  }, [activeTab]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
       <Sidebar params={params} onChange={setParams} />
 
-      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950">
-        {params.viewMode === "single" ? (
-          <SingleView params={params} />
-        ) : params.viewMode === "grid" ? (
-          <div className="p-4">
-            <GridView
-              stocks={params.allStocks ?? []}
-              period={params.period}
-              timeframe={params.timeframe}
-              secondaryTimeframe={params.secondaryTimeframe}
-              isCombine={params.isCombineTimeframe}
-              config={params.chartConfig}
-              columns={params.gridColumns}
-              theme={params.theme}
-            />
+      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-6 space-y-8">
+        {activeTab === "subsector" ? (
+          /* ================================================================
+             MAIN PAGE: SUBSECTOR ANALYSIS
+             ================================================================ */
+          <div className="space-y-8 max-w-7xl mx-auto w-full">
+            <header className="border-b border-gray-200 dark:border-gray-800 pb-4">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                Analisis & Ranking Subsektor Pasaran
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Data dikemas kini secara automatik dari BigQuery
+              </p>
+            </header>
+
+            {loadingSubsector ? (
+              <div className="flex flex-col items-center justify-center p-12 text-gray-400 gap-2">
+                <span className="animate-spin text-2xl">⏳</span>
+                <p className="text-sm">Memuatkan data subsektor...</p>
+              </div>
+            ) : subsectorError ? (
+              <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-500 text-sm text-center">
+                ⚠ {subsectorError}
+              </div>
+            ) : (
+              <>
+                {/* 1. Heatmap Subsektor */}
+                <section className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
+                    Heatmap Subsektor
+                  </h2>
+                  <SubsectorHeatmap data={heatmapData} />
+                </section>
+
+                {/* 2. Table Ranking Subsektor */}
+                <section className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
+                    Ranking Subsektor
+                  </h2>
+                  <RankingTable data={ranksData} />
+                </section>
+
+                {/* 3. Grid 40+ Carta Subsektor */}
+                <section>
+                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
+                    Carta Indeks Subsektor
+                  </h2>
+                  <SubsectorChartGrid
+                    ranks={ranksData}
+                    ohlcData={ohlcBulkData}
+                    theme={params.theme}
+                  />
+                </section>
+              </>
+            )}
           </div>
         ) : (
-          /* Mod Table */
-          <div className="p-4">
-            <TableView
-              selectedSheet={params.selectedSheet}
-              worksheet={params.worksheet}
-            />
+          /* ================================================================
+             SECONDARY TAB: GOOGLE SHEETS TRACKER
+             ================================================================ */
+          <div className="w-full">
+            {params.viewMode === "single" ? (
+              <SingleView params={params} />
+            ) : params.viewMode === "grid" ? (
+              <GridView
+                stocks={params.allStocks ?? []}
+                period={params.period}
+                timeframe={params.timeframe}
+                secondaryTimeframe={params.secondaryTimeframe}
+                isCombine={params.isCombineTimeframe}
+                config={params.chartConfig}
+                columns={params.gridColumns}
+                theme={params.theme}
+              />
+            ) : (
+              <TableView
+                selectedSheet={params.selectedSheet}
+                worksheet={params.worksheet}
+              />
+            )}
           </div>
         )}
       </main>

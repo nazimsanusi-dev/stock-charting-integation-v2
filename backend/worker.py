@@ -1,6 +1,7 @@
-"""Cloudflare Workers Python entry point — no framework, pure Python routing."""
+"""Cloudflare Workers Python entry point — pure Python routing with BigQuery support."""
 import os
 import json
+from src.services.bigquery_service import BigQueryService
 
 
 def _create_headers(extra_headers: dict | None = None):
@@ -24,6 +25,8 @@ def _load_env(env) -> None:
         "SHEET_URLS": lambda: env.SHEET_URLS,
         "SHEET_LABELS": lambda: env.SHEET_LABELS,
         "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+        "BIGQUERY_PROJECT_ID": lambda: getattr(env, "BIGQUERY_PROJECT_ID", None),
+        "BIGQUERY_ACCESS_TOKEN": lambda: getattr(env, "BIGQUERY_ACCESS_TOKEN", None),
     }
     for key, getter in mapping.items():
         try:
@@ -65,6 +68,17 @@ def _json(data, status=200, cache_seconds=0):
     return Response.new(json.dumps(data), status=status, headers=headers)
 
 
+def _get_bq_service(env):
+    """Inisialisasi BigQueryService menggunakan persekitaran Worker."""
+    project_id = getattr(env, "BIGQUERY_PROJECT_ID", os.environ.get("BIGQUERY_PROJECT_ID", ""))
+    access_token = getattr(env, "BIGQUERY_ACCESS_TOKEN", os.environ.get("BIGQUERY_ACCESS_TOKEN", ""))
+    
+    if not project_id:
+        raise ValueError("BIGQUERY_PROJECT_ID tidak ditetapkan dalam tetapan environment.")
+        
+    return BigQueryService(project_id=project_id, access_token=access_token)
+
+
 async def _route(request, env):
     from urllib.parse import urlparse, parse_qs
     from src.config import settings
@@ -82,11 +96,12 @@ async def _route(request, env):
             "SHEET_URLS": lambda: env.SHEET_URLS,
             "SHEET_LABELS": lambda: env.SHEET_LABELS,
             "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+            "BIGQUERY_PROJECT_ID": lambda: getattr(env, "BIGQUERY_PROJECT_ID", None),
         }
         for key, getter in tests.items():
             try:
                 val = getter()
-                debug[key] = f"FOUND (len={len(str(val))})"
+                debug[key] = f"FOUND (len={len(str(val))})" if val else "NOT SET"
             except Exception as e:
                 debug[key] = f"ERROR: {type(e).__name__}: {e}"
         debug["os_SHEET_URLS"] = os.environ.get("SHEET_URLS", "NOT SET")
@@ -96,6 +111,36 @@ async def _route(request, env):
     if path == "/health":
         return _json({"status": "ok"})
 
+    # ==============================================================================
+    # SUBSECTOR ANALYSIS ENDPOINTS (BIGQUERY)
+    # ==============================================================================
+    if path == "/api/subsector_ranks":
+        try:
+            bq = _get_bq_service(env)
+            ranks = bq.get_subsector_ranks()
+            return _json(ranks, cache_seconds=300)
+        except Exception as e:
+            return _json({"error": str(e)}, status=500)
+
+    if path == "/api/subsector_heatmap":
+        try:
+            bq = _get_bq_service(env)
+            heatmap = bq.get_subsector_heatmap()
+            return _json(heatmap, cache_seconds=300)
+        except Exception as e:
+            return _json({"error": str(e)}, status=500)
+
+    if path == "/api/subsector_ohlc/bulk":
+        try:
+            bq = _get_bq_service(env)
+            bulk_ohlc = bq.get_subsector_bulk_ohlc()
+            return _json(bulk_ohlc, cache_seconds=300)
+        except Exception as e:
+            return _json({"error": str(e)}, status=500)
+
+    # ==============================================================================
+    # GOOGLE SHEETS & CHARTS ENDPOINTS
+    # ==============================================================================
     if path == "/api/sheets":
         try:
             urls = getattr(settings, "sheet_urls", []) or []
@@ -134,7 +179,6 @@ async def _route(request, env):
         try:
             stocks = await get_stock_list(sheet_url, worksheet or "Sheet1", sa)
         except Exception as e:
-            # Fallback ke tab pertama sekiranya nama worksheet asal tiada
             all_sheets = await get_worksheet_names(sheet_url, sa)
             if all_sheets:
                 stocks = await get_stock_list(sheet_url, all_sheets[0], sa)
@@ -181,7 +225,6 @@ async def _route(request, env):
 async def on_fetch(request, env):
     from js import Response  # type: ignore[import]
 
-    # Kendali preflight request (OPTIONS)
     if str(request.method).upper() == "OPTIONS":
         return Response.new("", status=204, headers=_create_headers())
 

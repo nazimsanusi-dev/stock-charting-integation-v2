@@ -19,9 +19,13 @@ const TIMEFRAMES = [
   { value: "1mo", label: "Monthly" },
 ] as const;
 
+interface ExtendedSidebarParams extends SidebarParams {
+  activeTab?: "subsector" | "sheets";
+}
+
 interface Props {
-  params: SidebarParams;
-  onChange: (p: SidebarParams) => void;
+  params: ExtendedSidebarParams;
+  onChange: (p: ExtendedSidebarParams) => void;
 }
 
 export function Sidebar({ params, onChange }: Props) {
@@ -34,6 +38,8 @@ export function Sidebar({ params, onChange }: Props) {
   const [loadingStocks, setLoadingStocks] = useState(false);
   const [sheetsError, setSheetsError] = useState<string | null>(null);
   const [stocksError, setStocksError] = useState<string | null>(null);
+
+  const activeTab = params.activeTab ?? "subsector";
 
   // 1. Fetch senarai Sheets bila component mount
   useEffect(() => {
@@ -110,7 +116,7 @@ export function Sidebar({ params, onChange }: Props) {
     });
   };
 
-  const set = (patch: Partial<SidebarParams>) => onChange({ ...params, ...patch });
+  const set = (patch: Partial<ExtendedSidebarParams>) => onChange({ ...params, ...patch });
   const setCfg = (patch: Partial<SidebarParams["chartConfig"]>) =>
     set({ chartConfig: { ...params.chartConfig, ...patch } });
 
@@ -133,7 +139,7 @@ export function Sidebar({ params, onChange }: Props) {
           ▶
         </button>
         <span className="text-gray-300 dark:text-gray-600 text-xs rotate-90 mt-4 tracking-widest select-none">
-          STOCKS
+          NAV
         </span>
       </aside>
     );
@@ -155,6 +161,30 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
+      {/* Main Tab Navigation */}
+      <div className="flex flex-col gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <button
+          onClick={() => set({ activeTab: "subsector" })}
+          className={`py-1.5 px-2 text-xs font-semibold rounded-md transition-colors text-left flex items-center gap-2 ${
+            activeTab === "subsector"
+              ? "bg-white dark:bg-gray-700 text-[#26A69A] shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+          }`}
+        >
+          <span>🔥</span> Subsector Analysis
+        </button>
+        <button
+          onClick={() => set({ activeTab: "sheets" })}
+          className={`py-1.5 px-2 text-xs font-semibold rounded-md transition-colors text-left flex items-center gap-2 ${
+            activeTab === "sheets"
+              ? "bg-white dark:bg-gray-700 text-[#26A69A] shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+          }`}
+        >
+          <span>📋</span> Google Sheets Tracker
+        </button>
+      </div>
+
       {/* Theme Toggle Button */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
         <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Theme</span>
@@ -166,340 +196,345 @@ export function Sidebar({ params, onChange }: Props) {
         </button>
       </div>
 
-      {sheets.length > 0 && (
-        <div>
-          <label className="label">Sheet</label>
-          <select
-            className="select"
-            value={params.selectedSheet?.url ?? ""}
-            onChange={(e) => {
-              const newSheet = sheets.find((s) => s.url === e.target.value) ?? null;
-              if (newSheet) {
-                setStocks([]); // Clear state immediately
-                onChange({
-                  ...params,
-                  selectedSheet: newSheet,
-                  worksheet: "",
-                  allStocks: [],
-                  selectedStocks: [],
-                });
-              }
-            }}
-          >
-            {sheets.map((s) => (
-              <option key={s.url} value={s.url}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Worksheet selector */}
-      {worksheets.length > 1 && (
-        <div>
-          <label className="label">Worksheet</label>
-          <select
-            className="select"
-            value={params.worksheet}
-            onChange={(e) => {
-              setStocks([]); // Clear state immediately
-              onChange({
-                ...params,
-                worksheet: e.target.value,
-                selectedStocks: [],
-                allStocks: [],
-              });
-            }}
-          >
-            {worksheets.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Selected stock badge */}
-      {params.selectedStocks[0] && (
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#26A69A]/10 border border-[#26A69A]/30">
-          <span className="w-2 h-2 rounded-full bg-[#26A69A] shrink-0" />
-          <span className="text-xs font-medium text-[#1a7a72] truncate">
-            {params.selectedStocks[0].name}
-          </span>
-          <span className="ml-auto text-xs text-[#26A69A] shrink-0">
-            {params.selectedStocks[0].ticker}
-          </span>
-        </div>
-      )}
-
-      {/* Stock list */}
-      <div className="flex flex-col gap-1">
-        <label className="label">Stocks</label>
-        <input
-          className="input"
-          placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
-          {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
-          {stocksError && <p className="text-xs text-red-400 break-all py-1">⚠ {stocksError}</p>}
-          {filteredStocks.map((s) => {
-            const selected = selectedTicker === s.ticker;
-            return (
-              <label
-                key={s.ticker}
-                className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1 rounded text-xs transition-colors ${
-                  selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <input
-                    type="radio"
-                    name="stock-select"
-                    className="accent-[#26A69A] shrink-0"
-                    checked={selected}
-                    onChange={() => selectStock(s)}
-                    onClick={() => selected && selectStock(s)}
-                  />
-                  <span
-                    className={`truncate ${
-                      selected ? "text-[#1a7a72] font-semibold" : "text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    {s.name}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
-                    {s.ticker}
-                  </span>
-                  {s.change !== undefined && s.change !== null && (
-                    <span
-                      className={`text-[11px] font-mono font-medium ${
-                        Number(s.change) > 0
-                          ? "text-emerald-500"
-                          : Number(s.change) < 0
-                          ? "text-red-500"
-                          : "text-gray-400 dark:text-gray-500"
-                      }`}
-                    >
-                      {Number(s.change) > 0 ? `+${s.change}%` : `${s.change}%`}
-                    </span>
-                  )}
-                </div>
-              </label>
-            );
-          })}
-          {!loadingStocks && filteredStocks.length === 0 && (
-            <p className="text-xs text-gray-400 py-1">
-              {stocks.length ? "No matches" : "No stocks loaded"}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <hr className="border-gray-100 dark:border-gray-800" />
-
-      {/* View mode */}
-      <div>
-        <label className="label">View</label>
-        <div className="flex gap-1">
-          {(["single", "grid", "table"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => set({ viewMode: m })}
-              className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                params.viewMode === m
-                  ? "bg-[#26A69A] text-white border-[#26A69A]"
-                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-              }`}
-            >
-              {m === "single" ? "Single" : m === "grid" ? "Grid" : "Table"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid columns selector */}
-      {params.viewMode === "grid" && (
-        <div>
-          <label className="label">Columns</label>
-          <div className="flex gap-1">
-            {([1, 2, 3, 4] as const).map((n) => {
-              const disabled = params.isCombineTimeframe && n > 2;
-              return (
-                <button
-                  key={n}
-                  disabled={disabled}
-                  onClick={() => set({ gridColumns: n })}
-                  title={disabled ? "Combine mode supports up to 2 columns" : undefined}
-                  className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                    disabled
-                      ? "bg-gray-100 dark:bg-gray-800 text-gray-300 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed"
-                      : params.gridColumns === n
-                      ? "bg-[#26A69A] text-white border-[#26A69A]"
-                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                  }`}
-                >
-                  {n}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Timeframe & Combine Timeframe — hidden in table mode */}
-      {params.viewMode !== "table" && (
+      {/* KAWALAN GOOGLE SHEETS TRACKER (HANYA APABILA TAB SHEETS DIPILIH) */}
+      {activeTab === "sheets" && (
         <>
-          {/* Combine Timeframe Toggle & Selectors */}
-          <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                Combine Timeframes
-              </span>
-              <input
-                type="checkbox"
-                className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
-                checked={params.isCombineTimeframe}
-                onChange={(e) => {
-                  const isChecked = e.target.checked;
-                  set({
-                    isCombineTimeframe: isChecked,
-                    gridColumns: isChecked ? Math.min(params.gridColumns, 2) : params.gridColumns,
-                  });
-                }}
-              />
-            </label>
-
-            {params.isCombineTimeframe && (
-              <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <div>
-                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
-                    TF 1 (Left)
-                  </span>
-                  <select
-                    className="select text-xs mt-0.5 py-1 px-1.5"
-                    value={params.timeframe}
-                    onChange={(e) => set({ timeframe: e.target.value })}
-                  >
-                    {TIMEFRAMES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
-                    TF 2 (Right)
-                  </span>
-                  <select
-                    className="select text-xs mt-0.5 py-1 px-1.5"
-                    value={params.secondaryTimeframe}
-                    onChange={(e) => set({ secondaryTimeframe: e.target.value })}
-                  >
-                    {TIMEFRAMES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Single Timeframe Selector (hanya bila Combine OFF) */}
-          {!params.isCombineTimeframe && (
+          {sheets.length > 0 && (
             <div>
-              <label className="label">Timeframe</label>
-              <div className="flex gap-1">
-                {TIMEFRAMES.map((t) => (
-                  <button
-                    key={t.value}
-                    onClick={() => set({ timeframe: t.value })}
-                    className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                      params.timeframe === t.value
-                        ? "bg-[#26A69A] text-white border-[#26A69A]"
-                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
-                  >
-                    {t.label.slice(0, 1)}
-                  </button>
+              <label className="label">Sheet</label>
+              <select
+                className="select"
+                value={params.selectedSheet?.url ?? ""}
+                onChange={(e) => {
+                  const newSheet = sheets.find((s) => s.url === e.target.value) ?? null;
+                  if (newSheet) {
+                    setStocks([]);
+                    onChange({
+                      ...params,
+                      selectedSheet: newSheet,
+                      worksheet: "",
+                      allStocks: [],
+                      selectedStocks: [],
+                    });
+                  }
+                }}
+              >
+                {sheets.map((s) => (
+                  <option key={s.url} value={s.url}>
+                    {s.label}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           )}
 
-          <div>
-            <label className="label">Period</label>
-            <select
-              className="select"
-              value={params.period}
-              onChange={(e) => set({ period: e.target.value })}
-            >
-              {PERIODS.map((p) => (
-                <option key={p} value={p}>
-                  {PERIOD_LABELS[p]}
-                </option>
-              ))}
-            </select>
+          {/* Worksheet selector */}
+          {worksheets.length > 1 && (
+            <div>
+              <label className="label">Worksheet</label>
+              <select
+                className="select"
+                value={params.worksheet}
+                onChange={(e) => {
+                  setStocks([]);
+                  onChange({
+                    ...params,
+                    worksheet: e.target.value,
+                    selectedStocks: [],
+                    allStocks: [],
+                  });
+                }}
+              >
+                {worksheets.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Selected stock badge */}
+          {params.selectedStocks[0] && (
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[#26A69A]/10 border border-[#26A69A]/30">
+              <span className="w-2 h-2 rounded-full bg-[#26A69A] shrink-0" />
+              <span className="text-xs font-medium text-[#1a7a72] truncate">
+                {params.selectedStocks[0].name}
+              </span>
+              <span className="ml-auto text-xs text-[#26A69A] shrink-0">
+                {params.selectedStocks[0].ticker}
+              </span>
+            </div>
+          )}
+
+          {/* Stock list */}
+          <div className="flex flex-col gap-1">
+            <label className="label">Stocks</label>
+            <input
+              className="input"
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
+              {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
+              {stocksError && <p className="text-xs text-red-400 break-all py-1">⚠ {stocksError}</p>}
+              {filteredStocks.map((s) => {
+                const selected = selectedTicker === s.ticker;
+                return (
+                  <label
+                    key={s.ticker}
+                    className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1 rounded text-xs transition-colors ${
+                      selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <input
+                        type="radio"
+                        name="stock-select"
+                        className="accent-[#26A69A] shrink-0"
+                        checked={selected}
+                        onChange={() => selectStock(s)}
+                        onClick={() => selected && selectStock(s)}
+                      />
+                      <span
+                        className={`truncate ${
+                          selected ? "text-[#1a7a72] font-semibold" : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {s.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
+                        {s.ticker}
+                      </span>
+                      {s.change !== undefined && s.change !== null && (
+                        <span
+                          className={`text-[11px] font-mono font-medium ${
+                            Number(s.change) > 0
+                              ? "text-emerald-500"
+                              : Number(s.change) < 0
+                              ? "text-red-500"
+                              : "text-gray-400 dark:text-gray-500"
+                          }`}
+                        >
+                          {Number(s.change) > 0 ? `+${s.change}%` : `${s.change}%`}
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+              {!loadingStocks && filteredStocks.length === 0 && (
+                <p className="text-xs text-gray-400 py-1">
+                  {stocks.length ? "No matches" : "No stocks loaded"}
+                </p>
+              )}
+            </div>
           </div>
 
           <hr className="border-gray-100 dark:border-gray-800" />
 
-          {/* Indicators */}
-          <div className="flex flex-col gap-2">
-            <label className="label">Indicators</label>
+          {/* View mode */}
+          <div>
+            <label className="label">View</label>
+            <div className="flex gap-1">
+              {(["single", "grid", "table"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => set({ viewMode: m })}
+                  className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                    params.viewMode === m
+                      ? "bg-[#26A69A] text-white border-[#26A69A]"
+                      : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                  }`}
+                >
+                  {m === "single" ? "Single" : m === "grid" ? "Grid" : "Table"}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          {/* Grid columns selector */}
+          {params.viewMode === "grid" && (
             <div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
-              <div className="flex gap-1 mt-0.5">
-                <input
-                  className="input flex-1 text-xs"
-                  value={emaInput}
-                  onChange={(e) => setEmaInput(e.target.value)}
-                  onBlur={applyEma}
-                  onKeyDown={(e) => e.key === "Enter" && applyEma()}
-                  placeholder="5, 10, 20, 50, 100, 150, 200"
-                />
+              <label className="label">Columns</label>
+              <div className="flex gap-1">
+                {([1, 2, 3, 4] as const).map((n) => {
+                  const disabled = params.isCombineTimeframe && n > 2;
+                  return (
+                    <button
+                      key={n}
+                      disabled={disabled}
+                      onClick={() => set({ gridColumns: n })}
+                      title={disabled ? "Combine mode supports up to 2 columns" : undefined}
+                      className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                        disabled
+                          ? "bg-gray-100 dark:bg-gray-800 text-gray-300 dark:text-gray-600 border-gray-200 dark:border-gray-700 cursor-not-allowed"
+                          : params.gridColumns === n
+                          ? "bg-[#26A69A] text-white border-[#26A69A]"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          )}
 
-            {(
-              [
-                ["showVolume", "Volume"],
-                ["showRsi", "RSI (14)"],
-                ["showMacd", "MACD"],
-                ["showCvd", "CVD"],
-                ["showCmf", "CMF (20)"],
-              ] as [keyof SidebarParams["chartConfig"], string][]
-            ).map(([key, label]) => (
-              <label
-                key={key}
-                className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
-              >
-                <input
-                  type="checkbox"
-                  className="accent-[#26A69A]"
-                  checked={params.chartConfig[key] as boolean}
-                  onChange={(e) => setCfg({ [key]: e.target.checked })}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
+          {/* Timeframe & Combine Timeframe — hidden in table mode */}
+          {params.viewMode !== "table" && (
+            <>
+              {/* Combine Timeframe Toggle & Selectors */}
+              <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Combine Timeframes
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
+                    checked={params.isCombineTimeframe}
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      set({
+                        isCombineTimeframe: isChecked,
+                        gridColumns: isChecked ? Math.min(params.gridColumns, 2) : params.gridColumns,
+                      });
+                    }}
+                  />
+                </label>
+
+                {params.isCombineTimeframe && (
+                  <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div>
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                        TF 1 (Left)
+                      </span>
+                      <select
+                        className="select text-xs mt-0.5 py-1 px-1.5"
+                        value={params.timeframe}
+                        onChange={(e) => set({ timeframe: e.target.value })}
+                      >
+                        {TIMEFRAMES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                        TF 2 (Right)
+                      </span>
+                      <select
+                        className="select text-xs mt-0.5 py-1 px-1.5"
+                        value={params.secondaryTimeframe}
+                        onChange={(e) => set({ secondaryTimeframe: e.target.value })}
+                      >
+                        {TIMEFRAMES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Single Timeframe Selector (hanya bila Combine OFF) */}
+              {!params.isCombineTimeframe && (
+                <div>
+                  <label className="label">Timeframe</label>
+                  <div className="flex gap-1">
+                    {TIMEFRAMES.map((t) => (
+                      <button
+                        key={t.value}
+                        onClick={() => set({ timeframe: t.value })}
+                        className={`flex-1 py-1 text-xs rounded border transition-colors ${
+                          params.timeframe === t.value
+                            ? "bg-[#26A69A] text-white border-[#26A69A]"
+                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        {t.label.slice(0, 1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="label">Period</label>
+                <select
+                  className="select"
+                  value={params.period}
+                  onChange={(e) => set({ period: e.target.value })}
+                >
+                  {PERIODS.map((p) => (
+                    <option key={p} value={p}>
+                      {PERIOD_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <hr className="border-gray-100 dark:border-gray-800" />
+
+              {/* Indicators */}
+              <div className="flex flex-col gap-2">
+                <label className="label">Indicators</label>
+
+                <div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
+                  <div className="flex gap-1 mt-0.5">
+                    <input
+                      className="input flex-1 text-xs"
+                      value={emaInput}
+                      onChange={(e) => setEmaInput(e.target.value)}
+                      onBlur={applyEma}
+                      onKeyDown={(e) => e.key === "Enter" && applyEma()}
+                      placeholder="5, 10, 20, 50, 100, 150, 200"
+                    />
+                  </div>
+                </div>
+
+                {(
+                  [
+                    ["showVolume", "Volume"],
+                    ["showRsi", "RSI (14)"],
+                    ["showMacd", "MACD"],
+                    ["showCvd", "CVD"],
+                    ["showCmf", "CMF (20)"],
+                  ] as [keyof SidebarParams["chartConfig"], string][]
+                ).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-[#26A69A]"
+                      checked={params.chartConfig[key] as boolean}
+                      onChange={(e) => setCfg({ [key]: e.target.checked })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
 
       <div className="mt-auto text-xs text-gray-400 dark:text-gray-600 space-y-0.5">
         <p>Data: Yahoo Finance</p>
-        <p>List: Google Sheets</p>
+        <p>List:BigQuery & Google Sheets</p>
       </div>
     </aside>
   );

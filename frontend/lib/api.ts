@@ -1,4 +1,4 @@
-import type { ChartData, SheetEntry, Stock, TableData } from "./types";
+import type { ChartData, SheetEntry, Stock, TableData, SubsectorRank, SubsectorBulkOHLC, SubsectorHeatmapItem } from "./types";
 
 // Matches NEXT_PUBLIC_API_URL in .env.example / .env.local
 const API_BASE_URL =
@@ -86,5 +86,38 @@ export const api = {
     const data: TableData = await res.json();
     // console.log("[api] table:", data.headers.length, "cols,", data.rows.length, "rows");
     return data;
+  },
+
+  /**
+   * Tarik senarai ranking subsektor terkini
+   */
+  async subsectorRanks(): Promise<SubsectorRank[]> {
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ranks`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Gagal mengambil data subsector_ranks");
+    return res.json();
+  },
+
+  /**
+   * Tarik data pukal OHLC (Base 100) bagi semua subsektor
+   */
+  async subsectorBulkOHLC(): Promise<SubsectorBulkOHLC> {
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/bulk`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Gagal mengambil data subsector_ohlc");
+    return res.json();
+  },
+
+  /**
+   * Tarik data gabungan sektor/subsektor untuk Heatmap
+   */
+  async subsectorHeatmap(): Promise<SubsectorHeatmapItem[]> {
+    const res = await fetch(`${API_BASE_URL}/api/subsector_heatmap`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Gagal mengambil data subsector_heatmap");
+    return res.json();
   },
 };

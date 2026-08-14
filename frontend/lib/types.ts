@@ -62,3 +62,43 @@ export interface SidebarParams {
   chartConfig: ChartConfig;
   theme: "light" | "dark";           // Tambah tetapan tema
 }
+
+// ==============================================================================
+// SUBSECTOR ANALYSIS TYPES (BIGQUERY)
+// ==============================================================================
+
+export interface SubsectorRank {
+  date: string;
+  rank: number;
+  subsector_id: number;
+  subsector_name: string;
+  score: number;
+  status: string;
+  return_20d: number;
+  return_5d: number;
+  close_index: number;
+  num_stocks: number;
+}
+
+export interface SubsectorOHLC {
+  subsector_id: number;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface SubsectorBulkOHLC {
+  [subsector_id: number]: SubsectorOHLC[];
+}
+
+export interface SubsectorHeatmapItem {
+  subsector_id: number;
+  subsector_name: string;
+  sector_name: string;
+  score: number;
+  return_5d: number;
+  return_20d: number;
+  num_stocks: number;
+}
