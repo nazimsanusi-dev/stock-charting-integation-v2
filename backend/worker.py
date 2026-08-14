@@ -1,7 +1,7 @@
 """Cloudflare Workers Python entry point — pure Python routing with BigQuery support."""
 import os
 import json
-from src.services.bigquery_service import BigQueryService
+from src.services.bigquery_service import BigQueryService, get_gcp_access_token
 
 
 def _create_headers(extra_headers: dict | None = None):

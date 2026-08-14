@@ -1,7 +1,7 @@
 import json
 import time
 import base64
-from js import fetch, Object, Headers
+from js import fetch, Object, Headers, Uint8Array, crypto
 from pyodide.ffi import to_js
 
 
