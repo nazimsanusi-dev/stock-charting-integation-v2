@@ -68,14 +68,28 @@ def _json(data, status=200, cache_seconds=0):
     return Response.new(json.dumps(data), status=status, headers=headers)
 
 
-def _get_bq_service(env):
-    """Inisialisasi BigQueryService menggunakan persekitaran Worker."""
-    project_id = getattr(env, "BIGQUERY_PROJECT_ID", os.environ.get("BIGQUERY_PROJECT_ID", ""))
-    access_token = getattr(env, "BIGQUERY_ACCESS_TOKEN", os.environ.get("BIGQUERY_ACCESS_TOKEN", ""))
+# def _get_bq_service(env):
+#     """Inisialisasi BigQueryService menggunakan persekitaran Worker."""
+#     project_id = getattr(env, "BIGQUERY_PROJECT_ID", os.environ.get("BIGQUERY_PROJECT_ID", ""))
+#     access_token = getattr(env, "BIGQUERY_ACCESS_TOKEN", os.environ.get("BIGQUERY_ACCESS_TOKEN", ""))
     
-    if not project_id:
-        raise ValueError("BIGQUERY_PROJECT_ID tidak ditetapkan dalam tetapan environment.")
+#     if not project_id:
+#         raise ValueError("BIGQUERY_PROJECT_ID tidak ditetapkan dalam tetapan environment.")
         
+#     return BigQueryService(project_id=project_id, access_token=access_token)
+
+from src.services.bigquery_service import BigQueryService, get_gcp_access_token
+
+async def _get_bq_service(env):
+    project_id = getattr(env, "BIGQUERY_PROJECT_ID", "etl-stock-screener-bursa")
+    sa_json = getattr(env, "GCP_SERVICE_ACCOUNT", "")
+    
+    if not sa_json:
+        raise ValueError("GCP_SERVICE_ACCOUNT tidak wujud dalam secret.")
+        
+    # Jana access token terkini secara automatik
+    access_token = await get_gcp_access_token(sa_json)
+    
     return BigQueryService(project_id=project_id, access_token=access_token)
 
 
@@ -116,7 +130,7 @@ async def _route(request, env):
     # ==============================================================================
     if path == "/api/subsector_ranks":
         try:
-            bq = _get_bq_service(env)
+            bq = await _get_bq_service(env)
             ranks = await bq.get_subsector_ranks()  # Tambah await
             return _json(ranks, cache_seconds=300)
         except Exception as e:
