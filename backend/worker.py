@@ -116,7 +116,7 @@ async def _route(request, env):
     # ==============================================================================
     if path == "/api/subsector_ranks":
         try:
-            bq = _get_bq_service(env)
+            bq = await _get_bq_service(env)
             ranks = await bq.get_subsector_ranks()  # Tambah await
             return _json(ranks, cache_seconds=300)
         except Exception as e:
@@ -124,7 +124,7 @@ async def _route(request, env):
 
     if path == "/api/subsector_heatmap":
         try:
-            bq = _get_bq_service(env)
+            bq = await _get_bq_service(env)
             heatmap = await bq.get_subsector_heatmap()  # Tambah await
             return _json(heatmap, cache_seconds=300)
         except Exception as e:
@@ -132,7 +132,7 @@ async def _route(request, env):
 
     if path == "/api/subsector_ohlc/bulk":
         try:
-            bq = _get_bq_service(env)
+            bq = await _get_bq_service(env)
             bulk_ohlc = await bq.get_subsector_bulk_ohlc()  # Tambah await
             return _json(bulk_ohlc, cache_seconds=300)
         except Exception as e:

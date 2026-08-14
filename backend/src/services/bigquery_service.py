@@ -87,9 +87,13 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
 
 class BigQueryService:
     def __init__(self, project_id: str, access_token: str):
-        raw_id = project_id or "etl-stock-screener-bursa"
-        self.project_id = raw_id.strip().strip('"').strip("'")
-        self.access_token = access_token.strip().strip('"').strip("'")
+        # Clean sebarang spaces, quotes, newlines atau carriage returns
+        raw_id = str(project_id or "etl-stock-screener-bursa")
+        self.project_id = raw_id.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
+        
+        raw_token = str(access_token or "")
+        self.access_token = raw_token.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
+        
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
 
     async def _execute_query(self, sql: str):
@@ -108,13 +112,14 @@ class BigQueryService:
             response = await fetch(self.endpoint, to_js(init_opts))
             text_data = await response.text()
         except Exception as e:
-            raise Exception(f"Ralat sambungan rangkaian: {str(e)}")
+            raise Exception(f"Ralat sambungan ke {self.endpoint}: {str(e)}")
 
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
+            # Memaparkan URL endpoint untuk memudahkan pengesahan jika timbul 404
             raise Exception(
-                f"Respons daripada BigQuery bukan JSON sah (HTTP {response.status}): {text_data[:200]}"
+                f"URL: [{self.endpoint}] | Status: HTTP {response.status} | Output: {text_data[:200]}"
             )
 
         if response.status != 200:
