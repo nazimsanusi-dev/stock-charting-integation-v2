@@ -153,6 +153,16 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
+    # Route untuk ambil senarai saham mengikut subsektor
+    if path == "/api/subsector-stocks":
+        subsector_param = url.searchParams.get("subsector") or ""
+        if not subsector_param:
+            return json_response({"stocks": []})
+        
+        bq = await _get_bq_service(env)
+        stocks_data = await bq.get_stocks_by_subsector(subsector_param)
+        return json_response({"stocks": stocks_data})
+
     # ==============================================================================
     # GOOGLE SHEETS & CHARTS ENDPOINTS
     # ==============================================================================

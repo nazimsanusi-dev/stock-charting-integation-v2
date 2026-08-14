@@ -163,6 +163,28 @@ class BigQueryService:
             ORDER BY date ASC
         """)
 
+    async def get_stocks_by_subsector(self, subsector_name: str):
+        # Sanitize nama subsektor untuk elak ralat kueri
+        clean_name = subsector_name.replace("'", "\\'").strip()
+        return await self._execute_query(f"""
+            SELECT 
+                Name, 
+                Code, 
+                Shariah, 
+                Price, 
+                Change, 
+                Change_Percent, 
+                Volume, 
+                MCap_M, 
+                PE, 
+                ROE, 
+                DY, 
+                Scraped_Subsector
+            FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
+            WHERE Scraped_Subsector LIKE '%{clean_name}%'
+            ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
+        """)
+
         result = {}
         for row in raw_rows:
             sub_id = row.get("subsector_id")

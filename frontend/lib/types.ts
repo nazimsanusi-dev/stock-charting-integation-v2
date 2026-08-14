@@ -102,3 +102,18 @@ export interface SubsectorHeatmapItem {
   return_20d: number;
   num_stocks: number;
 }
+
+export interface SubsectorStockItem {
+  Name: string;
+  Code: string;
+  Shariah: string;
+  Price: string;
+  Change: string;
+  Change_Percent: string;
+  Volume: string;
+  MCap_M: string;
+  PE: string;
+  ROE: string;
+  DY: string;
+  Scraped_Subsector: string;
+}

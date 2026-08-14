@@ -9,6 +9,7 @@ import { OHLCSummary } from "@/components/OHLCSummary";
 import { RankingTable } from "@/components/RankingTable";
 import { SubsectorHeatmap } from "@/components/SubsectorHeatmap";
 import { SubsectorChartGrid } from "@/components/SubsectorChartGrid";
+import { SubsectorStocksTable } from "@/components/SubsectorStocksTable";
 
 import { api } from "@/lib/api";
 import { useChartData } from "@/hooks/useChartData";
@@ -164,6 +165,7 @@ export default function Home() {
   // States untuk Hide/Unhide Section (Default: Hidden / False)
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [showRanking, setShowRanking] = useState<boolean>(false);
+  const [showStocksTable, setShowStocksTable] = useState<boolean>(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", params.theme === "dark");
@@ -360,7 +362,45 @@ export default function Home() {
                   )}
                 </section>
 
-                {/* 3. Grid Carta Subsektor (End-to-End) */}
+                {/* 3. Table Saham Mengikut Subsektor (Collapsible) */}
+                <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                  <div
+                    onClick={() => setShowStocksTable(!showStocksTable)}
+                    className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                      <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
+                        Senarai Saham Mengikut Subsektor
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
+                    >
+                      <span>{showStocksTable ? "Tutup" : "Buka"}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          showStocksTable ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {showStocksTable && (
+                    <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+                      <SubsectorStocksTable subsectors={ranksData} />
+                    </div>
+                  )}
+                </section>
+
+                {/* 4. Grid Carta Subsektor (End-to-End) */}
                 <section className="w-full">
                   <h2 className="text-base font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
