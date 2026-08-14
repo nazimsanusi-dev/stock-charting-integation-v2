@@ -45,7 +45,7 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
         for i, b in enumerate(key_der):
             js_key_buf[i] = b
 
-        # Guna js.JSON.parse untuk menghasilkan Objek JS tulen (bukan JS Map)
+        # Guna js.JSON.parse untuk menghasilkan Objek JS tulen (bukan JS Map) 
         key_algorithm = js.JSON.parse(
             json.dumps(
                 {"name": "RSASSA-PKCS1-v1_5", "hash": {"name": "SHA-256"}}
