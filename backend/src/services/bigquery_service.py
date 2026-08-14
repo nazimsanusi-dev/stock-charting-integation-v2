@@ -30,7 +30,7 @@ class BigQueryService:
         except Exception as e:
             raise Exception(f"Ralat sambungan rangkaian (Fetch error): {str(e)}")
 
-        # 2. JSON Parse Error Handling
+        # 2. JSON Parse Error Handling, sangkut kat sini kalau response bukan JSON
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
