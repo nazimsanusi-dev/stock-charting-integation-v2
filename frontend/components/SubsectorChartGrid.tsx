@@ -28,7 +28,7 @@ function calculateEMA(data: { time: string; value: number }[], period: number) {
   return emaData;
 }
 
-// Helper Pengiraan MACD (12, 26, 9)
+// Helper Pengiraan MACD (12, 26, 9) - Mengembalikan Histogram, MACD Line & Signal Line
 function calculateMACD(data: { time: string; value: number }[]) {
   const ema12 = calculateEMA(data, 12);
   const ema26 = calculateEMA(data, 26);
@@ -36,24 +36,29 @@ function calculateMACD(data: { time: string; value: number }[]) {
 
   ema26.forEach((item) => {
     const match12 = ema12.find((x) => x.time === item.time);
-    if (match12) {
+    if (match12 !== undefined) {
       macdMap.set(item.time, match12.value - item.value);
     }
   });
 
   const macdLine = Array.from(macdMap.entries()).map(([time, value]) => ({ time, value }));
   const signalLine = calculateEMA(macdLine, 9);
+  const signalMap = new Map<string, number>(signalLine.map((s) => [s.time, s.value]));
 
-  const histogram = signalLine.map((sig) => {
-    const macdVal = macdMap.get(sig.time) || 0;
-    return {
-      time: sig.time,
-      value: macdVal - sig.value,
-      color: macdVal >= sig.value ? "#10b981" : "#f43f5e",
-    };
-  });
+  const histogram = [];
+  for (const m of macdLine) {
+    const sig = signalMap.get(m.time);
+    if (sig !== undefined) {
+      const diff = m.value - sig;
+      histogram.push({
+        time: m.time,
+        value: diff,
+        color: diff >= 0 ? "#10b981" : "#f43f5e",
+      });
+    }
+  }
 
-  return { histogram };
+  return { macdLine, signalLine, histogram };
 }
 
 function SubsectorCard({
@@ -78,7 +83,7 @@ function SubsectorCard({
 
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
-      height: 280,
+      height: 300,
       layout: {
         background: { type: ColorType.Solid, color: isDark ? "#0d111a" : "#ffffff" },
         textColor: isDark ? "#94a3b8" : "#475569",
@@ -90,15 +95,18 @@ function SubsectorCard({
       },
       rightPriceScale: {
         borderColor: isDark ? "#1e293b" : "#cbd5e1",
-        scaleMargins: { top: 0.12, bottom: 0.28 },
+        scaleMargins: { top: 0.08, bottom: 0.28 },
         autoScale: true,
       },
       timeScale: {
         visible: true,
         borderColor: isDark ? "#1e293b" : "#cbd5e1",
         timeVisible: true,
-        fixLeftEdge: true,
-        fixRightEdge: true,
+        fixLeftEdge: false,  // Benarkan tarik ke kiri tanpa sekatan
+        fixRightEdge: false, // Benarkan ruang margin di kanan
+        rightOffset: 6,      // Ruang ekstra pada tarikh terkini
+        barSpacing: 7,       // Jarak lilin yang selesa
+        minBarSpacing: 2,
       },
       crosshair: {
         vertLine: { color: isDark ? "#475569" : "#94a3b8", style: LineStyle.Dashed },
@@ -118,7 +126,7 @@ function SubsectorCard({
       }))
       .sort((a, b) => (a.time > b.time ? 1 : -1));
 
-    // 1. Candlestick Series (v5 API)
+    // 1. Candlestick Series
     const mainSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#10b981",
       downColor: "#f43f5e",
@@ -130,32 +138,63 @@ function SubsectorCard({
 
     const closePoints = candleData.map((d) => ({ time: d.time, value: d.close }));
 
-    // 2. EMA Overlays (v5 API)
+    // 2. EMA Overlays (EMA 10, 20, 50, 100)
     const ema10Data = calculateEMA(closePoints, 10);
     const ema20Data = calculateEMA(closePoints, 20);
     const ema50Data = calculateEMA(closePoints, 50);
+    const ema100Data = calculateEMA(closePoints, 100);
 
     const ema10 = chart.addSeries(LineSeries, { color: "#eab308", lineWidth: 1, priceLineVisible: false });
     const ema20 = chart.addSeries(LineSeries, { color: "#06b6d4", lineWidth: 1, priceLineVisible: false });
     const ema50 = chart.addSeries(LineSeries, { color: "#d946ef", lineWidth: 1, priceLineVisible: false });
+    const ema100 = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1.5, priceLineVisible: false });
 
     ema10.setData(ema10Data);
     ema20.setData(ema20Data);
     ema50.setData(ema50Data);
+    ema100.setData(ema100Data);
 
-    // 3. MACD Histogram Sub-panel (v5 API)
-    const { histogram } = calculateMACD(closePoints);
+    // 3. MACD Pane (Histogram + MACD Line + Signal Line)
+    const { histogram, macdLine, signalLine } = calculateMACD(closePoints);
+
+    chart.priceScale("macd").applyOptions({
+      scaleMargins: { top: 0.78, bottom: 0.02 },
+      borderColor: isDark ? "#1e293b" : "#cbd5e1",
+    });
+
     const macdHistSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: "volume" },
       priceScaleId: "macd",
-    });
-    chart.priceScale("macd").applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0.02 },
+      priceLineVisible: false,
     });
     macdHistSeries.setData(histogram);
 
-    chart.timeScale().fitContent();
+    const macdLineSeries = chart.addSeries(LineSeries, {
+      color: "#38bdf8", // Sky Blue
+      lineWidth: 1,
+      priceScaleId: "macd",
+      priceLineVisible: false,
+    });
+    macdLineSeries.setData(macdLine);
 
+    const signalLineSeries = chart.addSeries(LineSeries, {
+      color: "#f59e0b", // Amber
+      lineWidth: 1,
+      priceScaleId: "macd",
+      priceLineVisible: false,
+    });
+    signalLineSeries.setData(signalLine);
+
+    // Set paparan lalai fokus kepada data terkini (~65 bars terakhir)
+    const totalBars = candleData.length;
+    if (totalBars > 0) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, totalBars - 65),
+        to: totalBars + 6,
+      });
+    }
+
+    // Resize Observer tanpa reset posisi lilin
     const handleResize = () => {
       if (chartContainerRef.current && chartInstance.current) {
         chartInstance.current.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -202,7 +241,7 @@ function SubsectorCard({
       </div>
 
       {/* Indicator Legend Bar */}
-      <div className="px-3 py-1 bg-gray-100/50 dark:bg-[#0b0e14] border-b border-gray-200 dark:border-slate-800/60 flex items-center justify-between text-[10px] text-gray-500 dark:text-slate-400">
+      <div className="px-3 py-1 bg-gray-100/50 dark:bg-[#0b0e14] border-b border-gray-200 dark:border-slate-800/60 flex flex-wrap items-center justify-between text-[10px] text-gray-500 dark:text-slate-400 gap-y-1">
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1">
             <span className="w-2 h-0.5 bg-yellow-500"></span>EMA 10
@@ -213,8 +252,18 @@ function SubsectorCard({
           <span className="flex items-center gap-1">
             <span className="w-2 h-0.5 bg-fuchsia-500"></span>EMA 50
           </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-0.5 bg-orange-500"></span>EMA 100
+          </span>
         </div>
-        <span className="text-gray-400 dark:text-slate-500 font-mono">MACD (12,26,9)</span>
+        <div className="flex items-center gap-2 font-mono text-[9px]">
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>MACD
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Signal
+          </span>
+        </div>
       </div>
 
       {/* Chart Canvas */}
