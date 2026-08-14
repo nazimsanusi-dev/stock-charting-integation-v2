@@ -1,18 +1,24 @@
 import json
 import time
 import base64
-from js import fetch, Object, Headers, Uint8Array, crypto
+from js import fetch, Object, Headers
 from pyodide.ffi import to_js
 
 
+import base64
+import json
+import time
+import js
+
+
 async def get_gcp_access_token(sa_json_str: str) -> str:
-    """Tukar GCP Service Account JSON kepada Access Token yang sah secara dinamik."""
+    """Tukar GCP Service Account JSON kepada Access Token Google secara automatik."""
     try:
-        sa_data = json.loads(sa_json_str)
+        sa_data = json.loads(sa_json_str.strip())
         client_email = sa_data["client_email"]
         private_key_pem = sa_data["private_key"]
 
-        # 1. Bina Header & Payload JWT
+        # 1. Bina Header & Claim JWT
         now = int(time.time())
         header = {"alg": "RS256", "typ": "JWT"}
         payload = {
@@ -23,63 +29,72 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
             "iat": now,
         }
 
-        def b64url(data_bytes):
-            return base64.urlsafe_b64encode(data_bytes).decode("utf-8").rstrip("=")
+        def b64url(data_bytes: bytes) -> str:
+            return (
+                base64.urlsafe_b64encode(data_bytes).decode("utf-8").rstrip("=")
+            )
 
         header_b64 = b64url(json.dumps(header).encode("utf-8"))
         payload_b64 = b64url(json.dumps(payload).encode("utf-8"))
         unsigned_token = f"{header_b64}.{payload_b64}"
 
-        # 2. Extract Private Key DER
+        # 2. Parse Private Key DER
         pem_body = (
             private_key_pem.replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
             .replace("\n", "")
+            .replace("\r", "")
             .strip()
         )
         key_der = base64.b64decode(pem_body)
 
-        js_key_buffer = Uint8Array.new(len(key_der))
+        js_key_buf = js.Uint8Array.new(len(key_der))
         for i, b in enumerate(key_der):
-            js_key_buffer[i] = b
+            js_key_buf[i] = b
 
-        key_algorithm = to_js({"name": "RSASSA-PKCS1-v1_5", "hash": {"name": "SHA-256"}})
+        # Guna js.JSON.parse untuk menghasilkan Objek JS tulen (bukan JS Map)
+        key_algorithm = js.JSON.parse(
+            json.dumps(
+                {"name": "RSASSA-PKCS1-v1_5", "hash": {"name": "SHA-256"}}
+            )
+        )
+        key_usages = js.JSON.parse(json.dumps(["sign"]))
 
-        imported_key = await crypto.subtle.importKey(
-            "pkcs8", js_key_buffer.buffer, key_algorithm, False, to_js(["sign"])
+        imported_key = await js.crypto.subtle.importKey(
+            "pkcs8", js_key_buf.buffer, key_algorithm, False, key_usages
         )
 
-        # 3. Sign JWT guna Web Crypto API
+        # 3. Sign JWT guna Web Crypto
         token_bytes = unsigned_token.encode("utf-8")
-        js_data_buffer = Uint8Array.new(len(token_bytes))
+        js_data_buf = js.Uint8Array.new(len(token_bytes))
         for i, b in enumerate(token_bytes):
-            js_data_buffer[i] = b
+            js_data_buf[i] = b
 
-        signature_buffer = await crypto.subtle.sign(
-            key_algorithm, imported_key, js_data_buffer.buffer
+        sig_buffer = await js.crypto.subtle.sign(
+            key_algorithm, imported_key, js_data_buf.buffer
         )
 
-        sig_bytes = bytes(Uint8Array.new(signature_buffer))
+        sig_bytes = bytes(js.Uint8Array.new(sig_buffer))
         jwt_signed = f"{unsigned_token}.{b64url(sig_bytes)}"
 
-        # 4. Minta Access Token dari Google OAuth2
+        # 4. Request Access Token dari Google OAuth2
+        headers = js.Headers.new()
+        headers.set("Content-Type", "application/x-www-form-urlencoded")
+
         body_params = f"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion={jwt_signed}"
 
-        opts = to_js(
-            {
-                "method": "POST",
-                "headers": {"Content-Type": "application/x-www-form-urlencoded"},
-                "body": body_params,
-            }
-        )
+        fetch_opts = js.Object.new()
+        fetch_opts.method = "POST"
+        fetch_opts.headers = headers
+        fetch_opts.body = body_params
 
-        res = await fetch("https://oauth2.googleapis.com/token", opts)
+        res = await js.fetch("https://oauth2.googleapis.com/token", fetch_opts)
         text_res = await res.text()
         data = json.loads(text_res)
 
         if "access_token" in data:
             return data["access_token"]
-        raise Exception(f"Google OAuth Failed: {text_res}")
+        raise Exception(f"Google OAuth Error: {text_res}")
 
     except Exception as e:
         raise Exception(f"Gagal menjana GCP Access Token: {str(e)}")
