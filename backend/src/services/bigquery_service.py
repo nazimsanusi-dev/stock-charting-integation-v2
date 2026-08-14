@@ -7,7 +7,7 @@ class BigQueryService:
         if not project_id or not access_token:
             raise ValueError("BIGQUERY_PROJECT_ID atau BIGQUERY_ACCESS_TOKEN tidak wujud dalam environment.")
             
-        self.project_id = project_id
+        self.project_id = project_id or "etl-stock-screener-bursa"
         self.access_token = access_token
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
 
