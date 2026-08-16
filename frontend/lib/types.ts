@@ -113,5 +113,6 @@ export interface SubsectorStockItem {
   PE: string;
   ROE: string;
   DY: string;
+  Scraped_Sector: string;
   Scraped_Subsector: string;
 }

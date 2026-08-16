@@ -182,6 +182,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       <th className="py-2.5 px-3 text-right">Change %</th>
                       <th className="py-2.5 px-3 text-right">Volume</th>
                       <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                      <th className="py-2.5 px-3 text-left">Sector</th>
+                      <th className="py-2.5 px-3 text-left">Subsector</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
@@ -241,6 +243,12 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                           </td>
                           <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
                             {item.MCap_M}
+                          </td>
+                          <td className="py-2 px-3 text-left text-gray-600 dark:text-gray-300 truncate max-w-[120px]">
+                            {item.Scraped_Sector || "-"}
+                          </td>
+                          <td className="py-2 px-3 text-left text-gray-600 dark:text-gray-300 truncate max-w-[140px]">
+                            {item.Scraped_Subsector || "-"}
                           </td>
                         </tr>
                       );
