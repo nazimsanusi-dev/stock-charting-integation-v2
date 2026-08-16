@@ -122,12 +122,12 @@ export const api = {
     return res.json();
   },
 
-  /**
-   * Tarik senarai saham mengikut subsektor terpilih
-   */
-  async subsectorStocks(subsectorName: string): Promise<SubsectorStockItem[]> {
-    const query = new URLSearchParams({ subsector: subsectorName });
-    const res = await fetch(`${API_BASE_URL}/api/subsector-stocks?${query}`, {
+  async subsectorStocks(subsectorName: string = "", search: string = ""): Promise<SubsectorStockItem[]> {
+    const params = new URLSearchParams();
+    if (subsectorName && subsectorName !== "All Stock") params.set("subsector", subsectorName);
+    if (search) params.set("search", search);
+
+    const res = await fetch(`${API_BASE_URL}/api/subsector-stocks?${params.toString()}`, {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("Gagal mengambil senarai saham subsektor");

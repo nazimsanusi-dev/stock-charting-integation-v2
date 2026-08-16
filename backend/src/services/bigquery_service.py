@@ -174,9 +174,24 @@ class BigQueryService:
             grouped[sid].append(r)
         return grouped
 
-    async def get_stocks_by_subsector(self, subsector_name: str):
-        """Ambil senarai saham mengikut subsektor dan susun mengikut Change_Percent tertinggi"""
-        clean_name = subsector_name.replace("'", "\\'").strip()
+    async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = ""):
+        """Ambil senarai saham mengikut subsektor (atau semua) dan sokong carian nama/kod"""
+        where_clauses = []
+
+        # Filter Subsektor (Abaikan jika "All Stock" atau kosong)
+        if subsector_name and subsector_name not in ["All Stock", "all", ""]:
+            clean_sub = subsector_name.replace("'", "\\'").strip()
+            where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
+
+        # Filter Carian Nama / Kod Saham
+        if search and search.strip():
+            clean_search = search.replace("'", "\\'").strip().lower()
+            where_clauses.append(
+                f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE '%{clean_search}%')"
+            )
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
         rows = await self._execute_query(f"""
             SELECT 
                 Name, 
@@ -189,10 +204,11 @@ class BigQueryService:
                 MCap_M, 
                 PE, 
                 ROE, 
-                DY, 
+                DY,
+                Scraped_Sector, 
                 Scraped_Subsector
             FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
-            WHERE Scraped_Subsector LIKE '%{clean_name}%'
+            {where_sql}
             ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
         """)
         return rows or []

@@ -8,7 +8,7 @@ import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
 
 interface Props {
   subsectors: SubsectorRank[];
-  theme?: string;
+  theme?: "dark" | "light";
 }
 
 const DEFAULT_CHART_CONFIG = {
@@ -21,33 +21,25 @@ const DEFAULT_CHART_CONFIG = {
 };
 
 export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
+  // Default ke "All Stock" (id="")
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
   const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination states (10 baris setiap page)
+  // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
 
-  // Set default ke subsektor ranking #1
-  useEffect(() => {
-    if (subsectors.length > 0 && !selectedSubsector) {
-      setSelectedSubsector(subsectors[0].subsector_name);
-    }
-  }, [subsectors, selectedSubsector]);
-
-  // Load senarai saham dari API
-  const loadStocks = async (subName: string) => {
-    if (!subName) return;
+  const loadStocks = async (subName: string, search: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.subsectorStocks(subName);
+      const data = await api.subsectorStocks(subName, search);
       setStocks(data);
       setCurrentPage(1);
-      // Auto-select saham pertama bila data dimuatkan
       if (data && data.length > 0) {
         setSelectedStock(data[0]);
       } else {
@@ -61,20 +53,23 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     }
   };
 
+  // Muat turun semula bila dropdown subsektor berubah
   useEffect(() => {
-    if (selectedSubsector) {
-      loadStocks(selectedSubsector);
-    }
+    loadStocks(selectedSubsector, searchQuery);
   }, [selectedSubsector]);
 
-  // Format ticker Yahoo Finance (cth: "5225.KL")
+  // Handle carian bila tekan Enter atau submit
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadStocks(selectedSubsector, searchQuery);
+  };
+
   const activeTicker = selectedStock?.Code
     ? selectedStock.Code.includes(".KL")
       ? selectedStock.Code
       : `${selectedStock.Code}.KL`
     : null;
 
-  // Hook carta saham untuk bahagian kanan
   const chart = useChartData(
     activeTicker,
     "1y",
@@ -82,47 +77,80 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     DEFAULT_CHART_CONFIG.emaPeriods
   );
 
-  // Pengiraan Paging
   const totalPages = Math.ceil(stocks.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="space-y-4">
-      {/* Header Bar: Dropdown Pemilihan Subsektor */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-            Subsektor:
-          </label>
-          <select
-            value={selectedSubsector}
-            onChange={(e) => setSelectedSubsector(e.target.value)}
-            disabled={loading}
-            className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
-          >
-            {subsectors.map((s) => (
-              <option key={s.subsector_id} value={s.subsector_name}>
-                #{s.rank} {s.subsector_name} ({s.num_stocks} saham)
-              </option>
-            ))}
-          </select>
+      {/* Header Bar: Dropdown Subsektor & Search Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Dropdown Subsektor */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Subsektor:
+            </label>
+            <select
+              value={selectedSubsector}
+              onChange={(e) => setSelectedSubsector(e.target.value)}
+              disabled={loading}
+              className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
+            >
+              {/* Default Option #0 All Stock */}
+              <option value="">#0 All Stock (Semua Saham)</option>
+              {subsectors.map((s) => (
+                <option key={s.subsector_id} value={s.subsector_name}>
+                  #{s.rank} {s.subsector_name} ({s.num_stocks} saham)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Search Input Bar */}
+          <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              placeholder="Cari kod atau nama..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#26A69A] w-44 sm:w-56"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-[#26A69A] hover:bg-[#208a80] text-white font-medium transition"
+            >
+              Cari
+            </button>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  loadStocks(selectedSubsector, "");
+                }}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1"
+                title="Kosongkan carian"
+              >
+                ✕
+              </button>
+            )}
+          </form>
         </div>
 
         <button
-          onClick={() => loadStocks(selectedSubsector)}
-          disabled={loading || !selectedSubsector}
-          className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition"
+          onClick={() => loadStocks(selectedSubsector, searchQuery)}
+          disabled={loading}
+          className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition self-end md:self-auto"
         >
-          <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh Senarai
+          <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh
         </button>
       </div>
 
       {/* 2-Column Split View: Kiri (Table) & Kanan (Chart) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* ===================================================================
-            BAHAGIAN KIRI: JADUAL SAHAM DENGAN SCROLL & PAGING
-           =================================================================== */}
+        {/* Bahagian Kiri: Table Saham */}
         <div className="xl:col-span-7 flex flex-col space-y-2">
           {loading ? (
             <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
@@ -132,13 +160,13 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           ) : error ? (
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
               {error} -{" "}
-              <button onClick={() => loadStocks(selectedSubsector)} className="underline font-bold">
+              <button onClick={() => loadStocks(selectedSubsector, searchQuery)} className="underline font-bold">
                 Cuba Lagi
               </button>
             </div>
           ) : stocks.length === 0 ? (
             <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
-              Tiada data saham untuk subsektor ini.
+              Tiada data saham dijumpai.
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
@@ -156,7 +184,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       <th className="py-2.5 px-3 text-right">MCap (M)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60 font-sans">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                     {paginatedStocks.map((item, idx) => {
                       const changeVal = parseFloat(
                         item.Change_Percent.replace("%", "").replace("+", "")
@@ -221,11 +249,11 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 </table>
               </div>
 
-              {/* Bar Paging */}
+              {/* Bar Pagination */}
               {stocks.length > pageSize && (
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                   <div>
-                    {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length}
+                    {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length} saham
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -252,13 +280,10 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           )}
         </div>
 
-        {/* ===================================================================
-            BAHAGIAN KANAN: CARTA SAHAM YANG DIPILIH
-           =================================================================== */}
+        {/* Bahagian Kanan: Carta Saham */}
         <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[450px]">
           {selectedStock ? (
             <>
-              {/* Header Info Saham Terpilih */}
               <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -293,7 +318,6 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 </div>
               </div>
 
-              {/* Render StockChart */}
               <div className="flex-1 p-2 min-h-[380px]">
                 {chart.loading ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">
@@ -314,7 +338,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                     data={chart.data}
                     config={DEFAULT_CHART_CONFIG}
                     ticker={`${selectedStock.Code}.KL`}
-                    theme={theme === "light" ? "light" : "dark"}
+                    theme={theme}
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">

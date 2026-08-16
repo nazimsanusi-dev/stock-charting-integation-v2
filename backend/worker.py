@@ -161,22 +161,17 @@ async def _route(request, env):
     # Route: Senarai Saham Mengikut Subsektor
     # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
-        try:
-            # 1. Parse query string daripada request.url
-            parsed_url = urlparse(request.url)
-            query_params = parse_qs(parsed_url.query)
-            subsector_param = query_params.get("subsector", [""])[0]
+            try:
+                parsed_url = urlparse(request.url)
+                query_params = parse_qs(parsed_url.query)
+                subsector_param = query_params.get("subsector", [""])[0]
+                search_param = query_params.get("search", [""])[0]
 
-            if not subsector_param:
-                return _json({"stocks": []})
-
-            # 2. Ambil data dari BigQuery
-            bq = await _get_bq_service(env)
-            stocks_data = await bq.get_stocks_by_subsector(subsector_param)
-            return _json({"stocks": stocks_data or []}, cache_seconds=60)
-
-        except Exception as e:
-            return _json({"error": str(e), "stocks": []}, status=500)
+                bq = await _get_bq_service(env)
+                stocks_data = await bq.get_stocks_by_subsector(subsector_param, search_param)
+                return _json({"stocks": stocks_data or []}, cache_seconds=60)
+            except Exception as e:
+                return _json({"error": str(e), "stocks": []}, status=500)
 
     # ==============================================================================
     # GOOGLE SHEETS & CHARTS ENDPOINTS
