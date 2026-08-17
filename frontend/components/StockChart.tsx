@@ -3,7 +3,29 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
-// Helper Penukar Masa Selamat (Timestamp -> yyyy-mm-dd)
+// Helper Penukar Format Masa (Timestamp -> DD/MM/YYYY)
+function formatDisplayDate(time: any): string {
+  if (!time) return "";
+  let d: Date;
+  if (typeof time === "number") {
+    d = new Date(time > 1e11 ? time : time * 1000);
+  } else if (typeof time === "string") {
+    if (/^\d{10,13}$/.test(time)) {
+      const num = Number(time);
+      d = new Date(num > 1e11 ? num : num * 1000);
+    } else {
+      d = new Date(time);
+    }
+  } else {
+    d = new Date(time);
+  }
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// Helper Format Standard Lightweight Charts (yyyy-mm-dd)
 function formatLwcTime(time: any): string {
   if (!time) return "";
   if (typeof time === "number") {
@@ -57,6 +79,7 @@ const EMA_COLORS = ["#2196F3", "#FF9800", "#9C27B0", "#E91E63", "#00BCD4", "#8BC
 type DrawingTool = "none" | "long" | "range";
 
 interface LongPositionDrawing {
+  id: string;
   type: "long";
   entryTime: string;
   entryPrice: number;
@@ -66,6 +89,7 @@ interface LongPositionDrawing {
 }
 
 interface RangeDrawing {
+  id: string;
   type: "range";
   startTime: string;
   startPrice: number;
@@ -95,13 +119,18 @@ export const StockChart = memo(function StockChart({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<any>(null);
   const mainSeriesRef = useRef<any>(null);
+  const lastTickerRef = useRef<string>("");
 
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
-  // State semasa pengguna sedang 'drag' tetikus
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
-  const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
+  // State Ukuran (Drag & Drop)
+  const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
+  const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
+
+  // State Handle TP / SL Long Position
+  const [draggingHandle, setDraggingHandle] = useState<{ id: string; handle: "tp" | "sl" } | null>(null);
+  const [cursorStyle, setCursorStyle] = useState<string>("default");
 
   const C = COLOR_PALETTES[theme];
 
@@ -122,53 +151,67 @@ export const StockChart = memo(function StockChart({
 
     const timeScale = chart.timeScale();
 
-    // Fungsi Render Item Lukisan
-    const renderDrawing = (d: DrawingItem) => {
+    const drawItem = (d: DrawingItem) => {
+      // --- LUKISAN LONG POSITION ---
       if (d.type === "long") {
         const x1 = timeScale.timeToCoordinate(d.entryTime as any);
-        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 ? x1 + 90 : null);
+        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 100 : null);
         const yEntry = series.priceToCoordinate(d.entryPrice);
         const yTp = series.priceToCoordinate(d.tpPrice);
         const ySl = series.priceToCoordinate(d.slPrice);
 
         if (x1 === null || yEntry === null || yTp === null || ySl === null) return;
 
-        const boxWidth = Math.max(70, (x2 ?? x1 + 90) - x1);
+        const boxWidth = Math.max(80, (x2 ?? x1 + 100) - x1);
 
-        // Zon TP (Hijau)
+        // Zon TP
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yTp, boxWidth, yEntry - yTp);
 
-        // Zon SL (Merah)
+        // Zon SL
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yEntry, boxWidth, ySl - yEntry);
 
         // Garisan Entry
         ctx.strokeStyle = "#94a3b8";
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([4, 3]);
         ctx.beginPath();
         ctx.moveTo(x1, yEntry);
         ctx.lineTo(x1 + boxWidth, yEntry);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const targetPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
-        const stopPct = (((d.entryPrice - d.slPrice) / d.entryPrice) * 100).toFixed(2);
-        const riskVal = Math.abs(d.entryPrice - d.slPrice);
-        const rrRatio = riskVal > 0 ? (Math.abs(d.tpPrice - d.entryPrice) / riskVal).toFixed(2) : "1.00";
+        // Handle TP & SL
+        ctx.fillStyle = "#26A69A";
+        ctx.beginPath();
+        ctx.arc(x1 + boxWidth / 2, yTp, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#EF5350";
+        ctx.beginPath();
+        ctx.arc(x1 + boxWidth / 2, ySl, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        const tpPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
+        const slPct = (((d.entryPrice - d.slPrice) / d.entryPrice) * 100).toFixed(2);
+        const risk = Math.abs(d.entryPrice - d.slPrice);
+        const reward = Math.abs(d.tpPrice - d.entryPrice);
+        const rr = risk > 0 ? (reward / risk).toFixed(2) : "0.00";
 
         ctx.fillStyle = theme === "dark" ? "#FFFFFF" : "#111827";
         ctx.font = "bold 10px monospace";
-        ctx.fillText(`Target: +${targetPct}%`, x1 + 6, yTp + 13);
-        ctx.fillText(`R:R = ${rrRatio}`, x1 + 6, yEntry - 4);
-        ctx.fillText(`Stop: -${stopPct}%`, x1 + 6, ySl - 4);
+        ctx.fillText(`Target: +${tpPct}% (RM${d.tpPrice.toFixed(3)})`, x1 + 6, yTp + 14);
+        ctx.fillText(`R:R = ${rr} | Entry: RM${d.entryPrice.toFixed(3)}`, x1 + 6, yEntry - 4);
+        ctx.fillText(`Stop: -${slPct}% (RM${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
       }
 
+      // --- LUKISAN MEASURE TOOL (PRICE & DATE RANGE) ---
       if (d.type === "range") {
         const x1 = timeScale.timeToCoordinate(d.startTime as any);
         const x2 = timeScale.timeToCoordinate(d.endTime as any);
@@ -184,6 +227,7 @@ export const StockChart = memo(function StockChart({
         const priceDiff = d.endPrice - d.startPrice;
         const isUp = priceDiff >= 0;
 
+        // Kotak Kawasan Ukuran
         ctx.fillStyle = isUp ? "rgba(38, 166, 154, 0.18)" : "rgba(239, 83, 80, 0.18)";
         ctx.fillRect(left, top, width, height);
 
@@ -200,56 +244,79 @@ export const StockChart = memo(function StockChart({
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
-        const pctDiff = ((priceDiff / d.startPrice) * 100).toFixed(2);
-        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pctDiff}%) | ${d.barsCount} Bars`;
+        // 1. PIN & HIGHLIGHT POINT 1 (Mula)
+        ctx.fillStyle = "#38BDF8";
+        ctx.beginPath();
+        ctx.arc(x1, y1, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        const p1Text = `P1: ${formatDisplayDate(d.startTime)}, RM${d.startPrice.toFixed(3)}`;
+        ctx.font = "bold 9px monospace";
+        const p1Width = ctx.measureText(p1Text).width;
+        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+        ctx.fillRect(x1 - p1Width / 2 - 4, y1 - 20, p1Width + 8, 15);
+        ctx.fillStyle = "#38BDF8";
+        ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 9);
+
+        // 2. PIN & HIGHLIGHT POINT 2 (Akhir)
+        ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
+        ctx.beginPath();
+        ctx.arc(x2, y2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        const p2Text = `P2: ${formatDisplayDate(d.endTime)}, RM${d.endPrice.toFixed(3)}`;
+        const p2Width = ctx.measureText(p2Text).width;
+        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+        ctx.fillRect(x2 - p2Width / 2 - 4, y2 + 8, p2Width + 8, 15);
+        ctx.fillStyle = isUp ? "#34D399" : "#F87171";
+        ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 19);
+
+        // 3. BADGE UTAMA (RINGKASAN PERUBAHAN)
+        const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
+        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Bars`;
 
         ctx.font = "bold 10px monospace";
         const textWidth = ctx.measureText(label).width;
         const badgeX = left + width / 2 - textWidth / 2 - 6;
-        const badgeY = top - 18 < 0 ? top + height + 4 : top - 18;
+        const badgeY = top - 24 < 0 ? top + height + 6 : top - 24;
 
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
-        ctx.fillRect(badgeX, badgeY, textWidth + 12, 16);
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, textWidth + 12, 18, 4);
+        ctx.fill();
 
         ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "left";
-        ctx.fillText(label, badgeX + 6, badgeY + 12);
+        ctx.fillText(label, badgeX + 6, badgeY + 13);
       }
     };
 
-    // Lukis semua yang telah disimpan
-    drawings.forEach(renderDrawing);
+    drawings.forEach(drawItem);
 
-    // Lukis preview masa nyata semasa 'drag'
-    if (dragStart && dragCurrent) {
-      if (activeTool === "range") {
-        renderDrawing({
-          type: "range",
-          startTime: dragStart.timeStr,
-          startPrice: dragStart.price,
-          endTime: dragCurrent.timeStr,
-          endPrice: dragCurrent.price,
-          barsCount: Math.abs(dragCurrent.barIdx - dragStart.barIdx) + 1,
-        });
-      } else if (activeTool === "long") {
-        const diff = Math.abs(dragCurrent.price - dragStart.price);
-        renderDrawing({
-          type: "long",
-          entryTime: dragStart.timeStr,
-          entryPrice: dragStart.price,
-          tpPrice: Number((dragStart.price + (diff || dragStart.price * 0.06)).toFixed(3)),
-          slPrice: Number((dragStart.price - (diff * 0.5 || dragStart.price * 0.03)).toFixed(3)),
-          endTime: dragCurrent.timeStr,
-        });
-      }
+    // Preview semasa Dragging
+    if (rangeStart && rangeCurrent) {
+      drawItem({
+        id: "preview_range",
+        type: "range",
+        startTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeStart.timeStr : rangeCurrent.timeStr,
+        startPrice: rangeStart.price,
+        endTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeCurrent.timeStr : rangeStart.timeStr,
+        endPrice: rangeCurrent.price,
+        barsCount: Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1,
+      });
     }
-  }, [drawings, dragStart, dragCurrent, activeTool, theme, mini]);
+  }, [drawings, rangeStart, rangeCurrent, theme, mini]);
 
   useEffect(() => {
     redrawCanvas();
-  }, [drawings, dragStart, dragCurrent, redrawCanvas]);
+  }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi TradingView Lightweight Charts
+  // 2. Inisialisasi TradingView Charts (Kekalkan Posisi)
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -308,7 +375,7 @@ export const StockChart = memo(function StockChart({
           }))
         );
 
-        // Volum
+        // Volum (Title Dikosongkan)
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -329,14 +396,12 @@ export const StockChart = memo(function StockChart({
           );
         }
 
-        // EMA Overlays
+        // EMA (Title Dikosongkan)
         if (data.indicators?.ema) {
           Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
             const points = values
               .map((v, i) =>
-                v !== null
-                  ? { time: times[i] as any, value: Number(v) }
-                  : null
+                v !== null ? { time: times[i] as any, value: Number(v) } : null
               )
               .filter(Boolean) as any[];
 
@@ -344,7 +409,7 @@ export const StockChart = memo(function StockChart({
             const s = chart.addSeries(LineSeries, {
               color: EMA_COLORS[idx % EMA_COLORS.length],
               lineWidth: 1,
-              title: `EMA ${period}`,
+              title: "", // Tajuk indicator dikosongkan
               priceLineVisible: false,
               lastValueVisible: false,
             });
@@ -352,13 +417,11 @@ export const StockChart = memo(function StockChart({
           });
         }
 
-        // RSI Pane
+        // RSI (Title Dikosongkan)
         if (!mini && config.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
-              v !== null
-                ? { time: times[i] as any, value: Number(v) }
-                : null
+              v !== null ? { time: times[i] as any, value: Number(v) } : null
             )
             .filter(Boolean) as any[];
 
@@ -367,7 +430,7 @@ export const StockChart = memo(function StockChart({
             const rsiSeries = rsiPane.addSeries(LineSeries, {
               color: C.rsi,
               lineWidth: 1,
-              title: "RSI(14)",
+              title: "", // Tajuk indicator dikosongkan
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -386,30 +449,18 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // MACD Pane
+        // MACD (Title Dikosongkan)
         if (!mini && config.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
-            .map((v, i) =>
-              v !== null
-                ? { time: times[i] as any, value: Number(v) }
-                : null
-            )
+            .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
           const sigPoints = (data.indicators.macd_signal || [])
-            .map((v, i) =>
-              v !== null
-                ? { time: times[i] as any, value: Number(v) }
-                : null
-            )
+            .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
           const histPoints = (data.indicators.macd_histogram || [])
             .map((v, i) =>
               v !== null
-                ? {
-                    time: times[i] as any,
-                    value: Number(v),
-                    color: Number(v) >= 0 ? C.up : C.down,
-                  }
+                ? { time: times[i] as any, value: Number(v), color: Number(v) >= 0 ? C.up : C.down }
                 : null
             )
             .filter(Boolean) as any[];
@@ -426,7 +477,7 @@ export const StockChart = memo(function StockChart({
             const m = macdPane.addSeries(LineSeries, {
               color: C.macd,
               lineWidth: 1,
-              title: "MACD",
+              title: "", // Tajuk indicator dikosongkan
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -436,7 +487,7 @@ export const StockChart = memo(function StockChart({
               const s = macdPane.addSeries(LineSeries, {
                 color: C.macdSignal,
                 lineWidth: 1,
-                title: "Signal",
+                title: "", // Tajuk indicator dikosongkan
                 priceLineVisible: false,
                 lastValueVisible: true,
               });
@@ -445,7 +496,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // CVD Pane
+        // CVD (Title Dikosongkan)
         if (!mini && config.showCvd && data.indicators?.cvd) {
           const cvdCandles = data.indicators.cvd as unknown as Array<{
             open: number;
@@ -465,7 +516,7 @@ export const StockChart = memo(function StockChart({
               wickDownColor: C.down,
               priceLineVisible: false,
               lastValueVisible: true,
-              title: "CVD",
+              title: "", // Tajuk indicator dikosongkan
             });
 
             cvdSeries.setData(
@@ -480,14 +531,10 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // CMF Pane
+        // CMF (Title Dikosongkan)
         if (!mini && config.showCmf && data.indicators?.cmf) {
           const cmfPoints = data.indicators.cmf
-            .map((v, i) =>
-              v !== null
-                ? { time: times[i] as any, value: Number(v) }
-                : null
-            )
+            .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
 
           if (cmfPoints.length) {
@@ -495,7 +542,7 @@ export const StockChart = memo(function StockChart({
             const cmf = cmfPane.addSeries(LineSeries, {
               color: C.cmf,
               lineWidth: 1,
-              title: "CMF(20)",
+              title: "", // Tajuk indicator dikosongkan
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -512,19 +559,18 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // Sinkronisasi Canvas semasa Zoom / Scroll
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
           redrawCanvas();
         });
 
-        if (data.ohlcv.length > 0) {
+        // Hanya set skala awal jika ticker bertukar (tidak mereset posisi carta semasa interaksi alat)
+        if (ticker !== lastTickerRef.current && data.ohlcv.length > 0) {
+          lastTickerRef.current = ticker;
           const totalBars = data.ohlcv.length;
           chart.timeScale().setVisibleLogicalRange({
             from: Math.max(0, totalBars - 105),
             to: totalBars - 1,
           });
-        } else {
-          chart.timeScale().fitContent();
         }
 
         redrawCanvas();
@@ -536,9 +582,9 @@ export const StockChart = memo(function StockChart({
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [data, config, mini, theme, redrawCanvas]);
+  }, [data, config, mini, theme, ticker, redrawCanvas]);
 
-  // 3. Pengendali Drag Tetikus Interaktif
+  // 3. Pengendali Acara Tetikus
   const getCoordinatesFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -561,63 +607,133 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
+  const checkHoverHandle = (x: number, y: number) => {
+    const chart = chartRef.current;
+    const series = mainSeriesRef.current;
+    if (!chart || !series) return null;
+
+    for (const d of drawings) {
+      if (d.type === "long") {
+        const x1 = chart.timeScale().timeToCoordinate(d.entryTime as any);
+        const x2 = chart.timeScale().timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 100 : null);
+        const yTp = series.priceToCoordinate(d.tpPrice);
+        const ySl = series.priceToCoordinate(d.slPrice);
+
+        if (x1 === null || yTp === null || ySl === null) continue;
+        const boxWidth = Math.max(80, (x2 ?? x1 + 100) - x1);
+
+        if (x >= x1 && x <= x1 + boxWidth && Math.abs(y - yTp) <= 8) {
+          return { id: d.id, handle: "tp" as const };
+        }
+        if (x >= x1 && x <= x1 + boxWidth && Math.abs(y - ySl) <= 8) {
+          return { id: d.id, handle: "sl" as const };
+        }
+      }
+    }
+    return null;
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === "none" || mini) return;
+    if (mini) return;
     const coord = getCoordinatesFromEvent(e);
     if (!coord) return;
 
-    setDragStart(coord);
-    setDragCurrent(coord);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!dragStart || activeTool === "none" || mini) return;
-    const coord = getCoordinatesFromEvent(e);
-    if (!coord) return;
-
-    setDragCurrent(coord);
-  };
-
-  const handleMouseUp = () => {
-    if (!dragStart || !dragCurrent || activeTool === "none") {
-      setDragStart(null);
-      setDragCurrent(null);
+    const hovered = checkHoverHandle(coord.x, coord.y);
+    if (hovered) {
+      setDraggingHandle(hovered);
       return;
     }
 
     if (activeTool === "range") {
-      const barsCount = Math.abs(dragCurrent.barIdx - dragStart.barIdx) + 1;
-      const isStartFirst = dragStart.barIdx <= dragCurrent.barIdx;
+      setRangeStart(coord);
+      setRangeCurrent(coord);
+      return;
+    }
+
+    if (activeTool === "long") {
+      const bars = data.ohlcv;
+      const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
+      const entryP = coord.price;
+
+      const newLong: LongPositionDrawing = {
+        id: `long_${Date.now()}`,
+        type: "long",
+        entryTime: coord.timeStr,
+        entryPrice: entryP,
+        tpPrice: Number((entryP * 1.06).toFixed(3)),
+        slPrice: Number((entryP * 0.98).toFixed(3)),
+        endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
+      };
+
+      setDrawings((prev) => [...prev, newLong]);
+      setActiveTool("none");
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mini) return;
+    const coord = getCoordinatesFromEvent(e);
+    if (!coord) return;
+
+    if (draggingHandle) {
+      setDrawings((prev) =>
+        prev.map((d) => {
+          if (d.id === draggingHandle.id && d.type === "long") {
+            if (draggingHandle.handle === "tp") {
+              return { ...d, tpPrice: Math.max(d.entryPrice + 0.001, coord.price) };
+            }
+            if (draggingHandle.handle === "sl") {
+              return { ...d, slPrice: Math.min(d.entryPrice - 0.001, coord.price) };
+            }
+          }
+          return d;
+        })
+      );
+      return;
+    }
+
+    if (rangeStart && activeTool === "range") {
+      setRangeCurrent(coord);
+      return;
+    }
+
+    const hovered = checkHoverHandle(coord.x, coord.y);
+    if (hovered) {
+      setCursorStyle("ns-resize");
+    } else if (activeTool !== "none") {
+      setCursorStyle("crosshair");
+    } else {
+      setCursorStyle("default");
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (draggingHandle) {
+      setDraggingHandle(null);
+      return;
+    }
+
+    if (rangeStart && rangeCurrent && activeTool === "range") {
+      const barsCount = Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1;
+      const isStartFirst = rangeStart.barIdx <= rangeCurrent.barIdx;
 
       setDrawings((prev) => [
         ...prev,
         {
+          id: `range_${Date.now()}`,
           type: "range",
-          startTime: isStartFirst ? dragStart.timeStr : dragCurrent.timeStr,
-          startPrice: isStartFirst ? dragStart.price : dragCurrent.price,
-          endTime: isStartFirst ? dragCurrent.timeStr : dragStart.timeStr,
-          endPrice: isStartFirst ? dragCurrent.price : dragStart.price,
+          startTime: isStartFirst ? rangeStart.timeStr : rangeCurrent.timeStr,
+          startPrice: rangeStart.price,
+          endTime: isStartFirst ? rangeCurrent.timeStr : rangeStart.timeStr,
+          endPrice: rangeCurrent.price,
           barsCount,
         },
       ]);
-    } else if (activeTool === "long") {
-      const diff = Math.abs(dragCurrent.price - dragStart.price);
-      setDrawings((prev) => [
-        ...prev,
-        {
-          type: "long",
-          entryTime: dragStart.timeStr,
-          entryPrice: dragStart.price,
-          tpPrice: Number((dragStart.price + (diff || dragStart.price * 0.06)).toFixed(3)),
-          slPrice: Number((dragStart.price - (diff * 0.5 || dragStart.price * 0.03)).toFixed(3)),
-          endTime: dragCurrent.timeStr,
-        },
-      ]);
-    }
 
-    setDragStart(null);
-    setDragCurrent(null);
-    setActiveTool("none");
+      setRangeStart(null);
+      setRangeCurrent(null);
+      setActiveTool("none");
+    }
   };
 
   return (
@@ -631,30 +747,16 @@ export const StockChart = memo(function StockChart({
               type="button"
               onClick={() => {
                 setActiveTool("none");
-                setDragStart(null);
-                setDragCurrent(null);
+                setRangeStart(null);
+                setRangeCurrent(null);
               }}
               className={`px-2 py-0.5 rounded border transition ${
                 activeTool === "none"
                   ? "bg-gray-300 dark:bg-gray-700 font-bold border-gray-400 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Kursor Biasa"
             >
               👆 Pointer
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTool("long")}
-              className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
-                activeTool === "long"
-                  ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
-                  : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
-              }`}
-              title="Klik & seret pada carta untuk menetapkan Long Position (TP/SL)"
-            >
-              📈 Long Position
             </button>
 
             <button
@@ -665,9 +767,22 @@ export const StockChart = memo(function StockChart({
                   ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik & seret pada carta untuk mengukur Julat Harga & Bilangan Lilin"
+              title="Klik & drag pada carta untuk mengukur % harga & bilangan lilin"
             >
               📐 Price & Date Range
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTool("long")}
+              className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
+                activeTool === "long"
+                  ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
+                  : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+              }`}
+              title="Klik pada lilin untuk letak Long (Default TP +6%, SL -2% & boleh drag)"
+            >
+              📈 Long Position
             </button>
           </div>
 
@@ -686,6 +801,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
+      {/* Bekas Carta TV & Canvas Ukuran */}
       <div className="relative flex-1 w-full" style={{ minHeight: mini ? 200 : 550 }}>
         <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
@@ -695,8 +811,11 @@ export const StockChart = memo(function StockChart({
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            style={{ cursor: cursorStyle }}
             className={`absolute inset-0 w-full h-full z-10 ${
-              activeTool !== "none" ? "cursor-crosshair pointer-events-auto" : "pointer-events-none"
+              activeTool !== "none" || drawings.length > 0
+                ? "pointer-events-auto"
+                : "pointer-events-none"
             }`}
           />
         )}
