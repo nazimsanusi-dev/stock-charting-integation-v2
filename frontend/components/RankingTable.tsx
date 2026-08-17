@@ -394,12 +394,37 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                   </div>
                 </div>
 
-                {/* Legend Mini Penunjuk EMA */}
-                <div className="flex items-center gap-2 text-[10px] font-mono">
-                  <span className="text-[#38bdf8]">EMA10</span>
-                  <span className="text-[#f59e0b]">EMA20</span>
-                  <span className="text-[#a855f7]">EMA50</span>
-                  <span className="text-[#f43f5e]">EMA100</span>
+                {/* Legend Mini Penunjuk Changes (5D & 20D) */}
+                <div className="flex items-center gap-3 text-[11px] font-mono">
+                  <span>
+                    5D:{" "}
+                    <strong
+                      className={
+                        parseNum(selectedSubsector.return_5d) >= 0
+                          ? "text-emerald-500"
+                          : "text-rose-500"
+                      }
+                    >
+                      {parseNum(selectedSubsector.return_5d) >= 0 ? "+" : ""}
+                      {formatNum(selectedSubsector.return_5d)}%
+                    </strong>
+                  </span>
+
+                  <span className="text-gray-300 dark:text-gray-700">•</span>
+
+                  <span>
+                    20D:{" "}
+                    <strong
+                      className={
+                        parseNum(selectedSubsector.return_20d) >= 0
+                          ? "text-emerald-500"
+                          : "text-rose-500"
+                      }
+                    >
+                      {parseNum(selectedSubsector.return_20d) >= 0 ? "+" : ""}
+                      {formatNum(selectedSubsector.return_20d)}%
+                    </strong>
+                  </span>
                 </div>
               </div>
 
