@@ -288,6 +288,16 @@ export default function Home() {
 
             {loadingSubsector ? (
               <div className="flex flex-col items-center justify-center p-16 space-y-4">
+                {/* Keyframes 3.5 Saat */}
+                <style>{`
+                  @keyframes loadProgress35 {
+                    0% { width: 0%; }
+                    30% { width: 35%; }
+                    70% { width: 75%; }
+                    100% { width: 98%; }
+                  }
+                `}</style>
+
                 <div className="w-full max-w-sm space-y-2.5">
                   <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                     <span className="flex items-center gap-1.5">
@@ -301,16 +311,21 @@ export default function Home() {
 
                   {/* Progress Bar Container */}
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden relative">
-                    {/* Bar yang bergerak dari kiri ke kanan */}
-                    <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full w-1/3 rounded-full absolute left-0 top-0 animate-[shimmer_1.5s_infinite_linear]"></div>
+                    {/* Bar bergerak dari 0% ke 100% selama 3.5s */}
+                    <div
+                      className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full rounded-full"
+                      style={{
+                        animation: "loadProgress35 3.5s ease-out forwards",
+                      }}
+                    />
                   </div>
                 </div>
-                
+
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center max-w-xs leading-relaxed">
                   Menyusun ranking momentum, indeks Base 100, & data lilin pasaran semasa.
                 </p>
               </div>
-            ): subsectorError ? (
+            ) : subsectorError ? (
               <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
                 <div className="text-3xl">⚠️</div>
                 <div className="text-rose-600 dark:text-rose-400 font-semibold text-base">
