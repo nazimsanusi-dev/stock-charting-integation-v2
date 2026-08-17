@@ -198,9 +198,11 @@ async def _route(request, env):
     # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
         try:
-            subsector_param = q("subsector", "")
-            search_param = q("search", "")
-            min_price_str = q("min_price", "0.3")
+            parsed_url = urlparse(request.url)
+            query_params = parse_qs(parsed_url.query)
+            subsector_param = query_params.get("subsector", [""])[0]
+            search_param = query_params.get("search", [""])[0]
+            min_price_str = query_params.get("min_price", ["0.3"])[0]
 
             try:
                 min_price_val = float(min_price_str) if min_price_str != "" else 0.0
@@ -209,7 +211,7 @@ async def _route(request, env):
 
             bq = await _get_bq_service(env)
             stocks_data = await bq.get_stocks_by_subsector(subsector_param, search_param, min_price_val)
-            return _json(stocks_data or [], cache_seconds=60)
+            return _json({"stocks": stocks_data or []}, cache_seconds=60)
         except Exception as e:
             return _json({"error": str(e), "stocks": []}, status=500)
 
