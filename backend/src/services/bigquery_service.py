@@ -213,6 +213,6 @@ class BigQueryService:
                 Scraped_Subsector
             FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
             {where_sql}
-            ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC, Shariah DESC
+            ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
         """)
         return rows or []
