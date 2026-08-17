@@ -2,8 +2,8 @@
 import os
 import json
 import js
-from src.services.bigquery_service import BigQueryService, get_gcp_access_token
 from urllib.parse import parse_qs, urlparse
+from src.services.bigquery_service import BigQueryService, get_gcp_access_token
 
 
 def _create_headers(extra_headers: dict | None = None):
@@ -24,9 +24,10 @@ def _create_headers(extra_headers: dict | None = None):
 
 def _load_env(env) -> None:
     mapping = {
-        "SHEET_URLS": lambda: env.SHEET_URLS,
-        "SHEET_LABELS": lambda: env.SHEET_LABELS,
-        "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+        "SHEET_URLS": lambda: getattr(env, "SHEET_URLS", None),
+        "SHEET_LABELS": lambda: getattr(env, "SHEET_LABELS", None),
+        "GCP_SERVICE_ACCOUNT": lambda: getattr(env, "GCP_SERVICE_ACCOUNT", None),
+        "GCP_SERVICE_ACCOUNT_BQ": lambda: getattr(env, "GCP_SERVICE_ACCOUNT_BQ", None),
         "BIGQUERY_PROJECT_ID": lambda: getattr(env, "BIGQUERY_PROJECT_ID", None),
         "BIGQUERY_ACCESS_TOKEN": lambda: getattr(env, "BIGQUERY_ACCESS_TOKEN", None),
     }
@@ -70,33 +71,29 @@ def _json(data, status=200, cache_seconds=0):
     return Response.new(json.dumps(data), status=status, headers=headers)
 
 
-# def _get_bq_service(env):
-#     """Inisialisasi BigQueryService menggunakan persekitaran Worker."""
-#     project_id = getattr(env, "BIGQUERY_PROJECT_ID", os.environ.get("BIGQUERY_PROJECT_ID", ""))
-#     access_token = getattr(env, "BIGQUERY_ACCESS_TOKEN", os.environ.get("BIGQUERY_ACCESS_TOKEN", ""))
-    
-#     if not project_id:
-#         raise ValueError("BIGQUERY_PROJECT_ID tidak ditetapkan dalam tetapan environment.")
-        
-#     return BigQueryService(project_id=project_id, access_token=access_token)
-
-from src.services.bigquery_service import BigQueryService, get_gcp_access_token
-
 async def _get_bq_service(env):
-    project_id = getattr(env, "BIGQUERY_PROJECT_ID", "etl-stock-screener-bursa")
-    sa_json = getattr(env, "GCP_SERVICE_ACCOUNT_BQ", "")
+    """Inisialisasi BigQueryService dengan penjanaan token GCP automatik."""
+    project_id = (
+        getattr(env, "BIGQUERY_PROJECT_ID", None)
+        or os.environ.get("BIGQUERY_PROJECT_ID")
+        or "etl-stock-screener-bursa"
+    )
+    sa_json = (
+        getattr(env, "GCP_SERVICE_ACCOUNT_BQ", None)
+        or getattr(env, "GCP_SERVICE_ACCOUNT", None)
+        or os.environ.get("GCP_SERVICE_ACCOUNT_BQ")
+        or os.environ.get("GCP_SERVICE_ACCOUNT")
+        or ""
+    )
     
     if not sa_json:
-        raise ValueError("GCP_SERVICE_ACCOUNT tidak wujud dalam secret.")
+        raise ValueError("GCP_SERVICE_ACCOUNT / GCP_SERVICE_ACCOUNT_BQ tidak wujud dalam secret/environment.")
         
-    # Jana access token terkini secara automatik
     access_token = await get_gcp_access_token(sa_json)
-    
     return BigQueryService(project_id=project_id, access_token=access_token)
 
 
 async def _route(request, env):
-    from urllib.parse import urlparse, parse_qs
     from src.config import settings
 
     parsed = urlparse(str(request.url))
@@ -109,9 +106,10 @@ async def _route(request, env):
     if path == "/debug/env":
         debug = {}
         tests = {
-            "SHEET_URLS": lambda: env.SHEET_URLS,
-            "SHEET_LABELS": lambda: env.SHEET_LABELS,
-            "GCP_SERVICE_ACCOUNT": lambda: env.GCP_SERVICE_ACCOUNT,
+            "SHEET_URLS": lambda: getattr(env, "SHEET_URLS", None),
+            "SHEET_LABELS": lambda: getattr(env, "SHEET_LABELS", None),
+            "GCP_SERVICE_ACCOUNT": lambda: getattr(env, "GCP_SERVICE_ACCOUNT", None),
+            "GCP_SERVICE_ACCOUNT_BQ": lambda: getattr(env, "GCP_SERVICE_ACCOUNT_BQ", None),
             "BIGQUERY_PROJECT_ID": lambda: getattr(env, "BIGQUERY_PROJECT_ID", None),
         }
         for key, getter in tests.items():
@@ -133,16 +131,16 @@ async def _route(request, env):
     if path == "/api/subsector_ranks":
         try:
             bq = await _get_bq_service(env)
-            ranks = await bq.get_subsector_ranks()  # Tambah await
-            return _json(ranks, cache_seconds=300)
+            ranks = await bq.get_subsector_ranks()
+            return _json(ranks or [], cache_seconds=300)
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
     if path == "/api/subsector_heatmap":
         try:
             bq = await _get_bq_service(env)
-            heatmap = await bq.get_subsector_heatmap()  # Tambah await
-            return _json(heatmap, cache_seconds=300)
+            heatmap = await bq.get_subsector_heatmap()
+            return _json(heatmap or [], cache_seconds=300)
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
@@ -168,10 +166,9 @@ async def _route(request, env):
             if not rows:
                 return _json({"error": "Data subsektor tidak dijumpai"}, status=404)
 
-            # Formatkan kepada senarai lilin standard OHLCV
             ohlcv = [
                 {
-                    "time": r.get("date"),
+                    "time": str(r.get("date")),
                     "open": float(r.get("open", 0)),
                     "high": float(r.get("high", 0)),
                     "low": float(r.get("low", 0)),
@@ -181,10 +178,10 @@ async def _route(request, env):
                 for r in rows
             ]
 
-            # Kira indikator teknikal jika modul wujud
+            indicators = {}
             try:
-                from src.services.indicators import calculate_indicators
-                indicators = calculate_indicators(ohlcv, [5, 10, 20, 50, 100, 200])
+                from src.services import indicators as ind
+                indicators = ind.calculate_all(ohlcv, [10, 20, 50, 100])
             except Exception:
                 indicators = {}
 
@@ -201,11 +198,9 @@ async def _route(request, env):
     # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
         try:
-            parsed_url = urlparse(request.url)
-            query_params = parse_qs(parsed_url.query)
-            subsector_param = query_params.get("subsector", [""])[0]
-            search_param = query_params.get("search", [""])[0]
-            min_price_str = query_params.get("min_price", ["0.3"])[0]
+            subsector_param = q("subsector", "")
+            search_param = q("search", "")
+            min_price_str = q("min_price", "0.3")
 
             try:
                 min_price_val = float(min_price_str) if min_price_str != "" else 0.0
@@ -214,7 +209,7 @@ async def _route(request, env):
 
             bq = await _get_bq_service(env)
             stocks_data = await bq.get_stocks_by_subsector(subsector_param, search_param, min_price_val)
-            return _json({"stocks": stocks_data or []}, cache_seconds=60)
+            return _json(stocks_data or [], cache_seconds=60)
         except Exception as e:
             return _json({"error": str(e), "stocks": []}, status=500)
 

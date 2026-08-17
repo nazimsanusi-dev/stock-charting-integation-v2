@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import type { SubsectorRank, ChartData } from "@/lib/types";
+import type { SubsectorRank, ChartData, IndicatorData } from "@/lib/types";
 import dynamic from "next/dynamic";
 
 const StockChart = dynamic(
@@ -23,15 +23,14 @@ interface Props {
 }
 
 const DEFAULT_CHART_CONFIG = {
-  emaPeriods: [5, 10, 20, 50, 100, 200],
-  showVolume: true,
+  emaPeriods: [10, 20, 50, 100],
+  showVolume: false,
   showRsi: false,
   showMacd: true,
   showCvd: false,
-  showCmf: true,
+  showCmf: false,
 };
 
-// Helper selamat untuk menukar string/number kepada format nombor perpuluhan
 function formatNum(val: any, decimals: number = 2): string {
   if (val === null || val === undefined || val === "") return "-";
   const num = typeof val === "number" ? val : parseFloat(val);
@@ -44,25 +43,121 @@ function parseNum(val: any): number {
   return isNaN(num) ? 0 : num;
 }
 
+function computeClientIndicators(ohlcv: any[]): IndicatorData {
+  const emptyIndicators: IndicatorData = {
+    ema: {},
+    macd: [],
+    macd_signal: [],
+    macd_histogram: [],
+    rsi: [],
+    cvd: [],
+    cmf: [],
+  } as unknown as IndicatorData;
+
+  if (!ohlcv || ohlcv.length === 0) return emptyIndicators;
+
+  const closes = ohlcv.map((b) => Number(b.close || 0));
+  const n = closes.length;
+
+  const calcEMA = (period: number): (number | null)[] => {
+    if (n < period) return new Array(n).fill(null);
+    const k = 2 / (period + 1);
+    const result: (number | null)[] = new Array(period - 1).fill(null);
+
+    let sma = 0;
+    for (let i = 0; i < period; i++) sma += closes[i];
+    sma = sma / period;
+    result.push(Number(sma.toFixed(4)));
+
+    let current = sma;
+    for (let i = period; i < n; i++) {
+      current = closes[i] * k + current * (1 - k);
+      result.push(Number(current.toFixed(4)));
+    }
+    return result;
+  };
+
+  const ema10 = calcEMA(10);
+  const ema20 = calcEMA(20);
+  const ema50 = calcEMA(50);
+  const ema100 = calcEMA(100);
+
+  const ema12 = calcEMA(12);
+  const ema26 = calcEMA(26);
+
+  const macdLine: (number | null)[] = [];
+  for (let i = 0; i < n; i++) {
+    if (ema12[i] !== null && ema26[i] !== null) {
+      macdLine.push(Number(((ema12[i] as number) - (ema26[i] as number)).toFixed(4)));
+    } else {
+      macdLine.push(null);
+    }
+  }
+
+  const validMacd = macdLine.filter((v): v is number => v !== null);
+  const signalLine: (number | null)[] = new Array(n).fill(null);
+
+  if (validMacd.length >= 9) {
+    const k9 = 2 / (9 + 1);
+    let sma9 = 0;
+    for (let i = 0; i < 9; i++) sma9 += validMacd[i];
+    sma9 = sma9 / 9;
+
+    const firstValidIdx = macdLine.findIndex((v) => v !== null);
+    const firstSignalIdx = firstValidIdx + 8;
+    signalLine[firstSignalIdx] = Number(sma9.toFixed(4));
+
+    let currentSig = sma9;
+    for (let i = firstSignalIdx + 1; i < n; i++) {
+      const macdVal = macdLine[i];
+      if (macdVal !== null) {
+        currentSig = macdVal * k9 + currentSig * (1 - k9);
+        signalLine[i] = Number(currentSig.toFixed(4));
+      }
+    }
+  }
+
+  const macdHist: (number | null)[] = [];
+  for (let i = 0; i < n; i++) {
+    if (macdLine[i] !== null && signalLine[i] !== null) {
+      macdHist.push(Number(((macdLine[i] as number) - (signalLine[i] as number)).toFixed(4)));
+    } else {
+      macdHist.push(null);
+    }
+  }
+
+  return {
+    ema: {
+      "10": ema10,
+      "20": ema20,
+      "50": ema50,
+      "100": ema100,
+    },
+    macd: macdLine,
+    macd_signal: signalLine,
+    macd_histogram: macdHist,
+    rsi: [],
+    cvd: [],
+    cmf: [],
+  } as unknown as IndicatorData;
+}
+
 export function RankingTable({ data, theme = "dark" }: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<SubsectorRank | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 12;
 
-  // State untuk Data Carta Single Subsector
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartLoading, setChartLoading] = useState<boolean>(false);
   const [chartError, setChartError] = useState<string | null>(null);
 
-  // Set subsektor pertama secara default
   useEffect(() => {
     if (data && data.length > 0 && !selectedSubsector) {
       setSelectedSubsector(data[0]);
     }
   }, [data, selectedSubsector]);
 
-  // Panggil API Single Subsector apabila selectedSubsector bertukar
   useEffect(() => {
     if (!selectedSubsector) return;
 
@@ -72,17 +167,30 @@ export function RankingTable({ data, theme = "dark" }: Props) {
 
     api
       .subsectorSingleOHLC(selectedSubsector.subsector_id)
-      .then((res) => {
-        if (isMounted) {
-          setChartData({
-            ...res,
-            ticker: selectedSubsector.subsector_name,
-          });
-        }
+      .then((res: any) => {
+        if (!isMounted) return;
+
+        const rawBars = Array.isArray(res) ? res : res.ohlcv || [];
+        const formattedOhlcv = rawBars.map((b: any) => ({
+          time: b.date || b.time,
+          open: Number(b.open),
+          high: Number(b.high),
+          low: Number(b.low),
+          close: Number(b.close),
+          volume: Number(b.volume || 0),
+        }));
+
+        const calculatedIndicators = computeClientIndicators(formattedOhlcv);
+
+        setChartData({
+          ticker: selectedSubsector.subsector_name,
+          ohlcv: formattedOhlcv,
+          indicators: calculatedIndicators,
+        });
       })
       .catch((err) => {
         if (isMounted) {
-          console.error(err);
+          console.error("Gagal memuatkan carta subsektor:", err);
           setChartError("Gagal memuatkan data carta.");
           setChartData(null);
         }
@@ -96,7 +204,6 @@ export function RankingTable({ data, theme = "dark" }: Props) {
     };
   }, [selectedSubsector]);
 
-  // Penapisan Carian
   const filteredData = (data || []).filter((item) =>
     (item?.subsector_name || "").toLowerCase().includes(searchQuery.trim().toLowerCase())
   );
@@ -126,7 +233,7 @@ export function RankingTable({ data, theme = "dark" }: Props) {
         </div>
       </div>
 
-      {/* 2-Column Split View: Kiri (Table) & Kanan (Chart) */}
+      {/* 2-Column Split View */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         {/* Bahagian Kiri: Jadual Ranking */}
         <div className="xl:col-span-7 flex flex-col space-y-2">
@@ -287,29 +394,12 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                   </div>
                 </div>
 
-                <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
-                  <div>
-                    5D:{" "}
-                    <span
-                      className={`font-mono font-semibold ${
-                        parseNum(selectedSubsector.return_5d) >= 0 ? "text-emerald-500" : "text-rose-500"
-                      }`}
-                    >
-                      {parseNum(selectedSubsector.return_5d) >= 0 ? "+" : ""}
-                      {formatNum(selectedSubsector.return_5d)}%
-                    </span>
-                  </div>
-                  <div>
-                    20D:{" "}
-                    <span
-                      className={`font-mono font-semibold ${
-                        parseNum(selectedSubsector.return_20d) >= 0 ? "text-emerald-500" : "text-rose-500"
-                      }`}
-                    >
-                      {parseNum(selectedSubsector.return_20d) >= 0 ? "+" : ""}
-                      {formatNum(selectedSubsector.return_20d)}%
-                    </span>
-                  </div>
+                {/* Legend Mini Penunjuk EMA */}
+                <div className="flex items-center gap-2 text-[10px] font-mono">
+                  <span className="text-[#38bdf8]">EMA10</span>
+                  <span className="text-[#f59e0b]">EMA20</span>
+                  <span className="text-[#a855f7]">EMA50</span>
+                  <span className="text-[#f43f5e]">EMA100</span>
                 </div>
               </div>
 
