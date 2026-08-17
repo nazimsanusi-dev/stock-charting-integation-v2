@@ -167,8 +167,9 @@ export default function Home() {
   const [showRanking, setShowRanking] = useState<boolean>(false);
   const [showStocksTable, setShowStocksTable] = useState<boolean>(false);
 
-  // State & Ref untuk Scroll To Top
-  const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+  // State & Ref untuk Scroll Position Memory
+  const [scrollMode, setScrollMode] = useState<"hidden" | "up" | "down">("hidden");
+  const [lastScrollPos, setLastScrollPos] = useState<number | null>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function Home() {
 
   const activeTab = params.activeTab ?? "subsector";
 
-  // Fungsi Panggilan API yang boleh dipanggil semula (Retry / Refresh)
+  // Fungsi Panggilan API
   const fetchSubsectorData = useCallback(async () => {
     setLoadingSubsector(true);
     setSubsectorError(null);
@@ -208,22 +209,31 @@ export default function Home() {
     }
   }, [activeTab, fetchSubsectorData]);
 
-  // Fungsi Pengesan Skrol & Naik ke Atas
+  // Pantau Posisi Skrol & Toggle Butang
   const handleScroll = () => {
-    if (mainRef.current) {
-      if (mainRef.current.scrollTop > 300) {
-        setShowScrollTop(true);
-      } else {
-        setShowScrollTop(false);
-      }
+    if (!mainRef.current) return;
+    const currentScroll = mainRef.current.scrollTop;
+
+    if (currentScroll > 300) {
+      setScrollMode("up");
+    } else if (currentScroll <= 50 && lastScrollPos && lastScrollPos > 300) {
+      setScrollMode("down");
+    } else if (!lastScrollPos) {
+      setScrollMode("hidden");
     }
   };
 
-  const scrollToTop = () => {
-    mainRef.current?.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+  // Fungsi Toggle: Naik ke Atas / Kembali ke Posisi Terakhir
+  const handleScrollToggle = () => {
+    if (!mainRef.current) return;
+
+    if (scrollMode === "up") {
+      setLastScrollPos(mainRef.current.scrollTop);
+      mainRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (scrollMode === "down" && lastScrollPos) {
+      mainRef.current.scrollTo({ top: lastScrollPos, behavior: "smooth" });
+      setLastScrollPos(null);
+    }
   };
 
   return (
@@ -281,7 +291,6 @@ export default function Home() {
                 <p className="text-sm font-medium">Memuatkan data subsektor...</p>
               </div>
             ) : subsectorError ? (
-              /* Inline Error Card dengan Butang Retry */
               <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
                 <div className="text-3xl">⚠️</div>
                 <div className="text-rose-600 dark:text-rose-400 font-semibold text-base">
@@ -470,25 +479,42 @@ export default function Home() {
         )}
       </main>
 
-      {/* BUTANG SCROLL TO TOP (ARROW UP) */}
-      {showScrollTop && (
+      {/* BUTANG TOGGLE SCROLL MEMORY (UP / DOWN) */}
+      {scrollMode !== "hidden" && (
         <button
           type="button"
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-[#26A69A] hover:bg-[#208a80] text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-110 focus:outline-none flex items-center justify-center border border-white/20"
-          aria-label="Scroll to top"
-          title="Naik ke atas"
+          onClick={handleScrollToggle}
+          className={`fixed bottom-6 right-6 z-50 p-3 rounded-full text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-110 focus:outline-none flex items-center justify-center border border-white/20 ${
+            scrollMode === "up"
+              ? "bg-[#26A69A] hover:bg-[#208a80]"
+              : "bg-indigo-600 hover:bg-indigo-700 animate-bounce"
+          }`}
+          aria-label={scrollMode === "up" ? "Scroll to top" : "Back to last position"}
+          title={scrollMode === "up" ? "Naik ke atas" : "Kembali ke kedudukan terakhir"}
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
+          {scrollMode === "up" ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
         </button>
       )}
     </div>
