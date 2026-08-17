@@ -287,9 +287,21 @@ export default function Home() {
             </header>
 
             {loadingSubsector ? (
-              <div className="flex flex-col items-center justify-center p-16 text-gray-400 gap-3">
-                <span className="animate-spin text-3xl">⏳</span>
-                <p className="text-sm font-medium">Memuatkan data subsektor...</p>
+              <div className="flex flex-col items-center justify-center p-16 space-y-4">
+                <div className="w-full max-w-sm space-y-2">
+                  <div className="flex justify-between items-center text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <span>Memuatkan data subsektor...</span>
+                    <span className="animate-pulse">Sila tunggu</span>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div className="bg-blue-600 h-2 rounded-full w-full animate-pulse"></div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                  Mengambil data ranking, heatmap & OHLC dari BigQuery
+                </p>
               </div>
             ) : subsectorError ? (
               <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
