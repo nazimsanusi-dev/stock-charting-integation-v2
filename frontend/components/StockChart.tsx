@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
-// Helper Penukar Format Tarikh Paparan (DD/MM/YYYY)
 function formatDisplayDate(time: any): string {
   if (!time) return "";
   let d: Date;
@@ -25,7 +24,6 @@ function formatDisplayDate(time: any): string {
   return `${day}/${month}/${year}`;
 }
 
-// Helper Format Standard Masa Lightweight Charts (YYYY-MM-DD)
 function formatLwcTime(time: any): string {
   if (!time) return "";
   if (typeof time === "number") {
@@ -124,20 +122,16 @@ export const StockChart = memo(function StockChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
-  // State Ukuran Drag
+  const isMouseDownRef = useRef<boolean>(false);
   const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
   const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
-
-  // State Dragging TP/SL
   const [draggingHandle, setDraggingHandle] = useState<{ id: string; handle: "tp" | "sl" } | null>(null);
 
   const C = COLOR_PALETTES[theme];
-
-  // Simpan rujukan ke drawings & redraw untuk elak re-init chart
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   drawingsRef.current = drawings;
 
-  // 1. Melukis Semula Canvas Overlay (Bebas dari Chart Lifecycle)
+  // 1. Lukis Semula Canvas Overlay
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -155,7 +149,6 @@ export const StockChart = memo(function StockChart({
     const timeScale = chart.timeScale();
 
     const drawItem = (d: DrawingItem) => {
-      // --- LUKISAN LONG POSITION ---
       if (d.type === "long") {
         const x1 = timeScale.timeToCoordinate(d.entryTime as any);
         const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 100 : null);
@@ -167,21 +160,18 @@ export const StockChart = memo(function StockChart({
 
         const boxWidth = Math.max(80, (x2 ?? x1 + 100) - x1);
 
-        // Zon TP
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yTp, boxWidth, yEntry - yTp);
 
-        // Zon SL
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yEntry, boxWidth, ySl - yEntry);
 
-        // Garisan Entry
         ctx.strokeStyle = "#94a3b8";
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
@@ -190,15 +180,14 @@ export const StockChart = memo(function StockChart({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Handle Titik TP & SL
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
-        ctx.arc(x1 + boxWidth / 2, yTp, 4.5, 0, Math.PI * 2);
+        ctx.arc(x1 + boxWidth / 2, yTp, 6, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = "#EF5350";
         ctx.beginPath();
-        ctx.arc(x1 + boxWidth / 2, ySl, 4.5, 0, Math.PI * 2);
+        ctx.arc(x1 + boxWidth / 2, ySl, 6, 0, Math.PI * 2);
         ctx.fill();
 
         const tpPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
@@ -214,7 +203,6 @@ export const StockChart = memo(function StockChart({
         ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
       }
 
-      // --- LUKISAN MEASURE TOOL ---
       if (d.type === "range") {
         const x1 = timeScale.timeToCoordinate(d.startTime as any);
         const x2 = timeScale.timeToCoordinate(d.endTime as any);
@@ -245,7 +233,6 @@ export const StockChart = memo(function StockChart({
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
-        // Pin & Highlight P1 (Mula)
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
         ctx.arc(x1, y1, 5, 0, Math.PI * 2);
@@ -262,7 +249,6 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = "#38BDF8";
         ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 9);
 
-        // Pin & Highlight P2 (Akhir)
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
         ctx.arc(x2, y2, 5, 0, Math.PI * 2);
@@ -278,7 +264,6 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = isUp ? "#34D399" : "#F87171";
         ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 19);
 
-        // Badge Peratus & Bilangan Lilin
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
         const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Days`;
 
@@ -299,14 +284,13 @@ export const StockChart = memo(function StockChart({
 
     drawingsRef.current.forEach(drawItem);
 
-    // Live preview semasa drag
     if (rangeStart && rangeCurrent) {
       drawItem({
         id: "preview_range",
         type: "range",
-        startTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeStart.timeStr : rangeCurrent.timeStr,
+        startTime: rangeStart.timeStr,
         startPrice: rangeStart.price,
-        endTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeCurrent.timeStr : rangeStart.timeStr,
+        endTime: rangeCurrent.timeStr,
         endPrice: rangeCurrent.price,
         barsCount: Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1,
       });
@@ -320,7 +304,7 @@ export const StockChart = memo(function StockChart({
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi Carta TradingView (Hanya berjalan sekali per ticker/data)
+  // 2. Inisialisasi TradingView Chart
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -379,7 +363,6 @@ export const StockChart = memo(function StockChart({
           }))
         );
 
-        // Volum
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -400,7 +383,6 @@ export const StockChart = memo(function StockChart({
           );
         }
 
-        // EMA (Tajuk dikosongkan)
         if (data.indicators?.ema) {
           Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
             const points = values
@@ -421,7 +403,6 @@ export const StockChart = memo(function StockChart({
           });
         }
 
-        // RSI (Tajuk dikosongkan)
         if (!mini && config.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -451,7 +432,6 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // MACD (Tajuk dikosongkan)
         if (!mini && config.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -498,75 +478,10 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // CVD (Tajuk dikosongkan)
-        if (!mini && config.showCvd && data.indicators?.cvd) {
-          const cvdCandles = data.indicators.cvd as unknown as Array<{
-            open: number;
-            high: number;
-            low: number;
-            close: number;
-          }>;
-
-          if (cvdCandles && cvdCandles.length) {
-            const cvdPane = chart.addPane();
-            const cvdSeries = cvdPane.addSeries(CandlestickSeries, {
-              upColor: C.up,
-              downColor: C.down,
-              borderUpColor: C.up,
-              borderDownColor: C.down,
-              wickUpColor: C.up,
-              wickDownColor: C.down,
-              priceLineVisible: false,
-              lastValueVisible: true,
-              title: "",
-            });
-
-            cvdSeries.setData(
-              cvdCandles.map((c, i) => ({
-                time: times[i] as any,
-                open: Number(c.open),
-                high: Number(c.high),
-                low: Number(c.low),
-                close: Number(c.close),
-              }))
-            );
-          }
-        }
-
-        // CMF (Tajuk dikosongkan)
-        if (!mini && config.showCmf && data.indicators?.cmf) {
-          const cmfPoints = data.indicators.cmf
-            .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
-            .filter(Boolean) as any[];
-
-          if (cmfPoints.length) {
-            const cmfPane = chart.addPane();
-            const cmf = cmfPane.addSeries(LineSeries, {
-              color: C.cmf,
-              lineWidth: 1,
-              title: "",
-              priceLineVisible: false,
-              lastValueVisible: true,
-            });
-            cmf.setData(cmfPoints);
-
-            const zeroLine = cmfPane.addSeries(LineSeries, {
-              color: C.zeroLine,
-              lineWidth: 1,
-              lineStyle: 2,
-              priceLineVisible: false,
-              lastValueVisible: false,
-            });
-            zeroLine.setData(cmfPoints.map((p) => ({ time: p.time, value: 0 })));
-          }
-        }
-
-        // Sync visual semasa zoom / scroll tanpa re-render
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
           redrawCanvasRef.current();
         });
 
-        // Set kedudukan awal hanya apabila ticker bertukar
         if (ticker !== lastTickerRef.current && data.ohlcv.length > 0) {
           lastTickerRef.current = ticker;
           const totalBars = data.ohlcv.length;
@@ -587,16 +502,16 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, ticker]);
 
-  // 3. Pengendali Acara Tetikus
-  const getCoordinatesFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // 3. Helper Pengiraan Koordinat
+  const getCoordinatesRaw = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
     const series = mainSeriesRef.current;
     if (!canvas || !chart || !series) return null;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
     const price = series.coordinateToPrice(y);
     const logical = chart.timeScale().coordinateToLogical(x);
@@ -610,10 +525,35 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
+  const commitRangeDrawing = (
+    start: { price: number; timeStr: string; barIdx: number },
+    end: { price: number; timeStr: string; barIdx: number }
+  ) => {
+    const barsCount = Math.abs(end.barIdx - start.barIdx) + 1;
+    setDrawings((prev) => [
+      ...prev,
+      {
+        id: `range_${Date.now()}`,
+        type: "range",
+        startTime: start.timeStr,
+        startPrice: start.price,
+        endTime: end.timeStr,
+        endPrice: end.price,
+        barsCount,
+      },
+    ]);
+    setRangeStart(null);
+    setRangeCurrent(null);
+    setActiveTool("none");
+  };
+
+  // 4. Desktop Handlers (Mouse Drag)
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mini) return;
-    const coord = getCoordinatesFromEvent(e);
+    if (e.button !== 0 || mini) return;
+    const coord = getCoordinatesRaw(e.clientX, e.clientY);
     if (!coord) return;
+
+    isMouseDownRef.current = true;
 
     if (activeTool === "range") {
       setRangeStart(coord);
@@ -626,24 +566,25 @@ export const StockChart = memo(function StockChart({
       const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
       const entryP = coord.price;
 
-      const newLong: LongPositionDrawing = {
-        id: `long_${Date.now()}`,
-        type: "long",
-        entryTime: coord.timeStr,
-        entryPrice: entryP,
-        tpPrice: Number((entryP * 1.06).toFixed(3)), // Default TP 6%
-        slPrice: Number((entryP * 0.98).toFixed(3)), // Default SL 2%
-        endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
-      };
-
-      setDrawings((prev) => [...prev, newLong]);
+      setDrawings((prev) => [
+        ...prev,
+        {
+          id: `long_${Date.now()}`,
+          type: "long",
+          entryTime: coord.timeStr,
+          entryPrice: entryP,
+          tpPrice: Number((entryP * 1.06).toFixed(3)),
+          slPrice: Number((entryP * 0.98).toFixed(3)),
+          endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
+        },
+      ]);
       setActiveTool("none");
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (mini) return;
-    const coord = getCoordinatesFromEvent(e);
+    const coord = getCoordinatesRaw(e.clientX, e.clientY);
     if (!coord) return;
 
     if (draggingHandle) {
@@ -663,37 +604,69 @@ export const StockChart = memo(function StockChart({
       return;
     }
 
-    if (rangeStart && activeTool === "range") {
+    if (isMouseDownRef.current && rangeStart && activeTool === "range") {
       setRangeCurrent(coord);
     }
   };
 
   const handleMouseUp = () => {
+    isMouseDownRef.current = false;
     if (draggingHandle) {
       setDraggingHandle(null);
       return;
     }
 
     if (rangeStart && rangeCurrent && activeTool === "range") {
-      const barsCount = Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1;
-      const isStartFirst = rangeStart.barIdx <= rangeCurrent.barIdx;
+      commitRangeDrawing(rangeStart, rangeCurrent);
+    }
+  };
+
+  // 5. Tablet/Mobile Handlers (Tap & Drag Friendly)
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length !== 1 || mini) return;
+    const t = e.touches[0];
+    const coord = getCoordinatesRaw(t.clientX, t.clientY);
+    if (!coord) return;
+
+    if (activeTool === "range") {
+      if (!rangeStart) {
+        setRangeStart(coord);
+        setRangeCurrent(coord);
+      } else {
+        commitRangeDrawing(rangeStart, coord);
+      }
+      return;
+    }
+
+    if (activeTool === "long") {
+      const bars = data.ohlcv;
+      const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
+      const entryP = coord.price;
 
       setDrawings((prev) => [
         ...prev,
         {
-          id: `range_${Date.now()}`,
-          type: "range",
-          startTime: isStartFirst ? rangeStart.timeStr : rangeCurrent.timeStr,
-          startPrice: rangeStart.price,
-          endTime: isStartFirst ? rangeCurrent.timeStr : rangeStart.timeStr,
-          endPrice: rangeCurrent.price,
-          barsCount,
+          id: `long_${Date.now()}`,
+          type: "long",
+          entryTime: coord.timeStr,
+          entryPrice: entryP,
+          tpPrice: Number((entryP * 1.06).toFixed(3)),
+          slPrice: Number((entryP * 0.98).toFixed(3)),
+          endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
         },
       ]);
+      setActiveTool("none");
+    }
+  };
 
-      setRangeStart(null);
-      setRangeCurrent(null);
-      setActiveTool("none"); // Automatik kembali ke Pointer mode supaya carta boleh diskrol semula
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length !== 1 || mini) return;
+    const t = e.touches[0];
+    const coord = getCoordinatesRaw(t.clientX, t.clientY);
+    if (!coord) return;
+
+    if (rangeStart && activeTool === "range") {
+      setRangeCurrent(coord);
     }
   };
 
@@ -711,7 +684,7 @@ export const StockChart = memo(function StockChart({
                 setRangeStart(null);
                 setRangeCurrent(null);
               }}
-              className={`px-2 py-0.5 rounded border transition ${
+              className={`px-2 py-1 rounded border transition ${
                 activeTool === "none"
                   ? "bg-gray-300 dark:bg-gray-700 font-bold border-gray-400 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
@@ -722,21 +695,25 @@ export const StockChart = memo(function StockChart({
 
             <button
               type="button"
-              onClick={() => setActiveTool("range")}
-              className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
+              onClick={() => {
+                setActiveTool("range");
+                setRangeStart(null);
+                setRangeCurrent(null);
+              }}
+              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
                 activeTool === "range"
                   ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik & drag pada carta untuk mengukur % harga & bilangan lilin"
+              title="Drag tetikus (Desktop) atau Tap 2 titik (Tablet) untuk mengukur % harga"
             >
-              📐 Price & Date Range
+              📐 Price & Date Range {rangeStart ? " (Pilih P2)" : ""}
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTool("long")}
-              className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
+              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
                 activeTool === "long"
                   ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
@@ -762,7 +739,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* Bekas Carta TV & Canvas Ukuran */}
+      {/* Container Carta */}
       <div className="relative flex-1 w-full" style={{ minHeight: mini ? 200 : 550 }}>
         <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
@@ -772,8 +749,10 @@ export const StockChart = memo(function StockChart({
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            className={`absolute inset-0 w-full h-full z-10 ${
-              activeTool !== "none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            className={`absolute inset-0 w-full h-full z-10 touch-none ${
+              activeTool !== "none" || draggingHandle !== null
                 ? "cursor-crosshair pointer-events-auto"
                 : "pointer-events-none"
             }`}
