@@ -170,22 +170,23 @@ export const KLineStockChart = memo(function KLineStockChart({
         console.log("🏷️ [Langkah 6] setSymbol(...) selesai.");
       }
 
-      // 7. Cipta Indikator
-      console.log("📈 [Langkah 7] Menambah indikator...");
-      try {
-        chart.createIndicator("EMA", true, { id: "candle_pane" });
-        console.log("✅ [Langkah 7] EMA dicipta pada candle_pane.");
-      } catch (e) {
-        console.warn("⚠️ [Langkah 7] Ralat mencipta EMA:", e);
-      }
+        console.log("📈 [Langkah 7] Menambah indikator...");
+        try {
+            // false = render terus di atas lilin carta utama
+            chart.createIndicator("EMA", false);
+            console.log("✅ [Langkah 7] EMA dicipta pada carta lilin utama.");
+        } catch (e) {
+            console.warn("⚠️ [Langkah 7] Ralat mencipta EMA:", e);
+        }
 
-      try {
-        chart.createIndicator("VOL", false);
-        chart.createIndicator("MACD", false);
-        console.log("✅ [Langkah 7] Sub-panes VOL & MACD dicipta.");
-      } catch (e) {
-        console.warn("⚠️ [Langkah 7] Ralat mencipta VOL/MACD:", e);
-      }
+        try {
+            // VOL & MACD automatik dibuka dalam sub-pane berasingan di bawah
+            chart.createIndicator("VOL");
+            chart.createIndicator("MACD");
+            console.log("✅ [Langkah 7] Sub-panes VOL & MACD dicipta.");
+        } catch (e) {
+            console.warn("⚠️ [Langkah 7] Ralat mencipta VOL/MACD:", e);
+        }
 
       // 8. Semakan Status Selepas 250ms
       setTimeout(() => {
