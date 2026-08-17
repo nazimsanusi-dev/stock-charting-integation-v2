@@ -21,15 +21,18 @@ export const KLineStockChart = memo(function KLineStockChart({
 
   const isDark = theme === "dark";
 
+  // 1. Inisialisasi Chart Sekali Sahaja (atau bila tema bertukar)
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // 1. Inisialisasi Chart
+    // Pastikan sebarang instance lama dibersihkan
+    dispose(containerRef.current);
+
     const chart = init(containerRef.current, {
       styles: {
         grid: {
-          horizontal: { color: isDark ? "#1f2937" : "#f3f4f6" },
-          vertical: { color: isDark ? "#1f2937" : "#f3f4f6" },
+          horizontal: { color: isDark ? "#1e293b" : "#f1f5f9" },
+          vertical: { color: isDark ? "#1e293b" : "#f1f5f9" },
         },
         candle: {
           bar: {
@@ -40,6 +43,15 @@ export const KLineStockChart = memo(function KLineStockChart({
             upWickColor: "#26A69A",
             downWickColor: "#EF5350",
           },
+          priceMark: {
+            last: {
+              upColor: "#26A69A",
+              downColor: "#EF5350",
+            },
+          },
+        },
+        indicator: {
+          lastValueMark: { show: true },
         },
       },
     });
@@ -47,8 +59,42 @@ export const KLineStockChart = memo(function KLineStockChart({
     if (!chart) return;
     chartRef.current = chart;
 
-    // 2. Format Data Saham Bursa ke KLineData
-    const klineData = (data?.ohlcv || [])
+    // Cipta Indikator Utama & Sub-panes (Serasi v9 & v10)
+    try {
+      (chart as any).createIndicator("EMA", false, { id: "candle_pane" });
+    } catch {
+      (chart as any).createIndicator?.({ name: "EMA", paneId: "candle_pane" });
+    }
+
+    try {
+      chart.createIndicator("VOL");
+      chart.createIndicator("MACD");
+    } catch (e) {
+      console.warn("Indicator creation:", e);
+    }
+
+    // Auto-resize
+    const resizeObserver = new ResizeObserver(() => {
+      chart.resize();
+    });
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (containerRef.current) {
+        dispose(containerRef.current);
+      }
+      chartRef.current = null;
+    };
+  }, [isDark]);
+
+  // 2. Masukkan / Kemas Kini Data OHLCV Bila Data Berubah
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !data?.ohlcv || data.ohlcv.length === 0) return;
+
+    // Format Timestamp Unix ke Milisaat
+    const klineData = data.ohlcv
       .map((d) => {
         let ts = 0;
         if (typeof d.time === "number") {
@@ -68,33 +114,20 @@ export const KLineStockChart = memo(function KLineStockChart({
       })
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // 3. Masukkan Data (v10 API)
-    chart.setDataLoader({
-      getBars: ({ callback }) => {
-        callback(klineData);
-      },
-    });
+    // Muat turun data ke canvas (Sokong v10 applyData & v9 applyNewData)
+    if (typeof (chart as any).applyData === "function") {
+      (chart as any).applyData(klineData);
+    } else if (typeof (chart as any).applyNewData === "function") {
+      (chart as any).applyNewData(klineData);
+    }
 
-    // 4. Tambah Indikator
-    chart.createIndicator({ name: "EMA", paneId: "candle_pane" });
-    chart.createIndicator("VOL");
-    chart.createIndicator("MACD");
-
-    // 5. Auto-resize
-    const resizeObserver = new ResizeObserver(() => {
+    // Laraskan skala paparan selepas data dimasukkan
+    setTimeout(() => {
       chart.resize();
-    });
-    resizeObserver.observe(containerRef.current);
+    }, 50);
+  }, [data, ticker]);
 
-    return () => {
-      resizeObserver.disconnect();
-      if (containerRef.current) {
-        dispose(containerRef.current);
-      }
-    };
-  }, [data, isDark]);
-
-  // Fungsi Alat Lukisan & Ukuran
+  // Fungsi Aktifkan Alat Lukisan
   const handleSelectTool = (overlayName: string) => {
     setActiveTool(overlayName);
     if (overlayName === "none") return;
@@ -107,9 +140,9 @@ export const KLineStockChart = memo(function KLineStockChart({
   };
 
   return (
-    <div className="flex flex-col w-full h-full min-h-[580px] bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
-      {/* Toolbar Lukisan & Ukuran */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-800 text-xs gap-2">
+    <div className="flex flex-col w-full bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
+      {/* Drawing Toolbar */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-xs gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-bold text-[10px] text-gray-400 mr-1">TOOLS:</span>
 
@@ -125,7 +158,6 @@ export const KLineStockChart = memo(function KLineStockChart({
             👆 Pointer
           </button>
 
-          {/* MEASURE TOOL (Price, Date Range & % Change) */}
           <button
             type="button"
             onClick={() => handleSelectTool("priceAndVolumeRange")}
@@ -134,7 +166,7 @@ export const KLineStockChart = memo(function KLineStockChart({
                 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500 font-bold"
                 : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
             }`}
-            title="Ukur Perubahan Harga %, Bilangan Lilin, & Tempoh Hari"
+            title="Ukur Perubahan Harga %, Bilangan Lilin & Tempoh"
           >
             📏 Measure Tool
           </button>
@@ -197,8 +229,11 @@ export const KLineStockChart = memo(function KLineStockChart({
         </button>
       </div>
 
-      {/* Kontena Render Canvas */}
-      <div ref={containerRef} className="w-full flex-1 min-h-[520px]" />
+      {/* Kontena Render Canvas (Ketinggian tetap 550px) */}
+      <div
+        ref={containerRef}
+        style={{ width: "100%", height: "550px" }}
+      />
     </div>
   );
 });
