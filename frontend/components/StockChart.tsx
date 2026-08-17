@@ -280,7 +280,7 @@ export const StockChart = memo(function StockChart({
 
         // Badge Peratus & Bilangan Lilin
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
-        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Bars`;
+        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Days`;
 
         ctx.font = "bold 10px monospace";
         const textWidth = ctx.measureText(label).width;
