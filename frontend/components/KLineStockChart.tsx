@@ -22,19 +22,12 @@ export const KLineStockChart = memo(function KLineStockChart({
 
   const isDark = theme === "dark";
 
-  // 1. Inisialisasi Chart & Indikator dengan Error Handling
+  // 1. Inisialisasi Chart & Indikator
   useEffect(() => {
-    console.log(`[KLineStockChart] Initializing chart instance for ticker: ${ticker}, theme: ${theme}`);
+    if (!containerRef.current) return;
     setChartError(null);
 
-    if (!containerRef.current) {
-      const err = "[KLineStockChart] Container ref is null!";
-      console.warn(err);
-      return;
-    }
-
     try {
-      // Bersihkan sebarang instance lama
       dispose(containerRef.current);
 
       const chart = init(containerRef.current, {
@@ -66,45 +59,39 @@ export const KLineStockChart = memo(function KLineStockChart({
       });
 
       if (!chart) {
-        throw new Error("Instance klinecharts gagal dicipta oleh browser.");
+        throw new Error("Gagal mencipta instance carta.");
       }
 
       chartRef.current = chart;
-      console.log("[KLineStockChart] Chart instance created successfully.", chart);
 
-      // Cipta Indikator Utama & Sub-panes (Fallback v9 & v10)
+      // Cipta EMA di atas Candle Pane (isStack = true)
       try {
-        (chart as any).createIndicator("EMA", false, { id: "candle_pane" });
-        console.log("[KLineStockChart] EMA indicator created (v9 style).");
+        (chart as any).createIndicator("EMA", true, { id: "candle_pane" });
       } catch {
         try {
-          (chart as any).createIndicator?.({ name: "EMA", paneId: "candle_pane" });
-          console.log("[KLineStockChart] EMA indicator created (v10 style).");
-        } catch (indErr) {
-          console.error("[KLineStockChart] Indicator EMA error:", indErr);
+          (chart as any).createIndicator?.({
+            name: "EMA",
+            paneOptions: { id: "candle_pane" },
+          });
+        } catch (e) {
+          console.warn("EMA creation failed:", e);
         }
       }
 
+      // Sub-panes untuk Volume & MACD
       try {
         chart.createIndicator("VOL");
         chart.createIndicator("MACD");
-        console.log("[KLineStockChart] VOL & MACD indicators created.");
-      } catch (indErr) {
-        console.warn("[KLineStockChart] Indicator VOL/MACD warning:", indErr);
+      } catch (e) {
+        console.warn("VOL/MACD creation failed:", e);
       }
 
-      // Auto-resize
       const resizeObserver = new ResizeObserver(() => {
-        try {
-          chart.resize();
-        } catch (resErr) {
-          console.warn("[KLineStockChart] Resize observer warning:", resErr);
-        }
+        chart.resize();
       });
       resizeObserver.observe(containerRef.current);
 
       return () => {
-        console.log("[KLineStockChart] Cleaning up chart instance...");
         resizeObserver.disconnect();
         if (containerRef.current) {
           dispose(containerRef.current);
@@ -112,41 +99,24 @@ export const KLineStockChart = memo(function KLineStockChart({
         chartRef.current = null;
       };
     } catch (err: any) {
-      console.error("[KLineStockChart] Initialization failed:", err);
-      setChartError(err?.message || "Gagal memulakan enjin carta.");
+      console.error("[KLineStockChart] Init Error:", err);
+      setChartError(err?.message || "Gagal memulakan carta.");
     }
   }, [isDark, ticker]);
 
-  // 2. Masukkan / Kemas Kini Data OHLCV dengan Error Handling
+  // 2. Masukkan & Muat Data OHLCV
   useEffect(() => {
     const chart = chartRef.current;
-    console.log(`[KLineStockChart] Data effect triggered. OHLCV bars count: ${data?.ohlcv?.length || 0}`);
-
-    if (!chart) {
-      console.warn("[KLineStockChart] Chart instance is not ready yet.");
-      return;
-    }
-
-    if (!data?.ohlcv || data.ohlcv.length === 0) {
-      console.warn("[KLineStockChart] data.ohlcv is empty!", data);
-      return;
-    }
+    if (!chart || !data?.ohlcv || data.ohlcv.length === 0) return;
 
     try {
-      console.log("[KLineStockChart] Raw OHLCV sample (first bar):", data.ohlcv[0]);
-
-      // Format Timestamp Unix ke Milisaat
       const klineData = data.ohlcv
-        .map((d, index) => {
+        .map((d) => {
           let ts = 0;
           if (typeof d.time === "number") {
             ts = d.time > 1e11 ? d.time : d.time * 1000;
           } else {
             ts = new Date(d.time).getTime();
-          }
-
-          if (isNaN(ts)) {
-            throw new Error(`Format masa tidak sah pada baris ${index}: ${d.time}`);
           }
 
           return {
@@ -160,62 +130,46 @@ export const KLineStockChart = memo(function KLineStockChart({
         })
         .sort((a, b) => a.timestamp - b.timestamp);
 
-      console.log(`[KLineStockChart] Formatted klineData total: ${klineData.length} bars.`);
-
-      // Masukkan data mengikut versi method yang disokong
-      if (typeof (chart as any).applyData === "function") {
-        console.log("[KLineStockChart] Calling chart.applyData(...)");
-        (chart as any).applyData(klineData);
-      } else if (typeof (chart as any).applyNewData === "function") {
-        console.log("[KLineStockChart] Calling chart.applyNewData(...)");
+      // Sokongan applyNewData (v9) & setDataLoader + loadMore (v10)
+      if (typeof (chart as any).applyNewData === "function") {
         (chart as any).applyNewData(klineData);
+      } else if (typeof (chart as any).applyData === "function") {
+        (chart as any).applyData(klineData);
       } else if (typeof (chart as any).setDataLoader === "function") {
-        console.log("[KLineStockChart] Calling chart.setDataLoader(...)");
         (chart as any).setDataLoader({
           getBars: ({ callback }: any) => {
             callback({ bars: klineData, more: false });
           },
         });
-      } else {
-        throw new Error("Tiada fungsi kemas kini data yang sah pada instance KLineChart.");
+        if (typeof (chart as any).loadMore === "function") {
+          (chart as any).loadMore();
+        }
       }
 
       setTimeout(() => {
-        try {
-          chart.resize();
-        } catch {}
+        chart.resize();
       }, 50);
     } catch (err: any) {
-      console.error("[KLineStockChart] Data formatting/loading error:", err);
-      setChartError(err?.message || "Gagal memproses data lilin pasaran.");
+      console.error("[KLineStockChart] Data Loading Error:", err);
+      setChartError("Ralat semasa memuatkan lilin harga.");
     }
   }, [data, ticker]);
 
-  // 3. Fungsi Alat Lukisan dengan Error Guard
+  // 3. Alat Lukisan
   const handleSelectTool = (overlayName: string) => {
-    try {
-      console.log(`[KLineStockChart] Selected tool: ${overlayName}`);
-      setActiveTool(overlayName);
-      if (overlayName === "none") return;
-      chartRef.current?.createOverlay(overlayName);
-    } catch (err) {
-      console.error("[KLineStockChart] createOverlay error:", err);
-    }
+    setActiveTool(overlayName);
+    if (overlayName === "none") return;
+    chartRef.current?.createOverlay(overlayName);
   };
 
   const handleClearDrawings = () => {
-    try {
-      console.log("[KLineStockChart] Removing all overlays");
-      chartRef.current?.removeOverlay();
-      setActiveTool("none");
-    } catch (err) {
-      console.error("[KLineStockChart] removeOverlay error:", err);
-    }
+    chartRef.current?.removeOverlay();
+    setActiveTool("none");
   };
 
   return (
     <div className="flex flex-col w-full bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm relative">
-      {/* Drawing Toolbar */}
+      {/* Toolbar Lukisan & Ukuran */}
       <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-xs gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-bold text-[10px] text-gray-400 mr-1">TOOLS:</span>
@@ -303,21 +257,13 @@ export const KLineStockChart = memo(function KLineStockChart({
         </button>
       </div>
 
-      {/* Paparan Ralat jika berlaku masalah (Error Banner Overlay) */}
       {chartError && (
-        <div className="absolute inset-x-4 top-14 z-20 p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-500 text-xs flex items-center justify-between">
-          <span>⚠️ {chartError}</span>
-          <button
-            type="button"
-            onClick={() => setChartError(null)}
-            className="text-rose-600 dark:text-rose-400 font-bold hover:underline ml-3"
-          >
-            Tutup
-          </button>
+        <div className="p-3 bg-rose-500/10 border-b border-rose-500/30 text-rose-500 text-xs">
+          ⚠️ {chartError}
         </div>
       )}
 
-      {/* Kontena Render Canvas (Ketinggian tetap 550px) */}
+      {/* Kontena Render Canvas */}
       <div
         ref={containerRef}
         style={{ width: "100%", height: "550px" }}
