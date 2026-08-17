@@ -236,7 +236,7 @@ export function RankingTable({ data, theme = "dark" }: Props) {
       {/* 2-Column Split View */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         {/* Bahagian Kiri: Jadual Ranking */}
-        <div className="xl:col-span-7 flex flex-col space-y-2">
+        <div className="xl:col-span-6 flex flex-col space-y-2">
           <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs whitespace-nowrap">
@@ -367,7 +367,7 @@ export function RankingTable({ data, theme = "dark" }: Props) {
         </div>
 
         {/* Bahagian Kanan: Carta Indeks Subsektor */}
-        <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
+        <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
           {selectedSubsector ? (
             <>
               <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">

@@ -167,7 +167,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
       {/* 2-Column Split View */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         {/* Bahagian Kiri: Jadual Saham */}
-        <div className="xl:col-span-7 flex flex-col space-y-2">
+        <div className="xl:col-span-6 flex flex-col space-y-2">
           {loading ? (
             <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
               <span className="animate-spin inline-block mr-2 text-base">⏳</span>
@@ -310,7 +310,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
         </div>
 
         {/* Bahagian Kanan: Carta Saham (TradingView Lightweight) */}
-        <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
+        <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
           {selectedStock ? (
             <>
               <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
