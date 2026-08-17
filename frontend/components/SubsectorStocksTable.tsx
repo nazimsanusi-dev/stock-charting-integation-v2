@@ -2,10 +2,23 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { StockChart } from "@/components/StockChart";
+// import { StockChart } from "@/components/StockChart"; // <-- 1. COMMENT JIKA TAK GUNA LAGI
 import { useChartData } from "@/hooks/useChartData";
 import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
-import { KLineStockChart } from "@/components/KLineStockChart";
+// import { KLineStockChart } from "@/components/KLineStockChart"; // <-- 2. WAJIB COMMENT/BUANG (sebab dah guna dynamic)
+import dynamic from "next/dynamic";
+
+const KLineStockChart = dynamic(
+  () => import("@/components/KLineStockChart").then((mod) => mod.KLineStockChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full min-h-[500px] flex items-center justify-center text-xs text-gray-400">
+        <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
+      </div>
+    ),
+  }
+);
 
 interface Props {
   subsectors: SubsectorRank[];
