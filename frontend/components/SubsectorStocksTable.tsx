@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { StockChart } from "@/components/StockChart";
 import { useChartData } from "@/hooks/useChartData";
 import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
+import { KLineStockChart } from "@/components/KLineStockChart";
 
 interface Props {
   subsectors: SubsectorRank[];
@@ -297,8 +298,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           )}
         </div>
 
-        {/* Bahagian Kanan: Carta Saham */}
-        <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[450px]">
+        {/* Bahagian Kanan: Carta KLineCharts */}
+        <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
           {selectedStock ? (
             <>
               <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
@@ -335,7 +336,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 </div>
               </div>
 
-              <div className="flex-1 p-2 min-h-[380px]">
+              <div className="flex-1 p-2 min-h-[520px]">
                 {chart.loading ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">
                     <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
@@ -352,9 +353,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                     </button>
                   </div>
                 ) : chart.data ? (
-                  <StockChart
+                  <KLineStockChart
                     data={chart.data}
-                    config={DEFAULT_CHART_CONFIG}
                     ticker={`${selectedStock.Code}.KL`}
                     theme={theme}
                   />
@@ -366,7 +366,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
               </div>
             </>
           ) : (
-            <div className="h-full min-h-[400px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
+            <div className="h-full min-h-[450px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
               Pilih mana-mana baris saham di sebelah kiri untuk melihat carta.
             </div>
           )}
