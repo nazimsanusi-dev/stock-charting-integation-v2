@@ -23,66 +23,41 @@ export const KLineStockChart = memo(function KLineStockChart({
   const isDark = theme === "dark";
 
   useEffect(() => {
-    console.group(`[KLineStockChart] Lifecycle for: ${ticker}`);
+    if (!containerRef.current) return;
     setChartError(null);
 
-    // 1. Semak Kontena DOM
-    if (!containerRef.current) {
-      console.error("[1. DOM Check] containerRef.current is NULL!");
-      console.groupEnd();
+    // 1. Bersihkan sebarang kanvas lama
+    dispose(containerRef.current);
+
+    // 2. PEMETAAN (MAPPING) DARI API JSON KE FORMAT KLINECHARTS
+    const rawOhlcv = data?.ohlcv || [];
+    if (rawOhlcv.length === 0) {
       return;
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
-    console.log(`[1. DOM Check] Container mounted. Width: ${rect.width}px, Height: ${rect.height}px`);
+    const klineData = rawOhlcv
+      .map((item) => {
+        // Tukar Unix Timestamp saat (10 digit) -> milisaat (13 digit)
+        const ts =
+          typeof item.time === "number"
+            ? item.time > 1e11
+              ? item.time
+              : item.time * 1000
+            : new Date(item.time).getTime();
+
+        return {
+          timestamp: ts,
+          open: Number(item.open),
+          high: Number(item.high),
+          low: Number(item.low),
+          close: Number(item.close),
+          volume: Number(item.volume || 0),
+        };
+      })
+      .sort((a, b) => a.timestamp - b.timestamp); // Susun secara kronologi menaik
 
     try {
-      // 2. Bersihkan Instance Lama
-      dispose(containerRef.current);
-      console.log("[2. Cleanup] Previous chart instance disposed.");
-
-      // 3. Semak & Format Data OHLCV
-      const rawList = data?.ohlcv || [];
-      console.log(`[3. Data Check] Raw OHLCV count: ${rawList.length}`);
-
-      if (rawList.length === 0) {
-        console.warn("[3. Data Check] Data OHLCV kosong, render dibatalkan.");
-        console.groupEnd();
-        return;
-      }
-
-      console.log("[3. Data Check] Sample raw first bar:", rawList[0]);
-
-      const klineData = rawList
-        .map((d, idx) => {
-          let ts = 0;
-          if (typeof d.time === "number") {
-            ts = d.time > 1e11 ? d.time : d.time * 1000;
-          } else {
-            ts = new Date(d.time).getTime();
-          }
-
-          if (isNaN(ts)) {
-            console.error(`[Data Error] Invalid timestamp at index ${idx}:`, d.time);
-          }
-
-          return {
-            timestamp: ts,
-            open: Number(d.open),
-            high: Number(d.high),
-            low: Number(d.low),
-            close: Number(d.close),
-            volume: Number(d.volume || 0),
-          };
-        })
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-      console.log(`[3. Data Check] Formatted klineData count: ${klineData.length}`);
-      console.log("[3. Data Check] Sample formatted bar [0]:", klineData[0]);
-      console.log("[3. Data Check] Sample formatted bar [last]:", klineData[klineData.length - 1]);
-
-      // 4. Inisialisasi KLineChart
-      console.log("[4. Init] Creating new KLineChart instance...");
+      // 3. Inisialisasi Enjin Carta KLineCharts (v10)
       const chart = init(containerRef.current, {
         styles: {
           grid: {
@@ -121,84 +96,50 @@ export const KLineStockChart = memo(function KLineStockChart({
         },
       });
 
-      if (!chart) {
-        throw new Error("init() mengembalikan null.");
-      }
-
+      if (!chart) throw new Error("Gagal mencipta kanvas carta.");
       chartRef.current = chart;
-      console.log("[4. Init] Chart instance successfully created:", chart);
 
-      // 5. Masukkan Data ke Chart (Semak fungsi yang wujud)
-      const chartAny = chart as any;
-      console.log("[5. Data Feeding] Available methods on chart:", {
-        hasApplyData: typeof chartAny.applyData === "function",
-        hasApplyNewData: typeof chartAny.applyNewData === "function",
-        hasSetDataLoader: typeof chartAny.setDataLoader === "function",
-        hasLoadMore: typeof chartAny.loadMore === "function",
+      // 4. Daftarkan DataLoader (v10)
+      chart.setDataLoader({
+        getBars: ({ callback }) => {
+          callback(klineData);
+        },
       });
 
-      if (typeof chartAny.applyData === "function") {
-        console.log("[5. Data Feeding] Executing chart.applyData(...)");
-        chartAny.applyData(klineData);
-      } else if (typeof chartAny.applyNewData === "function") {
-        console.log("[5. Data Feeding] Executing chart.applyNewData(...)");
-        chartAny.applyNewData(klineData);
-      } else if (typeof chartAny.setDataLoader === "function") {
-        console.log("[5. Data Feeding] Setting up setDataLoader...");
-        chartAny.setDataLoader({
-          getBars: ({ callback }: any) => {
-            console.log("[5. Data Feeding] getBars callback executed with", klineData.length, "bars");
-            // Menyokong kedua-dua format payload callback
-            try {
-              callback({ bars: klineData, more: false });
-            } catch {
-              callback(klineData);
-            }
-          },
-        });
-
-        if (typeof chartAny.loadMore === "function") {
-          console.log("[5. Data Feeding] Triggering chart.loadMore()...");
-          chartAny.loadMore();
-        }
-      }
-
-      // 6. Cipta Indikator
-      console.log("[6. Indicators] Creating indicators...");
+      // 5. Cipta Indikator
       try {
-        chartAny.createIndicator("EMA", true, { id: "candle_pane" });
-        console.log("[6. Indicators] EMA created on candle_pane (isStack = true)");
-      } catch (e1) {
-        try {
-          chartAny.createIndicator?.({
-            name: "EMA",
-            paneOptions: { id: "candle_pane" },
-          });
-          console.log("[6. Indicators] EMA created via object options");
-        } catch (e2) {
-          console.warn("[6. Indicators] Failed to create EMA:", e2);
-        }
+        (chart as any).createIndicator("EMA", true, { id: "candle_pane" });
+      } catch {
+        (chart as any).createIndicator?.({
+          name: "EMA",
+          paneOptions: { id: "candle_pane" },
+        });
       }
 
       try {
         chart.createIndicator("VOL", false);
         chart.createIndicator("MACD", false);
-        console.log("[6. Indicators] VOL and MACD sub-panes created");
-      } catch (e3) {
-        console.warn("[6. Indicators] Failed to create VOL/MACD:", e3);
+      } catch (e) {
+        console.warn("Indicator setup warning:", e);
       }
 
-      // 7. Resize Observer
+      // 6. Cetuskan Panggilan DataLoader Melalui setSymbol (Wajib untuk v10)
+      if (typeof (chart as any).setSymbol === "function") {
+        (chart as any).setSymbol({
+          ticker: ticker || data.ticker || "STOCK",
+          shortName: ticker || data.ticker || "STOCK",
+          pricePrecision: 3,
+          volumePrecision: 0,
+        });
+      }
+
+      // 7. Auto Resize Kanvas
       const resizeObserver = new ResizeObserver(() => {
-        console.log("[7. Resize] Container resized, triggering chart.resize()");
         chart.resize();
       });
       resizeObserver.observe(containerRef.current);
 
-      console.groupEnd();
-
       return () => {
-        console.log(`[Cleanup] Unmounting chart for ${ticker}`);
         resizeObserver.disconnect();
         if (containerRef.current) {
           dispose(containerRef.current);
@@ -206,30 +147,26 @@ export const KLineStockChart = memo(function KLineStockChart({
         chartRef.current = null;
       };
     } catch (err: any) {
-      console.error("[Fatal Render Error]:", err);
+      console.error("[KLineStockChart Error]:", err);
       setChartError(err?.message || "Ralat memaparkan carta.");
-      console.groupEnd();
     }
   }, [data, ticker, isDark]);
 
-  // Fungsi Drawing Tools
+  // Fungsi Alat Ukuran & Lukisan
   const handleSelectTool = (overlayName: string) => {
-    console.log(`[Tool Selected] -> ${overlayName}`);
     setActiveTool(overlayName);
     if (overlayName === "none") return;
-    const res = chartRef.current?.createOverlay(overlayName);
-    console.log(`[Overlay Created] ID:`, res);
+    chartRef.current?.createOverlay(overlayName);
   };
 
   const handleClearDrawings = () => {
-    console.log("[Tool Action] Clearing all overlays");
     chartRef.current?.removeOverlay();
     setActiveTool("none");
   };
 
   return (
     <div className="flex flex-col w-full bg-white dark:bg-[#111827] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm relative">
-      {/* Drawing Toolbar */}
+      {/* Toolbar Ukuran & Lukisan */}
       <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-xs gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-bold text-[10px] text-gray-400 mr-1">TOOLS:</span>
@@ -323,7 +260,7 @@ export const KLineStockChart = memo(function KLineStockChart({
         </div>
       )}
 
-      {/* Kontena Render Canvas */}
+      {/* Kontena Render Canvas (Ketinggian tetap 550px) */}
       <div
         ref={containerRef}
         style={{ width: "100%", height: "550px" }}
