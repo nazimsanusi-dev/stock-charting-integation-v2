@@ -155,17 +155,18 @@ function SingleView({ params }: { params: ExtendedSidebarParams }) {
 export default function Home() {
   const [params, setParams] = useState<ExtendedSidebarParams>(DEFAULT_PARAMS);
 
-  // States untuk Subsector Analysis (BigQuery)
+  // States untuk Subsector Analysis
   const [ranksData, setRanksData] = useState<SubsectorRank[]>([]);
   const [heatmapData, setHeatmapData] = useState<SubsectorHeatmapItem[]>([]);
   const [ohlcBulkData, setOhlcBulkData] = useState<SubsectorBulkOHLC>({});
   const [loadingSubsector, setLoadingSubsector] = useState<boolean>(true);
   const [subsectorError, setSubsectorError] = useState<string | null>(null);
 
-  // States untuk Hide/Unhide Section (Default: Hidden / False)
+  // States untuk Hide/Unhide Section (Semua Default: Tutup / False)
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [showRanking, setShowRanking] = useState<boolean>(false);
   const [showStocksTable, setShowStocksTable] = useState<boolean>(false);
+  const [showChartGrid, setShowChartGrid] = useState<boolean>(false);
 
   // State & Ref untuk Scroll Position Memory
   const [scrollMode, setScrollMode] = useState<"hidden" | "up" | "down">("hidden");
@@ -178,7 +179,7 @@ export default function Home() {
 
   const activeTab = params.activeTab ?? "subsector";
 
-  // Fungsi Panggilan API
+  // Fungsi Panggilan API Subsektor
   const fetchSubsectorData = useCallback(async () => {
     setLoadingSubsector(true);
     setSubsectorError(null);
@@ -209,7 +210,7 @@ export default function Home() {
     }
   }, [activeTab, fetchSubsectorData]);
 
-  // Pantau Posisi Skrol & Toggle Butang
+  // Pantau Posisi Skrol
   const handleScroll = () => {
     if (!mainRef.current) return;
     const currentScroll = mainRef.current.scrollTop;
@@ -360,7 +361,7 @@ export default function Home() {
                   )}
                 </section>
 
-                {/* 2. Table Ranking Subsektor (Collapsible) */}
+                {/* 2. Table & Carta Ranking Subsektor (Collapsible - Split View) */}
                 <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
                   <div
                     onClick={() => setShowRanking(!showRanking)}
@@ -393,12 +394,12 @@ export default function Home() {
 
                   {showRanking && (
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                      <RankingTable data={ranksData} />
+                      <RankingTable data={ranksData} theme={params.theme} />
                     </div>
                   )}
                 </section>
 
-                {/* 3. Table Saham Mengikut Subsektor (Collapsible) */}
+                {/* 3. Table Saham Mengikut Subsektor (Collapsible - Split View) */}
                 <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
                   <div
                     onClick={() => setShowStocksTable(!showStocksTable)}
@@ -436,17 +437,46 @@ export default function Home() {
                   )}
                 </section>
 
-                {/* 4. Grid Carta Subsektor (End-to-End) */}
-                <section className="w-full">
-                  <h2 className="text-base font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
-                    Carta Indeks Subsektor
-                  </h2>
-                  <SubsectorChartGrid
-                    ranks={ranksData}
-                    ohlcData={ohlcBulkData}
-                    theme={params.theme}
-                  />
+                {/* 4. Grid Carta Subsektor (Collapsible - Default: Tutup) */}
+                <section className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm w-full">
+                  <div
+                    onClick={() => setShowChartGrid(!showChartGrid)}
+                    className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                      <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
+                        Carta Indeks Subsektor
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
+                    >
+                      <span>{showChartGrid ? "Tutup" : "Buka"}</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform duration-200 ${
+                          showChartGrid ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {showChartGrid && (
+                    <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+                      <SubsectorChartGrid
+                        ranks={ranksData}
+                        ohlcData={ohlcBulkData}
+                        theme={params.theme}
+                      />
+                    </div>
+                  )}
                 </section>
               </>
             )}

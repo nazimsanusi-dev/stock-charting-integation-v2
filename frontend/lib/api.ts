@@ -139,4 +139,10 @@ export const api = {
     const data = await res.json();
     return data.stocks ?? [];
   },
+
+  subsectorSingleOHLC: async (subsectorId: number | string): Promise<ChartData> => {
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/${subsectorId}`);
+    if (!res.ok) throw new Error("Gagal memuatkan data carta subsektor.");
+    return res.json();
+  },
 };

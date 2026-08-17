@@ -174,6 +174,19 @@ class BigQueryService:
             grouped[sid].append(r)
         return grouped
 
+    async def get_subsector_single_ohlc(self, subsector_id: int | str):
+        """Ambil data sejarah OHLC untuk satu subsektor khusus berdasarkan ID"""
+        query = f"""
+            SELECT date, open, high, low, close
+            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
+            WHERE subsector_id = {int(subsector_id)}
+            ORDER BY date ASC
+        """
+        rows = await self._execute_query(query)
+        if not rows:
+            return []
+        return rows
+
     async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = "", min_price: float = 0.3):
         """Ambil senarai saham mengikut subsektor, carian nama/kod, dan harga minimum"""
         where_clauses = []

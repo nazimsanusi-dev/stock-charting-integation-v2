@@ -146,7 +146,7 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
-# -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Route: Subsector Bulk OHLC
     # -------------------------------------------------------------------------
     if path == "/api/subsector_ohlc/bulk":
@@ -156,6 +156,37 @@ async def _route(request, env):
             return _json(bulk_ohlc or {}, cache_seconds=300)
         except Exception as e:
             return _json({"error": str(e)}, status=500)
+
+    @app.get("/api/subsector_ohlc/{subsector_id}")
+    async def get_single_subsector_chart(subsector_id: int):
+    rows = await bq_service.get_subsector_single_ohlc(subsector_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Data subsektor tidak dijumpai")
+
+    # Formatkan kepada senarai lilin standard OHLCV
+    ohlcv = [
+        {
+            "time": r.get("date"),
+            "open": float(r.get("open", 0)),
+            "high": float(r.get("high", 0)),
+            "low": float(r.get("low", 0)),
+            "close": float(r.get("close", 0)),
+            "volume": float(r.get("volume", 0) or 0)
+        }
+        for r in rows
+    ]
+
+    # Kira indikator teknikal (atau pulangkan {} jika tidak perlu)
+    try:
+        indicators = calculate_indicators(ohlcv, [5, 10, 20, 50, 100, 200])
+    except Exception:
+        indicators = {}
+
+    return {
+        "ticker": f"SUBSECTOR_{subsector_id}",
+        "ohlcv": ohlcv,
+        "indicators": indicators
+    }
 
     # -------------------------------------------------------------------------
     # Route: Senarai Saham Mengikut Subsektor
