@@ -218,12 +218,19 @@ export function Sidebar({ params, onChange }: Props) {
 
       {/* Theme Toggle Button */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
-        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Theme</span>
+        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+          Theme
+        </span>
         <button
+          type="button"
           onClick={() => set({ theme: params.theme === "dark" ? "light" : "dark" })}
-          className="px-2 py-1 text-xs rounded border bg-gray-100 dark:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-lg border bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          title={`Tukar ke mod ${params.theme === "dark" ? "Light" : "Dark"}`}
         >
-          {params.theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+          <span>{params.theme === "dark" ? "🌙" : "☀️"}</span>
+          <span className="hidden sm:inline">
+            {params.theme === "dark" ? "Dark" : "Light"}
+          </span>
         </button>
       </div>
 
