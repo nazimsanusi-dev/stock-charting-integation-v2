@@ -197,7 +197,7 @@ class BigQueryService:
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         rows = await self._execute_query(f"""
-            SELECT 
+            SELECT DISTINCT
                 Name, 
                 Code, 
                 Shariah, 
