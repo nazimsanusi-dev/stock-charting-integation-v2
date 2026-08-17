@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
-// Helper Penukar Format Masa (Timestamp -> DD/MM/YYYY)
+// Helper Penukar Format Tarikh Paparan (DD/MM/YYYY)
 function formatDisplayDate(time: any): string {
   if (!time) return "";
   let d: Date;
@@ -25,7 +25,7 @@ function formatDisplayDate(time: any): string {
   return `${day}/${month}/${year}`;
 }
 
-// Helper Format Standard Lightweight Charts (yyyy-mm-dd)
+// Helper Format Standard Masa Lightweight Charts (YYYY-MM-DD)
 function formatLwcTime(time: any): string {
   if (!time) return "";
   if (typeof time === "number") {
@@ -124,17 +124,20 @@ export const StockChart = memo(function StockChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
-  // State Ukuran (Drag & Drop)
+  // State Ukuran Drag
   const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
   const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
 
-  // State Handle TP / SL Long Position
+  // State Dragging TP/SL
   const [draggingHandle, setDraggingHandle] = useState<{ id: string; handle: "tp" | "sl" } | null>(null);
-  const [cursorStyle, setCursorStyle] = useState<string>("default");
 
   const C = COLOR_PALETTES[theme];
 
-  // 1. Melukis Semula Canvas Overlay
+  // Simpan rujukan ke drawings & redraw untuk elak re-init chart
+  const drawingsRef = useRef<DrawingItem[]>(drawings);
+  drawingsRef.current = drawings;
+
+  // 1. Melukis Semula Canvas Overlay (Bebas dari Chart Lifecycle)
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -187,7 +190,7 @@ export const StockChart = memo(function StockChart({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Handle TP & SL
+        // Handle Titik TP & SL
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
         ctx.arc(x1 + boxWidth / 2, yTp, 4.5, 0, Math.PI * 2);
@@ -208,10 +211,10 @@ export const StockChart = memo(function StockChart({
         ctx.font = "bold 10px monospace";
         ctx.fillText(`Target: +${tpPct}% (RM${d.tpPrice.toFixed(3)})`, x1 + 6, yTp + 14);
         ctx.fillText(`R:R = ${rr} | Entry: RM${d.entryPrice.toFixed(3)}`, x1 + 6, yEntry - 4);
-        ctx.fillText(`Stop: -${slPct}% (RM${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
+        ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
       }
 
-      // --- LUKISAN MEASURE TOOL (PRICE & DATE RANGE) ---
+      // --- LUKISAN MEASURE TOOL ---
       if (d.type === "range") {
         const x1 = timeScale.timeToCoordinate(d.startTime as any);
         const x2 = timeScale.timeToCoordinate(d.endTime as any);
@@ -227,7 +230,6 @@ export const StockChart = memo(function StockChart({
         const priceDiff = d.endPrice - d.startPrice;
         const isUp = priceDiff >= 0;
 
-        // Kotak Kawasan Ukuran
         ctx.fillStyle = isUp ? "rgba(38, 166, 154, 0.18)" : "rgba(239, 83, 80, 0.18)";
         ctx.fillRect(left, top, width, height);
 
@@ -237,14 +239,13 @@ export const StockChart = memo(function StockChart({
         ctx.strokeRect(left, top, width, height);
         ctx.setLineDash([]);
 
-        // Garisan Diagonal
         ctx.beginPath();
         ctx.strokeStyle = isUp ? "rgba(38, 166, 154, 0.6)" : "rgba(239, 83, 80, 0.6)";
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
-        // 1. PIN & HIGHLIGHT POINT 1 (Mula)
+        // Pin & Highlight P1 (Mula)
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
         ctx.arc(x1, y1, 5, 0, Math.PI * 2);
@@ -261,7 +262,7 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = "#38BDF8";
         ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 9);
 
-        // 2. PIN & HIGHLIGHT POINT 2 (Akhir)
+        // Pin & Highlight P2 (Akhir)
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
         ctx.arc(x2, y2, 5, 0, Math.PI * 2);
@@ -277,7 +278,7 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = isUp ? "#34D399" : "#F87171";
         ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 19);
 
-        // 3. BADGE UTAMA (RINGKASAN PERUBAHAN)
+        // Badge Peratus & Bilangan Lilin
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
         const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Bars`;
 
@@ -296,9 +297,9 @@ export const StockChart = memo(function StockChart({
       }
     };
 
-    drawings.forEach(drawItem);
+    drawingsRef.current.forEach(drawItem);
 
-    // Preview semasa Dragging
+    // Live preview semasa drag
     if (rangeStart && rangeCurrent) {
       drawItem({
         id: "preview_range",
@@ -310,13 +311,16 @@ export const StockChart = memo(function StockChart({
         barsCount: Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1,
       });
     }
-  }, [drawings, rangeStart, rangeCurrent, theme, mini]);
+  }, [rangeStart, rangeCurrent, theme, mini]);
+
+  const redrawCanvasRef = useRef(redrawCanvas);
+  redrawCanvasRef.current = redrawCanvas;
 
   useEffect(() => {
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi TradingView Charts (Kekalkan Posisi)
+  // 2. Inisialisasi Carta TradingView (Hanya berjalan sekali per ticker/data)
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -375,7 +379,7 @@ export const StockChart = memo(function StockChart({
           }))
         );
 
-        // Volum (Title Dikosongkan)
+        // Volum
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -396,7 +400,7 @@ export const StockChart = memo(function StockChart({
           );
         }
 
-        // EMA (Title Dikosongkan)
+        // EMA (Tajuk dikosongkan)
         if (data.indicators?.ema) {
           Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
             const points = values
@@ -409,7 +413,7 @@ export const StockChart = memo(function StockChart({
             const s = chart.addSeries(LineSeries, {
               color: EMA_COLORS[idx % EMA_COLORS.length],
               lineWidth: 1,
-              title: "", // Tajuk indicator dikosongkan
+              title: "",
               priceLineVisible: false,
               lastValueVisible: false,
             });
@@ -417,12 +421,10 @@ export const StockChart = memo(function StockChart({
           });
         }
 
-        // RSI (Title Dikosongkan)
+        // RSI (Tajuk dikosongkan)
         if (!mini && config.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
-            .map((v, i) =>
-              v !== null ? { time: times[i] as any, value: Number(v) } : null
-            )
+            .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
 
           if (rsiPoints.length) {
@@ -430,7 +432,7 @@ export const StockChart = memo(function StockChart({
             const rsiSeries = rsiPane.addSeries(LineSeries, {
               color: C.rsi,
               lineWidth: 1,
-              title: "", // Tajuk indicator dikosongkan
+              title: "",
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -449,7 +451,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // MACD (Title Dikosongkan)
+        // MACD (Tajuk dikosongkan)
         if (!mini && config.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -477,7 +479,7 @@ export const StockChart = memo(function StockChart({
             const m = macdPane.addSeries(LineSeries, {
               color: C.macd,
               lineWidth: 1,
-              title: "", // Tajuk indicator dikosongkan
+              title: "",
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -487,7 +489,7 @@ export const StockChart = memo(function StockChart({
               const s = macdPane.addSeries(LineSeries, {
                 color: C.macdSignal,
                 lineWidth: 1,
-                title: "", // Tajuk indicator dikosongkan
+                title: "",
                 priceLineVisible: false,
                 lastValueVisible: true,
               });
@@ -496,7 +498,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // CVD (Title Dikosongkan)
+        // CVD (Tajuk dikosongkan)
         if (!mini && config.showCvd && data.indicators?.cvd) {
           const cvdCandles = data.indicators.cvd as unknown as Array<{
             open: number;
@@ -516,7 +518,7 @@ export const StockChart = memo(function StockChart({
               wickDownColor: C.down,
               priceLineVisible: false,
               lastValueVisible: true,
-              title: "", // Tajuk indicator dikosongkan
+              title: "",
             });
 
             cvdSeries.setData(
@@ -531,7 +533,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // CMF (Title Dikosongkan)
+        // CMF (Tajuk dikosongkan)
         if (!mini && config.showCmf && data.indicators?.cmf) {
           const cmfPoints = data.indicators.cmf
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -542,7 +544,7 @@ export const StockChart = memo(function StockChart({
             const cmf = cmfPane.addSeries(LineSeries, {
               color: C.cmf,
               lineWidth: 1,
-              title: "", // Tajuk indicator dikosongkan
+              title: "",
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -559,11 +561,12 @@ export const StockChart = memo(function StockChart({
           }
         }
 
+        // Sync visual semasa zoom / scroll tanpa re-render
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-          redrawCanvas();
+          redrawCanvasRef.current();
         });
 
-        // Hanya set skala awal jika ticker bertukar (tidak mereset posisi carta semasa interaksi alat)
+        // Set kedudukan awal hanya apabila ticker bertukar
         if (ticker !== lastTickerRef.current && data.ohlcv.length > 0) {
           lastTickerRef.current = ticker;
           const totalBars = data.ohlcv.length;
@@ -573,7 +576,7 @@ export const StockChart = memo(function StockChart({
           });
         }
 
-        redrawCanvas();
+        redrawCanvasRef.current();
       }
     );
 
@@ -582,7 +585,7 @@ export const StockChart = memo(function StockChart({
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [data, config, mini, theme, ticker, redrawCanvas]);
+  }, [data, config, mini, theme, ticker]);
 
   // 3. Pengendali Acara Tetikus
   const getCoordinatesFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -607,42 +610,10 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
-  const checkHoverHandle = (x: number, y: number) => {
-    const chart = chartRef.current;
-    const series = mainSeriesRef.current;
-    if (!chart || !series) return null;
-
-    for (const d of drawings) {
-      if (d.type === "long") {
-        const x1 = chart.timeScale().timeToCoordinate(d.entryTime as any);
-        const x2 = chart.timeScale().timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 100 : null);
-        const yTp = series.priceToCoordinate(d.tpPrice);
-        const ySl = series.priceToCoordinate(d.slPrice);
-
-        if (x1 === null || yTp === null || ySl === null) continue;
-        const boxWidth = Math.max(80, (x2 ?? x1 + 100) - x1);
-
-        if (x >= x1 && x <= x1 + boxWidth && Math.abs(y - yTp) <= 8) {
-          return { id: d.id, handle: "tp" as const };
-        }
-        if (x >= x1 && x <= x1 + boxWidth && Math.abs(y - ySl) <= 8) {
-          return { id: d.id, handle: "sl" as const };
-        }
-      }
-    }
-    return null;
-  };
-
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (mini) return;
     const coord = getCoordinatesFromEvent(e);
     if (!coord) return;
-
-    const hovered = checkHoverHandle(coord.x, coord.y);
-    if (hovered) {
-      setDraggingHandle(hovered);
-      return;
-    }
 
     if (activeTool === "range") {
       setRangeStart(coord);
@@ -660,8 +631,8 @@ export const StockChart = memo(function StockChart({
         type: "long",
         entryTime: coord.timeStr,
         entryPrice: entryP,
-        tpPrice: Number((entryP * 1.06).toFixed(3)),
-        slPrice: Number((entryP * 0.98).toFixed(3)),
+        tpPrice: Number((entryP * 1.06).toFixed(3)), // Default TP 6%
+        slPrice: Number((entryP * 0.98).toFixed(3)), // Default SL 2%
         endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
       };
 
@@ -694,16 +665,6 @@ export const StockChart = memo(function StockChart({
 
     if (rangeStart && activeTool === "range") {
       setRangeCurrent(coord);
-      return;
-    }
-
-    const hovered = checkHoverHandle(coord.x, coord.y);
-    if (hovered) {
-      setCursorStyle("ns-resize");
-    } else if (activeTool !== "none") {
-      setCursorStyle("crosshair");
-    } else {
-      setCursorStyle("default");
     }
   };
 
@@ -732,7 +693,7 @@ export const StockChart = memo(function StockChart({
 
       setRangeStart(null);
       setRangeCurrent(null);
-      setActiveTool("none");
+      setActiveTool("none"); // Automatik kembali ke Pointer mode supaya carta boleh diskrol semula
     }
   };
 
@@ -780,7 +741,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik pada lilin untuk letak Long (Default TP +6%, SL -2% & boleh drag)"
+              title="Klik pada lilin untuk letak Long (Default TP +6%, SL -2%)"
             >
               📈 Long Position
             </button>
@@ -811,10 +772,9 @@ export const StockChart = memo(function StockChart({
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            style={{ cursor: cursorStyle }}
             className={`absolute inset-0 w-full h-full z-10 ${
-              activeTool !== "none" || drawings.length > 0
-                ? "pointer-events-auto"
+              activeTool !== "none"
+                ? "cursor-crosshair pointer-events-auto"
                 : "pointer-events-none"
             }`}
           />
