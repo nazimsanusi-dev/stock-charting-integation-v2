@@ -81,8 +81,11 @@ function SubsectorCard({
       chartInstance.current.remove();
     }
 
+    // 1. Dapatkan lebar kontena sebenar (fallback ke 300px jika 0/terlalu kecil)
+    const initialWidth = chartContainerRef.current.clientWidth || 300;
+
     const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
+      width: initialWidth,
       height: 310,
       layout: {
         background: { type: ColorType.Solid, color: isDark ? "#0d111a" : "#ffffff" },
@@ -103,8 +106,8 @@ function SubsectorCard({
         timeVisible: true,
         fixLeftEdge: false,
         fixRightEdge: false,
-        rightOffset: 6,
-        barSpacing: 7,
+        rightOffset: 4,
+        barSpacing: 6,
         minBarSpacing: 2,
       },
       crosshair: {
@@ -125,9 +128,7 @@ function SubsectorCard({
       }))
       .sort((a, b) => (a.time > b.time ? 1 : -1));
 
-    // =========================================================================
-    // 1. TR 1 (PANE 0): PRICE CANDLESTICK & EMAs
-    // =========================================================================
+    // TR 1: Candlestick & EMAs
     const mainSeries = chart.addSeries(
       CandlestickSeries,
       {
@@ -153,9 +154,7 @@ function SubsectorCard({
     ema50.setData(calculateEMA(closePoints, 50));
     ema100.setData(calculateEMA(closePoints, 100));
 
-    // =========================================================================
-    // 2. TR 2 (PANE 1): MACD INDICATOR (HISTOGRAM + LINES)
-    // =========================================================================
+    // TR 2: MACD
     const { histogram, macdLine, signalLine } = calculateMACD(closePoints);
 
     const macdHistSeries = chart.addSeries(
@@ -218,26 +217,33 @@ function SubsectorCard({
       // Fallback untuk versi tanpa setHeight
     }
 
-    // =========================================================================
-    // 3. TR 3: DATE TIMESCALE
-    // =========================================================================
+    // Set julat lilin mengikut saiz skrin
     const totalBars = candleData.length;
     if (totalBars > 0) {
+      const visibleBarsCount = initialWidth < 400 ? 35 : 65;
       chart.timeScale().setVisibleLogicalRange({
-        from: Math.max(0, totalBars - 65),
-        to: totalBars + 6,
+        from: Math.max(0, totalBars - visibleBarsCount),
+        to: totalBars + 4,
       });
     }
 
-    const handleResize = () => {
-      if (chartContainerRef.current && chartInstance.current) {
-        chartInstance.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+    // 2. Gunakan ResizeObserver untuk auto-laras lebar carta serta-merta pada mobile
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0 && chartInstance.current) {
+          chartInstance.current.applyOptions({
+            width: Math.floor(entry.contentRect.width),
+          });
+        }
       }
-    };
-    window.addEventListener("resize", handleResize);
+    });
+
+    if (chartContainerRef.current) {
+      resizeObserver.observe(chartContainerRef.current);
+    }
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       if (chartInstance.current) {
         chartInstance.current.remove();
       }
@@ -247,19 +253,19 @@ function SubsectorCard({
   const return5d = Number(rank.return_5d || 0);
 
   return (
-    <div className="bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+    <div className="bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col w-full min-w-0">
       {/* Header Info */}
       <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800/80 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 shrink-0">
             #{rank.rank}
           </span>
-          <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-slate-100 truncate max-w-[140px] sm:max-w-none">
+          <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-slate-100 truncate">
             {rank.subsector_name}
           </h3>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-gray-500 dark:text-slate-400">
+        <div className="flex items-center gap-2 text-xs shrink-0">
+          <span className="text-gray-500 dark:text-slate-400 hidden sm:inline">
             Score: <strong className="text-gray-800 dark:text-slate-200">{rank.score}</strong>
           </span>
           <span
@@ -276,32 +282,20 @@ function SubsectorCard({
 
       {/* Indicator Legend Bar */}
       <div className="px-3 py-1 bg-gray-100/50 dark:bg-[#0b0e14] border-b border-gray-200 dark:border-slate-800/60 flex flex-wrap items-center justify-between text-[10px] text-gray-500 dark:text-slate-400 gap-y-1">
-        <div className="flex items-center gap-2.5">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-0.5 bg-yellow-500"></span>EMA 10
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-0.5 bg-cyan-500"></span>EMA 20
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-0.5 bg-fuchsia-500"></span>EMA 50
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-0.5 bg-orange-500"></span>EMA 100
-          </span>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-yellow-500"></span>EMA10</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-cyan-500"></span>EMA20</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-fuchsia-500"></span>EMA50</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-orange-500"></span>EMA100</span>
         </div>
         <div className="flex items-center gap-2 font-mono text-[9px]">
-          <span className="flex items-center gap-1 text-sky-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>MACD
-          </span>
-          <span className="flex items-center gap-1 text-amber-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Signal
-          </span>
+          <span className="flex items-center gap-1 text-sky-400">MACD</span>
+          <span className="flex items-center gap-1 text-amber-400">Signal</span>
         </div>
       </div>
 
-      {/* Single Multi-Pane Chart Canvas */}
-      <div ref={chartContainerRef} className="w-full relative" />
+      {/* Container Carta */}
+      <div ref={chartContainerRef} className="w-full min-w-0 relative" />
     </div>
   );
 }

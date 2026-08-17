@@ -30,7 +30,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 20;
+  const pageSize = 16;
 
   const loadStocks = async (subName: string, search: string, minP: string) => {
     setLoading(true);
