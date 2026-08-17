@@ -31,6 +31,19 @@ const DEFAULT_CHART_CONFIG = {
   showCmf: true,
 };
 
+// Helper selamat untuk menukar string/number kepada format nombor perpuluhan
+function formatNum(val: any, decimals: number = 2): string {
+  if (val === null || val === undefined || val === "") return "-";
+  const num = typeof val === "number" ? val : parseFloat(val);
+  return isNaN(num) ? "-" : num.toFixed(decimals);
+}
+
+function parseNum(val: any): number {
+  if (val === null || val === undefined) return 0;
+  const num = typeof val === "number" ? val : parseFloat(val);
+  return isNaN(num) ? 0 : num;
+}
+
 export function RankingTable({ data, theme = "dark" }: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<SubsectorRank | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -84,8 +97,8 @@ export function RankingTable({ data, theme = "dark" }: Props) {
   }, [selectedSubsector]);
 
   // Penapisan Carian
-  const filteredData = data.filter((item) =>
-    item.subsector_name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  const filteredData = (data || []).filter((item) =>
+    (item?.subsector_name || "").toLowerCase().includes(searchQuery.trim().toLowerCase())
   );
 
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -135,8 +148,10 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                   {paginatedData.map((item) => {
                     const isSelected = selectedSubsector?.subsector_id === item.subsector_id;
-                    const is5dPos = (item.return_5d ?? 0) >= 0;
-                    const is20dPos = (item.return_20d ?? 0) >= 0;
+                    const r5d = parseNum(item.return_5d);
+                    const r20d = parseNum(item.return_20d);
+                    const is5dPos = r5d >= 0;
+                    const is20dPos = r20d >= 0;
 
                     return (
                       <tr
@@ -179,15 +194,15 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800 dark:text-gray-200">
-                          {item.score !== undefined ? item.score.toFixed(2) : "-"}
+                          {formatNum(item.score)}
                         </td>
                         <td
                           className={`py-2.5 px-3 text-right font-mono font-medium ${
                             is5dPos ? "text-emerald-500" : "text-rose-500"
                           }`}
                         >
-                          {item.return_5d !== undefined
-                            ? `${is5dPos ? "+" : ""}${item.return_5d.toFixed(2)}%`
+                          {item.return_5d !== undefined && item.return_5d !== null
+                            ? `${is5dPos ? "+" : ""}${formatNum(item.return_5d)}%`
                             : "-"}
                         </td>
                         <td
@@ -195,12 +210,12 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                             is20dPos ? "text-emerald-500" : "text-rose-500"
                           }`}
                         >
-                          {item.return_20d !== undefined
-                            ? `${is20dPos ? "+" : ""}${item.return_20d.toFixed(2)}%`
+                          {item.return_20d !== undefined && item.return_20d !== null
+                            ? `${is20dPos ? "+" : ""}${formatNum(item.return_20d)}%`
                             : "-"}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                          {item.close_index !== undefined ? item.close_index.toFixed(2) : "-"}
+                          {formatNum(item.close_index)}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
                           {item.num_stocks ?? "-"}
@@ -262,11 +277,11 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                     <span>
                       Score:{" "}
                       <strong className="text-gray-800 dark:text-gray-200">
-                        {selectedSubsector.score?.toFixed(2) ?? "-"}
+                        {formatNum(selectedSubsector.score)}
                       </strong>
                     </span>
                     <span>•</span>
-                    <span>Close: <strong className="text-gray-800 dark:text-gray-200">{selectedSubsector.close_index?.toFixed(2) ?? "-"}</strong></span>
+                    <span>Close: <strong className="text-gray-800 dark:text-gray-200">{formatNum(selectedSubsector.close_index)}</strong></span>
                     <span>•</span>
                     <span>{selectedSubsector.num_stocks ?? 0} saham</span>
                   </div>
@@ -277,22 +292,22 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                     5D:{" "}
                     <span
                       className={`font-mono font-semibold ${
-                        (selectedSubsector.return_5d ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"
+                        parseNum(selectedSubsector.return_5d) >= 0 ? "text-emerald-500" : "text-rose-500"
                       }`}
                     >
-                      {(selectedSubsector.return_5d ?? 0) >= 0 ? "+" : ""}
-                      {selectedSubsector.return_5d?.toFixed(2) ?? "0.00"}%
+                      {parseNum(selectedSubsector.return_5d) >= 0 ? "+" : ""}
+                      {formatNum(selectedSubsector.return_5d)}%
                     </span>
                   </div>
                   <div>
                     20D:{" "}
                     <span
                       className={`font-mono font-semibold ${
-                        (selectedSubsector.return_20d ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"
+                        parseNum(selectedSubsector.return_20d) >= 0 ? "text-emerald-500" : "text-rose-500"
                       }`}
                     >
-                      {(selectedSubsector.return_20d ?? 0) >= 0 ? "+" : ""}
-                      {selectedSubsector.return_20d?.toFixed(2) ?? "0.00"}%
+                      {parseNum(selectedSubsector.return_20d) >= 0 ? "+" : ""}
+                      {formatNum(selectedSubsector.return_20d)}%
                     </span>
                   </div>
                 </div>
