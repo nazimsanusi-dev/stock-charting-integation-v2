@@ -122,10 +122,15 @@ export const api = {
     return res.json();
   },
 
-  async subsectorStocks(subsectorName: string = "", search: string = ""): Promise<SubsectorStockItem[]> {
+  async subsectorStocks(
+    subsectorName: string = "",
+    search: string = "",
+    minPrice: string = "0.3"
+  ): Promise<SubsectorStockItem[]> {
     const params = new URLSearchParams();
     if (subsectorName && subsectorName !== "All Stock") params.set("subsector", subsectorName);
     if (search) params.set("search", search);
+    if (minPrice) params.set("min_price", minPrice);
 
     const res = await fetch(`${API_BASE_URL}/api/subsector-stocks?${params.toString()}`, {
       cache: "no-store",

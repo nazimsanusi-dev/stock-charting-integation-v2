@@ -174,11 +174,11 @@ class BigQueryService:
             grouped[sid].append(r)
         return grouped
 
-    async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = ""):
-        """Ambil senarai saham mengikut subsektor (atau semua) dan sokong carian nama/kod"""
+    async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = "", min_price: float = 0.3):
+        """Ambil senarai saham mengikut subsektor, carian nama/kod, dan harga minimum"""
         where_clauses = []
 
-        # Filter Subsektor (Abaikan jika "All Stock" atau kosong)
+        # Filter Subsektor
         if subsector_name and subsector_name not in ["All Stock", "all", ""]:
             clean_sub = subsector_name.replace("'", "\\'").strip()
             where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
@@ -189,6 +189,10 @@ class BigQueryService:
             where_clauses.append(
                 f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE '%{clean_search}%')"
             )
+
+        # Filter Min Price (Default: >= 0.3)
+        if min_price is not None and min_price > 0:
+            where_clauses.append(f"SAFE_CAST(Price AS FLOAT64) >= {min_price}")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 

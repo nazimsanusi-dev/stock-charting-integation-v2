@@ -21,23 +21,22 @@ const DEFAULT_CHART_CONFIG = {
 };
 
 export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
-  // Default ke "All Stock" (id="")
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [minPrice, setMinPrice] = useState<string>("0.3"); // Default 0.3
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
   const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
 
-  const loadStocks = async (subName: string, search: string) => {
+  const loadStocks = async (subName: string, search: string, minP: string) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.subsectorStocks(subName, search);
+      const data = await api.subsectorStocks(subName, search, minP);
       setStocks(data);
       setCurrentPage(1);
       if (data && data.length > 0) {
@@ -53,15 +52,13 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     }
   };
 
-  // Muat turun semula bila dropdown subsektor berubah
   useEffect(() => {
-    loadStocks(selectedSubsector, searchQuery);
+    loadStocks(selectedSubsector, searchQuery, minPrice);
   }, [selectedSubsector]);
 
-  // Handle carian bila tekan Enter atau submit
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadStocks(selectedSubsector, searchQuery);
+    loadStocks(selectedSubsector, searchQuery, minPrice);
   };
 
   const activeTicker = selectedStock?.Code
@@ -83,11 +80,14 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Header Bar: Dropdown Subsektor & Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+      {/* Header Bar: Dropdown Subsektor, Input Min Price & Search */}
+      <form
+        onSubmit={handleFilterSubmit}
+        className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800"
+      >
         <div className="flex flex-wrap items-center gap-3">
-          {/* Dropdown Subsektor */}
-          <div className="flex items-center gap-2">
+          {/* 1. Dropdown Subsektor */}
+          <div className="flex items-center gap-1.5">
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
               Subsektor:
             </label>
@@ -95,9 +95,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
               value={selectedSubsector}
               onChange={(e) => setSelectedSubsector(e.target.value)}
               disabled={loading}
-              className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
             >
-              {/* Default Option #0 All Stock */}
               <option value="">#0 All Stock (Semua Saham)</option>
               {subsectors.map((s) => (
                 <option key={s.subsector_id} value={s.subsector_name}>
@@ -107,46 +106,51 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
             </select>
           </div>
 
-          {/* Search Input Bar */}
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5">
+          {/* 2. Filter Min Price (Default: 0.3) */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              Min Price (RM):
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.30"
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 w-20 font-mono focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
+            />
+          </div>
+
+          {/* 3. Search Bar */}
+          <div className="flex items-center gap-1.5">
             <input
               type="text"
               placeholder="Cari kod atau nama..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#26A69A] w-44 sm:w-56"
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#26A69A] w-36 sm:w-48"
             />
-            <button
-              type="submit"
-              disabled={loading}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-[#26A69A] hover:bg-[#208a80] text-white font-medium transition"
-            >
-              Cari
-            </button>
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  loadStocks(selectedSubsector, "");
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1"
-                title="Kosongkan carian"
-              >
-                ✕
-              </button>
-            )}
-          </form>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg bg-[#26A69A] hover:bg-[#208a80] text-white font-medium transition shadow-sm"
+          >
+            Tapis & Cari
+          </button>
         </div>
 
         <button
-          onClick={() => loadStocks(selectedSubsector, searchQuery)}
+          type="button"
+          onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
           disabled={loading}
-          className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition self-end md:self-auto"
+          className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition self-end xl:self-auto"
         >
           <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh
         </button>
-      </div>
+      </form>
 
       {/* 2-Column Split View: Kiri (Table) & Kanan (Chart) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
@@ -160,13 +164,16 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           ) : error ? (
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
               {error} -{" "}
-              <button onClick={() => loadStocks(selectedSubsector, searchQuery)} className="underline font-bold">
+              <button
+                onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
+                className="underline font-bold"
+              >
                 Cuba Lagi
               </button>
             </div>
           ) : stocks.length === 0 ? (
             <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
-              Tiada data saham dijumpai.
+              Tiada saham melepasi kriteria penapisan (Min Price: RM{minPrice || "0"}).
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
@@ -174,8 +181,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="py-2.5 px-3">Kod</th>
-                      <th className="py-2.5 px-3">Nama</th>
+                      <th className="py-2.5 px-3 text-left">Kod</th>
+                      <th className="py-2.5 px-3 text-left">Nama</th>
                       <th className="py-2.5 px-2 text-center">Syariah</th>
                       <th className="py-2.5 px-3 text-right">Harga</th>
                       <th className="py-2.5 px-3 text-right">Perubahan</th>
@@ -209,7 +216,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                             {isSelected && <span className="text-amber-500 mr-1">▶</span>}
                             {item.Code}
                           </td>
-                          <td className="py-2 px-3 text-gray-800 dark:text-gray-200 truncate max-w-[130px]">
+                          <td className="py-2 px-3 text-gray-800 dark:text-gray-200 truncate max-w-[120px]">
                             {item.Name}
                           </td>
                           <td className="py-2 px-2 text-center">
@@ -221,7 +228,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                               <span className="text-[10px] text-gray-400">-</span>
                             )}
                           </td>
-                          <td className="py-2 px-3 text-right font-mono text-gray-700 dark:text-gray-300">
+                          <td className="py-2 px-3 text-right font-mono font-semibold text-gray-900 dark:text-gray-100">
                             {item.Price}
                           </td>
                           <td
@@ -244,10 +251,10 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                           <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
                             {item.MCap_M}
                           </td>
-                          <td className="py-2 px-3 text-left text-gray-600 dark:text-gray-300 truncate max-w-[120px]">
+                          <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
                             {item.Scraped_Sector || "-"}
                           </td>
-                          <td className="py-2 px-3 text-left text-gray-600 dark:text-gray-300 truncate max-w-[140px]">
+                          <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
                             {item.Scraped_Subsector || "-"}
                           </td>
                         </tr>
@@ -265,6 +272,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
+                      type="button"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -275,6 +283,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       {currentPage}/{totalPages}
                     </span>
                     <button
+                      type="button"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -335,6 +344,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                   <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-2">
                     <p className="text-xs text-rose-500">{chart.error}</p>
                     <button
+                      type="button"
                       onClick={chart.refetch}
                       className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs"
                     >
