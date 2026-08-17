@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { StockChart } from "@/components/StockChart";
 import { GridView } from "@/components/GridView";
@@ -167,6 +167,10 @@ export default function Home() {
   const [showRanking, setShowRanking] = useState<boolean>(false);
   const [showStocksTable, setShowStocksTable] = useState<boolean>(false);
 
+  // State & Ref untuk Scroll To Top
+  const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+  const mainRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", params.theme === "dark");
   }, [params.theme]);
@@ -185,7 +189,6 @@ export default function Home() {
         api.subsectorBulkOHLC(),
       ]);
 
-      // Fallback selamat bagi mengelakkan error null
       setRanksData(Array.isArray(ranks) ? ranks : []);
       setHeatmapData(Array.isArray(heatmap) ? heatmap : []);
       setOhlcBulkData(ohlcBulk && typeof ohlcBulk === "object" ? ohlcBulk : {});
@@ -205,14 +208,36 @@ export default function Home() {
     }
   }, [activeTab, fetchSubsectorData]);
 
+  // Fungsi Pengesan Skrol & Naik ke Atas
+  const handleScroll = () => {
+    if (mainRef.current) {
+      if (mainRef.current.scrollTop > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    }
+  };
+
+  const scrollToTop = () => {
+    mainRef.current?.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950">
+    <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-950 relative">
       <Sidebar params={params} onChange={setParams} />
 
-      <main className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-4 sm:p-6 space-y-6">
+      <main
+        ref={mainRef}
+        onScroll={handleScroll}
+        className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-4 sm:p-6 space-y-6 scroll-smooth"
+      >
         {activeTab === "subsector" ? (
           /* ================================================================
-             MAIN PAGE: SUBSECTOR ANALYSIS (END-TO-END FULL WIDTH)
+              MAIN PAGE: SUBSECTOR ANALYSIS (END-TO-END FULL WIDTH)
              ================================================================ */
           <div className="space-y-6 w-full">
             <header className="border-b border-gray-200 dark:border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -230,7 +255,7 @@ export default function Home() {
                 onClick={fetchSubsectorData}
                 disabled={loadingSubsector}
                 title="Segarkan data terkini"
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-700 transition disabled:opacity-50 w-fit"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-700 transition disabled:opacity-50 w-fit shadow-sm"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -419,7 +444,7 @@ export default function Home() {
           </div>
         ) : (
           /* ================================================================
-             SECONDARY TAB: GOOGLE SHEETS TRACKER
+              SECONDARY TAB: GOOGLE SHEETS TRACKER
              ================================================================ */
           <div className="w-full">
             {params.viewMode === "single" ? (
@@ -444,6 +469,28 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* BUTANG SCROLL TO TOP (ARROW UP) */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 p-3 rounded-full bg-[#26A69A] hover:bg-[#208a80] text-white shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-110 focus:outline-none flex items-center justify-center border border-white/20"
+          aria-label="Scroll to top"
+          title="Naik ke atas"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

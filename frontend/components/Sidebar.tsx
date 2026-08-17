@@ -29,7 +29,7 @@ interface Props {
 }
 
 export function Sidebar({ params, onChange }: Props) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [sheets, setSheets] = useState<SheetEntry[]>([]);
   const [worksheets, setWorksheets] = useState<string[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
