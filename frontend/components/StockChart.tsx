@@ -21,7 +21,6 @@ function formatLwcTime(time: any): string {
   return String(time);
 }
 
-// Palette Warna Light & Dark
 const COLOR_PALETTES = {
   light: {
     up: "#26A69A",
@@ -100,6 +99,10 @@ export const StockChart = memo(function StockChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
+  // State semasa pengguna sedang 'drag' tetikus
+  const [dragStart, setDragStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
+  const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
+
   const C = COLOR_PALETTES[theme];
 
   // 1. Melukis Semula Canvas Overlay
@@ -119,36 +122,45 @@ export const StockChart = memo(function StockChart({
 
     const timeScale = chart.timeScale();
 
-    drawings.forEach((d) => {
+    // Fungsi Render Item Lukisan
+    const renderDrawing = (d: DrawingItem) => {
       if (d.type === "long") {
         const x1 = timeScale.timeToCoordinate(d.entryTime as any);
-        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? canvas.width - 40;
+        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 ? x1 + 90 : null);
         const yEntry = series.priceToCoordinate(d.entryPrice);
         const yTp = series.priceToCoordinate(d.tpPrice);
         const ySl = series.priceToCoordinate(d.slPrice);
 
         if (x1 === null || yEntry === null || yTp === null || ySl === null) return;
 
-        const boxWidth = Math.max(70, (x2 ?? x1 + 100) - x1);
+        const boxWidth = Math.max(70, (x2 ?? x1 + 90) - x1);
 
+        // Zon TP (Hijau)
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
-
-        ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
-        ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
-
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yTp, boxWidth, yEntry - yTp);
 
+        // Zon SL (Merah)
+        ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
+        ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.strokeRect(x1, yEntry, boxWidth, ySl - yEntry);
 
+        // Garisan Entry
+        ctx.strokeStyle = "#94a3b8";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x1, yEntry);
+        ctx.lineTo(x1 + boxWidth, yEntry);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
         const targetPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
         const stopPct = (((d.entryPrice - d.slPrice) / d.entryPrice) * 100).toFixed(2);
-        const rrRatio = (
-          Math.abs(d.tpPrice - d.entryPrice) / Math.abs(d.entryPrice - d.slPrice)
-        ).toFixed(2);
+        const riskVal = Math.abs(d.entryPrice - d.slPrice);
+        const rrRatio = riskVal > 0 ? (Math.abs(d.tpPrice - d.entryPrice) / riskVal).toFixed(2) : "1.00";
 
         ctx.fillStyle = theme === "dark" ? "#FFFFFF" : "#111827";
         ctx.font = "bold 10px monospace";
@@ -169,35 +181,75 @@ export const StockChart = memo(function StockChart({
         const top = Math.min(y1, y2);
         const width = Math.abs(x2 - x1);
         const height = Math.abs(y2 - y1);
+        const priceDiff = d.endPrice - d.startPrice;
+        const isUp = priceDiff >= 0;
 
-        ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+        ctx.fillStyle = isUp ? "rgba(38, 166, 154, 0.18)" : "rgba(239, 83, 80, 0.18)";
         ctx.fillRect(left, top, width, height);
 
-        ctx.strokeStyle = "#38BDF8";
+        ctx.strokeStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.strokeRect(left, top, width, height);
         ctx.setLineDash([]);
 
-        const priceDiff = d.endPrice - d.startPrice;
-        const pctDiff = ((priceDiff / d.startPrice) * 100).toFixed(2);
+        // Garisan Diagonal
+        ctx.beginPath();
+        ctx.strokeStyle = isUp ? "rgba(38, 166, 154, 0.6)" : "rgba(239, 83, 80, 0.6)";
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
 
-        ctx.fillStyle = "#38BDF8";
+        const pctDiff = ((priceDiff / d.startPrice) * 100).toFixed(2);
+        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pctDiff}%) | ${d.barsCount} Bars`;
+
         ctx.font = "bold 10px monospace";
-        ctx.fillText(
-          `${priceDiff >= 0 ? "+" : ""}${priceDiff.toFixed(3)} (${pctDiff}%) | ${d.barsCount} Bars`,
-          left + 6,
-          top + 14
-        );
+        const textWidth = ctx.measureText(label).width;
+        const badgeX = left + width / 2 - textWidth / 2 - 6;
+        const badgeY = top - 18 < 0 ? top + height + 4 : top - 18;
+
+        ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
+        ctx.fillRect(badgeX, badgeY, textWidth + 12, 16);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "left";
+        ctx.fillText(label, badgeX + 6, badgeY + 12);
       }
-    });
-  }, [drawings, theme, mini]);
+    };
+
+    // Lukis semua yang telah disimpan
+    drawings.forEach(renderDrawing);
+
+    // Lukis preview masa nyata semasa 'drag'
+    if (dragStart && dragCurrent) {
+      if (activeTool === "range") {
+        renderDrawing({
+          type: "range",
+          startTime: dragStart.timeStr,
+          startPrice: dragStart.price,
+          endTime: dragCurrent.timeStr,
+          endPrice: dragCurrent.price,
+          barsCount: Math.abs(dragCurrent.barIdx - dragStart.barIdx) + 1,
+        });
+      } else if (activeTool === "long") {
+        const diff = Math.abs(dragCurrent.price - dragStart.price);
+        renderDrawing({
+          type: "long",
+          entryTime: dragStart.timeStr,
+          entryPrice: dragStart.price,
+          tpPrice: Number((dragStart.price + (diff || dragStart.price * 0.06)).toFixed(3)),
+          slPrice: Number((dragStart.price - (diff * 0.5 || dragStart.price * 0.03)).toFixed(3)),
+          endTime: dragCurrent.timeStr,
+        });
+      }
+    }
+  }, [drawings, dragStart, dragCurrent, activeTool, theme, mini]);
 
   useEffect(() => {
     redrawCanvas();
-  }, [drawings, redrawCanvas]);
+  }, [drawings, dragStart, dragCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi Lightweight Charts
+  // 2. Inisialisasi TradingView Lightweight Charts
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -249,14 +301,14 @@ export const StockChart = memo(function StockChart({
         candle.setData(
           data.ohlcv.map((b) => ({
             time: formatLwcTime(b.time) as any,
-            open: b.open,
-            high: b.high,
-            low: b.low,
-            close: b.close,
+            open: Number(b.open),
+            high: Number(b.high),
+            low: Number(b.low),
+            close: Number(b.close),
           }))
         );
 
-        // Volume Overlay
+        // Volum
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -271,8 +323,8 @@ export const StockChart = memo(function StockChart({
           volSeries.setData(
             data.ohlcv.map((b) => ({
               time: formatLwcTime(b.time) as any,
-              value: b.volume,
-              color: b.close >= b.open ? `${C.up}99` : `${C.down}99`,
+              value: Number(b.volume || 0),
+              color: Number(b.close) >= Number(b.open) ? `${C.up}99` : `${C.down}99`,
             }))
           );
         }
@@ -283,7 +335,7 @@ export const StockChart = memo(function StockChart({
             const points = values
               .map((v, i) =>
                 v !== null
-                  ? { time: times[i] as any, value: v }
+                  ? { time: times[i] as any, value: Number(v) }
                   : null
               )
               .filter(Boolean) as any[];
@@ -292,7 +344,7 @@ export const StockChart = memo(function StockChart({
             const s = chart.addSeries(LineSeries, {
               color: EMA_COLORS[idx % EMA_COLORS.length],
               lineWidth: 1,
-              title: "",
+              title: `EMA ${period}`,
               priceLineVisible: false,
               lastValueVisible: false,
             });
@@ -305,7 +357,7 @@ export const StockChart = memo(function StockChart({
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
               v !== null
-                ? { time: times[i] as any, value: v }
+                ? { time: times[i] as any, value: Number(v) }
                 : null
             )
             .filter(Boolean) as any[];
@@ -339,14 +391,14 @@ export const StockChart = memo(function StockChart({
           const macdPoints = data.indicators.macd
             .map((v, i) =>
               v !== null
-                ? { time: times[i] as any, value: v }
+                ? { time: times[i] as any, value: Number(v) }
                 : null
             )
             .filter(Boolean) as any[];
           const sigPoints = (data.indicators.macd_signal || [])
             .map((v, i) =>
               v !== null
-                ? { time: times[i] as any, value: v }
+                ? { time: times[i] as any, value: Number(v) }
                 : null
             )
             .filter(Boolean) as any[];
@@ -355,8 +407,8 @@ export const StockChart = memo(function StockChart({
               v !== null
                 ? {
                     time: times[i] as any,
-                    value: v,
-                    color: v >= 0 ? C.up : C.down,
+                    value: Number(v),
+                    color: Number(v) >= 0 ? C.up : C.down,
                   }
                 : null
             )
@@ -419,10 +471,10 @@ export const StockChart = memo(function StockChart({
             cvdSeries.setData(
               cvdCandles.map((c, i) => ({
                 time: times[i] as any,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
+                open: Number(c.open),
+                high: Number(c.high),
+                low: Number(c.low),
+                close: Number(c.close),
               }))
             );
           }
@@ -433,7 +485,7 @@ export const StockChart = memo(function StockChart({
           const cmfPoints = data.indicators.cmf
             .map((v, i) =>
               v !== null
-                ? { time: times[i] as any, value: v }
+                ? { time: times[i] as any, value: Number(v) }
                 : null
             )
             .filter(Boolean) as any[];
@@ -456,11 +508,11 @@ export const StockChart = memo(function StockChart({
               priceLineVisible: false,
               lastValueVisible: false,
             });
-
             zeroLine.setData(cmfPoints.map((p) => ({ time: p.time, value: 0 })));
           }
         }
 
+        // Sinkronisasi Canvas semasa Zoom / Scroll
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
           redrawCanvas();
         });
@@ -486,14 +538,12 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, redrawCanvas]);
 
-  // 3. Handle Klik Interaktif Alat Lukisan
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === "none" || mini) return;
-
+  // 3. Pengendali Drag Tetikus Interaktif
+  const getCoordinatesFromEvent = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
     const series = mainSeriesRef.current;
-    if (!canvas || !chart || !series) return;
+    if (!canvas || !chart || !series) return null;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -502,49 +552,72 @@ export const StockChart = memo(function StockChart({
     const price = series.coordinateToPrice(y);
     const logical = chart.timeScale().coordinateToLogical(x);
 
-    if (price === null || logical === null) return;
+    if (price === null || logical === null) return null;
 
     const bars = data.ohlcv;
-    const currentIdx = Math.min(Math.max(0, Math.floor(logical)), bars.length - 1);
-    const currentBar = bars[currentIdx];
-    if (!currentBar) return;
+    const barIdx = Math.min(Math.max(0, Math.floor(logical)), bars.length - 1);
+    const timeStr = formatLwcTime(bars[barIdx]?.time);
 
-    const timeStr = formatLwcTime(currentBar.time);
+    return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
+  };
 
-    if (activeTool === "long") {
-      const tp = Number((price * 1.06).toFixed(3));
-      const sl = Number((price * 0.97).toFixed(3));
-      const futureBar = bars[Math.min(bars.length - 1, currentIdx + 18)];
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeTool === "none" || mini) return;
+    const coord = getCoordinatesFromEvent(e);
+    if (!coord) return;
 
-      const newLong: LongPositionDrawing = {
-        type: "long",
-        entryTime: timeStr,
-        entryPrice: Number(price.toFixed(3)),
-        tpPrice: tp,
-        slPrice: sl,
-        endTime: formatLwcTime(futureBar?.time ?? timeStr),
-      };
+    setDragStart(coord);
+    setDragCurrent(coord);
+  };
 
-      setDrawings((prev) => [...prev, newLong]);
-      setActiveTool("none");
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!dragStart || activeTool === "none" || mini) return;
+    const coord = getCoordinatesFromEvent(e);
+    if (!coord) return;
+
+    setDragCurrent(coord);
+  };
+
+  const handleMouseUp = () => {
+    if (!dragStart || !dragCurrent || activeTool === "none") {
+      setDragStart(null);
+      setDragCurrent(null);
+      return;
     }
 
     if (activeTool === "range") {
-      const pastIdx = Math.max(0, currentIdx - 12);
-      const pastBar = bars[pastIdx];
+      const barsCount = Math.abs(dragCurrent.barIdx - dragStart.barIdx) + 1;
+      const isStartFirst = dragStart.barIdx <= dragCurrent.barIdx;
 
-      const newRange: RangeDrawing = {
-        type: "range",
-        startTime: formatLwcTime(pastBar?.time ?? timeStr),
-        startPrice: Number((price * 0.94).toFixed(3)),
-        endTime: timeStr,
-        endPrice: Number(price.toFixed(3)),
-        barsCount: currentIdx - pastIdx,
-      };
-
-      setDrawings((prev) => [...prev, newRange]);
-      setActiveTool("none");
+      setDrawings((prev) => [
+        ...prev,
+        {
+          type: "range",
+          startTime: isStartFirst ? dragStart.timeStr : dragCurrent.timeStr,
+          startPrice: isStartFirst ? dragStart.price : dragCurrent.price,
+          endTime: isStartFirst ? dragCurrent.timeStr : dragStart.timeStr,
+          endPrice: isStartFirst ? dragCurrent.price : dragStart.price,
+          barsCount,
+        },
+      ]);
+    } else if (activeTool === "long") {
+      const diff = Math.abs(dragCurrent.price - dragStart.price);
+      setDrawings((prev) => [
+        ...prev,
+        {
+          type: "long",
+          entryTime: dragStart.timeStr,
+          entryPrice: dragStart.price,
+          tpPrice: Number((dragStart.price + (diff || dragStart.price * 0.06)).toFixed(3)),
+          slPrice: Number((dragStart.price - (diff * 0.5 || dragStart.price * 0.03)).toFixed(3)),
+          endTime: dragCurrent.timeStr,
+        },
+      ]);
     }
+
+    setDragStart(null);
+    setDragCurrent(null);
+    setActiveTool("none");
   };
 
   return (
@@ -556,7 +629,11 @@ export const StockChart = memo(function StockChart({
 
             <button
               type="button"
-              onClick={() => setActiveTool("none")}
+              onClick={() => {
+                setActiveTool("none");
+                setDragStart(null);
+                setDragCurrent(null);
+              }}
               className={`px-2 py-0.5 rounded border transition ${
                 activeTool === "none"
                   ? "bg-gray-300 dark:bg-gray-700 font-bold border-gray-400 dark:border-gray-600 text-gray-900 dark:text-gray-100"
@@ -575,7 +652,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik pada carta untuk letak kedudukan Long (TP/SL/Risk-Reward)"
+              title="Klik & seret pada carta untuk menetapkan Long Position (TP/SL)"
             >
               📈 Long Position
             </button>
@@ -588,7 +665,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik pada carta untuk ukur Julat Harga & Tempoh Lilin"
+              title="Klik & seret pada carta untuk mengukur Julat Harga & Bilangan Lilin"
             >
               📐 Price & Date Range
             </button>
@@ -597,7 +674,10 @@ export const StockChart = memo(function StockChart({
           {drawings.length > 0 && (
             <button
               type="button"
-              onClick={() => setDrawings([])}
+              onClick={() => {
+                setDrawings([]);
+                redrawCanvas();
+              }}
               className="text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium px-2 py-0.5 rounded hover:bg-rose-500/10 transition text-[10px]"
             >
               🗑️ Padam Lukisan ({drawings.length})
@@ -612,9 +692,11 @@ export const StockChart = memo(function StockChart({
         {!mini && (
           <canvas
             ref={canvasRef}
-            onClick={handleCanvasClick}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
             className={`absolute inset-0 w-full h-full z-10 ${
-              activeTool !== "none" ? "cursor-crosshair" : "pointer-events-none"
+              activeTool !== "none" ? "cursor-crosshair pointer-events-auto" : "pointer-events-none"
             }`}
           />
         )}

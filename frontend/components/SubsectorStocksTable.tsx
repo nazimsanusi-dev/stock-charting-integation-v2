@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-// import { StockChart } from "@/components/StockChart"; // <-- 1. COMMENT JIKA TAK GUNA LAGI
 import { useChartData } from "@/hooks/useChartData";
 import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
-// import { KLineStockChart } from "@/components/KLineStockChart"; // <-- 2. WAJIB COMMENT/BUANG (sebab dah guna dynamic)
 import dynamic from "next/dynamic";
 
-const KLineStockChart = dynamic(
-  () => import("@/components/KLineStockChart").then((mod) => mod.KLineStockChart),
+const StockChart = dynamic(
+  () => import("@/components/StockChart").then((mod) => mod.StockChart),
   {
     ssr: false,
     loading: () => (
@@ -37,7 +35,7 @@ const DEFAULT_CHART_CONFIG = {
 export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [minPrice, setMinPrice] = useState<string>("0.3"); // Default 0.3
+  const [minPrice, setMinPrice] = useState<string>("0.3");
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
   const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -100,7 +98,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
         className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800"
       >
         <div className="flex flex-wrap items-center gap-3">
-          {/* 1. Dropdown Subsektor */}
+          {/* Dropdown Subsektor */}
           <div className="flex items-center gap-1.5">
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
               Subsektor:
@@ -120,7 +118,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
             </select>
           </div>
 
-          {/* 2. Filter Min Price (Default: 0.3) */}
+          {/* Filter Min Price */}
           <div className="flex items-center gap-1.5">
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
               Min Price (RM):
@@ -136,7 +134,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
             />
           </div>
 
-          {/* 3. Search Bar */}
+          {/* Search Bar */}
           <div className="flex items-center gap-1.5">
             <input
               type="text"
@@ -166,9 +164,9 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
         </button>
       </form>
 
-      {/* 2-Column Split View: Kiri (Table) & Kanan (Chart) */}
+      {/* 2-Column Split View */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* Bahagian Kiri: Table Saham */}
+        {/* Bahagian Kiri: Jadual Saham */}
         <div className="xl:col-span-7 flex flex-col space-y-2">
           {loading ? (
             <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
@@ -278,7 +276,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 </table>
               </div>
 
-              {/* Bar Pagination */}
+              {/* Pagination */}
               {stocks.length > pageSize && (
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                   <div>
@@ -311,7 +309,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           )}
         </div>
 
-        {/* Bahagian Kanan: Carta KLineCharts */}
+        {/* Bahagian Kanan: Carta Saham (TradingView Lightweight) */}
         <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
           {selectedStock ? (
             <>
@@ -366,9 +364,10 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                     </button>
                   </div>
                 ) : chart.data ? (
-                  <KLineStockChart
+                  <StockChart
                     data={chart.data}
                     ticker={`${selectedStock.Code}.KL`}
+                    config={DEFAULT_CHART_CONFIG}
                     theme={theme}
                   />
                 ) : (

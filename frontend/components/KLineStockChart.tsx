@@ -1,3 +1,5 @@
+// Deprecated: KLineStockChart.tsx
+
 "use client";
 
 import { useEffect, useRef, useState, memo } from "react";
