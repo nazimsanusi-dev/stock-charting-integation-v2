@@ -198,7 +198,7 @@ class BigQueryService:
 
         rows = await self._execute_query(f"""
             SELECT DISTINCT
-                Name, 
+                TRIM(REGEXP_REPLACE(Name, r'\s+', ' ')) AS Name, 
                 Code, 
                 Shariah, 
                 Price, 
