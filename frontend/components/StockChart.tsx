@@ -3,6 +3,24 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
+// Helper Penukar Masa Selamat (Timestamp -> yyyy-mm-dd)
+function formatLwcTime(time: any): string {
+  if (!time) return "";
+  if (typeof time === "number") {
+    const d = new Date(time > 1e11 ? time : time * 1000);
+    return d.toISOString().split("T")[0];
+  }
+  if (typeof time === "string") {
+    if (/^\d{10,13}$/.test(time)) {
+      const num = Number(time);
+      const d = new Date(num > 1e11 ? num : num * 1000);
+      return d.toISOString().split("T")[0];
+    }
+    return time.split("T")[0];
+  }
+  return String(time);
+}
+
 // Palette Warna Light & Dark
 const COLOR_PALETTES = {
   light: {
@@ -84,7 +102,7 @@ export const StockChart = memo(function StockChart({
 
   const C = COLOR_PALETTES[theme];
 
-  // 1. Fungsi Melukis Semula Canvas Overlay
+  // 1. Melukis Semula Canvas Overlay
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -113,11 +131,9 @@ export const StockChart = memo(function StockChart({
 
         const boxWidth = Math.max(70, (x2 ?? x1 + 100) - x1);
 
-        // Zon TP (Hijau)
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
 
-        // Zon SL (Merah)
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
 
@@ -218,7 +234,6 @@ export const StockChart = memo(function StockChart({
         });
         chartRef.current = chart;
 
-        // Candlestick Utama
         const candle = chart.addSeries(CandlestickSeries, {
           upColor: C.up,
           downColor: C.down,
@@ -229,11 +244,11 @@ export const StockChart = memo(function StockChart({
         });
         mainSeriesRef.current = candle;
 
-        const times = data.ohlcv.map((b) => b.time);
+        const times = data.ohlcv.map((b) => formatLwcTime(b.time));
 
         candle.setData(
           data.ohlcv.map((b) => ({
-            time: String(b.time).split("T")[0] as any,
+            time: formatLwcTime(b.time) as any,
             open: b.open,
             high: b.high,
             low: b.low,
@@ -255,7 +270,7 @@ export const StockChart = memo(function StockChart({
           });
           volSeries.setData(
             data.ohlcv.map((b) => ({
-              time: String(b.time).split("T")[0] as any,
+              time: formatLwcTime(b.time) as any,
               value: b.volume,
               color: b.close >= b.open ? `${C.up}99` : `${C.down}99`,
             }))
@@ -268,7 +283,7 @@ export const StockChart = memo(function StockChart({
             const points = values
               .map((v, i) =>
                 v !== null
-                  ? { time: String(times[i]).split("T")[0] as any, value: v }
+                  ? { time: times[i] as any, value: v }
                   : null
               )
               .filter(Boolean) as any[];
@@ -290,7 +305,7 @@ export const StockChart = memo(function StockChart({
           const rsiPoints = data.indicators.rsi
             .map((v, i) =>
               v !== null
-                ? { time: String(times[i]).split("T")[0] as any, value: v }
+                ? { time: times[i] as any, value: v }
                 : null
             )
             .filter(Boolean) as any[];
@@ -324,14 +339,14 @@ export const StockChart = memo(function StockChart({
           const macdPoints = data.indicators.macd
             .map((v, i) =>
               v !== null
-                ? { time: String(times[i]).split("T")[0] as any, value: v }
+                ? { time: times[i] as any, value: v }
                 : null
             )
             .filter(Boolean) as any[];
           const sigPoints = (data.indicators.macd_signal || [])
             .map((v, i) =>
               v !== null
-                ? { time: String(times[i]).split("T")[0] as any, value: v }
+                ? { time: times[i] as any, value: v }
                 : null
             )
             .filter(Boolean) as any[];
@@ -339,7 +354,7 @@ export const StockChart = memo(function StockChart({
             .map((v, i) =>
               v !== null
                 ? {
-                    time: String(times[i]).split("T")[0] as any,
+                    time: times[i] as any,
                     value: v,
                     color: v >= 0 ? C.up : C.down,
                   }
@@ -403,7 +418,7 @@ export const StockChart = memo(function StockChart({
 
             cvdSeries.setData(
               cvdCandles.map((c, i) => ({
-                time: String(times[i]).split("T")[0] as any,
+                time: times[i] as any,
                 open: c.open,
                 high: c.high,
                 low: c.low,
@@ -418,7 +433,7 @@ export const StockChart = memo(function StockChart({
           const cmfPoints = data.indicators.cmf
             .map((v, i) =>
               v !== null
-                ? { time: String(times[i]).split("T")[0] as any, value: v }
+                ? { time: times[i] as any, value: v }
                 : null
             )
             .filter(Boolean) as any[];
@@ -450,7 +465,6 @@ export const StockChart = memo(function StockChart({
           redrawCanvas();
         });
 
-        // Zoom lalai
         if (data.ohlcv.length > 0) {
           const totalBars = data.ohlcv.length;
           chart.timeScale().setVisibleLogicalRange({
@@ -472,7 +486,7 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, redrawCanvas]);
 
-  // 3. Handle Klik Interaktif Alat Lukisan pada Carta
+  // 3. Handle Klik Interaktif Alat Lukisan
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (activeTool === "none" || mini) return;
 
@@ -495,7 +509,7 @@ export const StockChart = memo(function StockChart({
     const currentBar = bars[currentIdx];
     if (!currentBar) return;
 
-    const timeStr = String(currentBar.time).split("T")[0];
+    const timeStr = formatLwcTime(currentBar.time);
 
     if (activeTool === "long") {
       const tp = Number((price * 1.06).toFixed(3));
@@ -508,7 +522,7 @@ export const StockChart = memo(function StockChart({
         entryPrice: Number(price.toFixed(3)),
         tpPrice: tp,
         slPrice: sl,
-        endTime: String(futureBar?.time ?? timeStr).split("T")[0],
+        endTime: formatLwcTime(futureBar?.time ?? timeStr),
       };
 
       setDrawings((prev) => [...prev, newLong]);
@@ -521,7 +535,7 @@ export const StockChart = memo(function StockChart({
 
       const newRange: RangeDrawing = {
         type: "range",
-        startTime: String(pastBar?.time ?? timeStr).split("T")[0],
+        startTime: formatLwcTime(pastBar?.time ?? timeStr),
         startPrice: Number((price * 0.94).toFixed(3)),
         endTime: timeStr,
         endPrice: Number(price.toFixed(3)),
@@ -535,7 +549,6 @@ export const StockChart = memo(function StockChart({
 
   return (
     <div className="flex flex-col h-full w-full select-none">
-      {/* Mini Drawing Toolbar (Hanya muncul jika bukan mod grid mini) */}
       {!mini && (
         <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 bg-gray-100/90 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-[11px] gap-2">
           <div className="flex items-center gap-1.5">
@@ -593,7 +606,6 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* Kontena Carta & Interactive Canvas Overlay */}
       <div className="relative flex-1 w-full" style={{ minHeight: mini ? 200 : 550 }}>
         <div ref={containerRef} className="absolute inset-0 w-full h-full" />
 
