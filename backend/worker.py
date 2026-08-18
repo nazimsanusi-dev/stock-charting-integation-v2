@@ -98,6 +98,7 @@ async def _route(request, env):
 
     parsed = urlparse(str(request.url))
     path = parsed.path.rstrip("/") or "/"
+    method = str(request.method).upper()
     params = parse_qs(parsed.query)
 
     def q(key, default=None):
@@ -126,6 +127,21 @@ async def _route(request, env):
         return _json({"status": "ok"})
 
     # ==============================================================================
+    # STOCK MONITORING INSERT ENDPOINT
+    # ==============================================================================
+    if path == "/api/monitoring/add":
+        if method != "POST":
+            return _json({"error": "Method not allowed"}, status=405)
+        try:
+            body_text = await request.text()
+            payload = json.loads(body_text) if body_text else {}
+            bq = await _get_bq_service(env)
+            inserted_row = await bq.insert_stock_monitoring(payload)
+            return _json({"success": True, "data": inserted_row})
+        except Exception as e:
+            return _json({"error": str(e)}, status=500)
+
+    # ==============================================================================
     # SUBSECTOR ANALYSIS ENDPOINTS (BIGQUERY)
     # ==============================================================================
     if path == "/api/subsector_ranks":
@@ -144,9 +160,6 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
-    # -------------------------------------------------------------------------
-    # Route: Subsector Bulk OHLC
-    # -------------------------------------------------------------------------
     if path == "/api/subsector_ohlc/bulk":
         try:
             bq = await _get_bq_service(env)
@@ -155,9 +168,6 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
-    # -------------------------------------------------------------------------
-    # Route: Subsector Single OHLC (by subsector_id)
-    # -------------------------------------------------------------------------
     if path.startswith("/api/subsector_ohlc/") and path != "/api/subsector_ohlc/bulk":
         subsector_id = path.replace("/api/subsector_ohlc/", "").strip().split("/")[0]
         try:
@@ -193,9 +203,6 @@ async def _route(request, env):
         except Exception as e:
             return _json({"error": str(e)}, status=500)
 
-    # -------------------------------------------------------------------------
-    # Route: Senarai Saham Mengikut Subsektor
-    # -------------------------------------------------------------------------
     if path == "/api/subsector-stocks":
         try:
             parsed_url = urlparse(request.url)
@@ -296,6 +303,14 @@ async def _route(request, env):
             "indicators": ind.calculate_all(bars, ema_periods),
         }, cache_seconds=60)
 
+    if path == "/api/monitoring/table":
+        try:
+            bq = await _get_bq_service(env)
+            data = await bq.get_monitoring_table_data()
+            return _json(data or {"headers": [], "rows": []}, cache_seconds=10)
+        except Exception as e:
+            return _json({"error": str(e)}, status=500)
+
     return _json({"error": "Not found"}, 404)
 
 
@@ -315,3 +330,4 @@ async def on_fetch(request, env):
             status=500,
             headers=_create_headers({"content-type": "application/json"}),
         )
+

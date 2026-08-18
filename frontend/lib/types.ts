@@ -116,3 +116,12 @@ export interface SubsectorStockItem {
   Scraped_Sector: string;
   Scraped_Subsector: string;
 }
+
+export interface AddMonitoringPayload {
+  code: string;
+  name: string;
+  price: string | number;
+  sector?: string;
+  subsector?: string;
+  source_table?: string;
+}

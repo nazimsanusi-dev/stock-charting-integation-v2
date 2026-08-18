@@ -1,6 +1,8 @@
 import json
 import time
 import base64
+import uuid
+from datetime import datetime, timezone
 import js
 from js import fetch, Object, Headers
 from pyodide.ffi import to_js
@@ -46,7 +48,7 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
         for i, b in enumerate(key_der):
             js_key_buf[i] = b
 
-        # Guna js.JSON.parse untuk menghasilkan Objek JS tulen (bukan JS Map) 
+        # Guna js.JSON.parse untuk menghasilkan Objek JS tulen
         key_algorithm = js.JSON.parse(
             json.dumps(
                 {"name": "RSASSA-PKCS1-v1_5", "hash": {"name": "SHA-256"}}
@@ -95,19 +97,20 @@ async def get_gcp_access_token(sa_json_str: str) -> str:
 
 
 class BigQueryService:
-    def __init__(self, project_id: str, access_token: str):
+    def __init__(self, project_id: str, access_token: str, dataset_id: str = "bursa_dataset"):
         raw_id = str(project_id or "etl-stock-screener-bursa")
         self.project_id = raw_id.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
         
         raw_token = str(access_token or "")
         self.access_token = raw_token.replace('"', '').replace("'", "").replace('\n', '').replace('\r', '').strip()
         
+        self.dataset_id = dataset_id
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
+        self.insert_endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/datasets/{self.dataset_id}/tables/stock_monitoring/insertAll"
 
     async def _execute_query(self, sql: str):
         payload = json.dumps({"query": sql, "useLegacySql": False})
 
-        # Pembinaan JS Headers & Object yang sah untuk js.fetch
         headers = Headers.new()
         headers.set("Authorization", f"Bearer {self.access_token}")
         headers.set("Content-Type", "application/json")
@@ -157,7 +160,6 @@ class BigQueryService:
         """)
 
     async def get_subsector_bulk_ohlc(self):
-        """Ambil data OHLC dan kelompokkan mengikut subsector_id"""
         rows = await self._execute_query("""
             SELECT subsector_id, date, open, high, low, close
             FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
@@ -175,7 +177,6 @@ class BigQueryService:
         return grouped
 
     async def get_subsector_single_ohlc(self, subsector_id: int | str):
-        """Ambil data sejarah OHLC untuk satu subsektor khusus berdasarkan ID"""
         query = f"""
             SELECT date, open, high, low, close
             FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
@@ -188,22 +189,18 @@ class BigQueryService:
         return rows
 
     async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = "", min_price: float = 0.3):
-        """Ambil senarai saham mengikut subsektor, carian nama/kod, dan harga minimum"""
         where_clauses = []
 
-        # Filter Subsektor
         if subsector_name and subsector_name not in ["All Stock", "all", ""]:
             clean_sub = subsector_name.replace("'", "\\'").strip()
             where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
 
-        # Filter Carian Nama / Kod Saham
         if search and search.strip():
             clean_search = search.replace("'", "\\'").strip().lower()
             where_clauses.append(
                 f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE '%{clean_search}%')"
             )
 
-        # Filter Min Price (Default: >= 0.3)
         if min_price is not None and min_price > 0:
             where_clauses.append(f"SAFE_CAST(Price AS FLOAT64) >= {min_price}")
 
@@ -211,12 +208,11 @@ class BigQueryService:
 
         rows = await self._execute_query(f"""
             SELECT DISTINCT
-                REGEXP_REPLACE(TRIM(Name), r'\s+', ' ') AS Name, 
+                REGEXP_REPLACE(TRIM(Name), r'\\s+', ' ') AS Name, 
                 Code, 
                 Shariah, 
                 SAFE_CAST(Price AS FLOAT64) AS Price, 
                 SAFE_CAST(Change AS FLOAT64) AS Change, 
-                -- Formatkan semula kepada nombor 2 perpuluhan bersama simbol %
                 FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
                 SAFE_CAST(Volume AS INT64) AS Volume, 
                 SAFE_CAST(MCap_M AS FLOAT64) AS MCap_M, 
@@ -230,3 +226,105 @@ class BigQueryService:
             ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
         """)
         return rows or []
+
+    async def insert_stock_monitoring(self, payload: dict) -> dict:
+        """Streaming Insert ke dalam BigQuery table stock_monitoring menggunakan REST API."""
+        raw_code = str(payload.get("code", "")).strip()
+        symbol = raw_code if raw_code.endswith(".KL") else f"{raw_code}.KL"
+        name = str(payload.get("name", raw_code)).strip()
+
+        raw_price = str(payload.get("price", "0")).replace(",", "").replace("RM", "").strip()
+        try:
+            insert_price = round(float(raw_price), 3)
+        except ValueError:
+            insert_price = 0.0
+
+        tp_price = round(insert_price * 1.06, 3)
+        sl_price = round(insert_price * 0.98, 3)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        row_data = {
+            "id": f"mon_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}",
+            "source_table": payload.get("source_table", "Subsector Analysis"),
+            "name": name,
+            "symbol": symbol,
+            "insert_price": insert_price,
+            "current_price": insert_price,
+            "highest_price": insert_price,
+            "lowest_price": insert_price,
+            "tp_price": tp_price,
+            "sl_price": sl_price,
+            "pnl_percent": 0.0,
+            "sector": payload.get("sector", "-"),
+            "subsector": payload.get("subsector", "-"),
+            "status": "MONITORING",
+            "is_active": True,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+
+        body = {
+            "rows": [
+                {
+                    "insertId": row_data["id"],
+                    "json": row_data
+                }
+            ]
+        }
+
+        headers = Headers.new()
+        headers.set("Authorization", f"Bearer {self.access_token}")
+        headers.set("Content-Type", "application/json")
+
+        fetch_opts = Object.new()
+        fetch_opts.method = "POST"
+        fetch_opts.headers = headers
+        fetch_opts.body = json.dumps(body)
+
+        try:
+            res = await fetch(self.insert_endpoint, fetch_opts)
+            text_res = await res.text()
+            res_json = json.loads(text_res)
+        except Exception as e:
+            raise Exception(f"Ralat sambungan Insert: {str(e)}")
+
+        if res.status != 200:
+            err_msg = res_json.get("error", {}).get("message", text_res)
+            raise Exception(f"BigQuery Insert Error (HTTP {res.status}): {err_msg}")
+
+        if res_json.get("insertErrors"):
+            raise Exception(f"BigQuery Insert Errors: {res_json.get('insertErrors')}")
+
+        return row_data
+
+    async def get_monitoring_table_data(self):
+        """Ambil data stock_monitoring dalam format sedia untuk TableView UI."""
+        query = f"""
+            SELECT 
+                name AS Name,
+                symbol AS Symbol,
+                insert_price AS Insert_Price,
+                current_price AS Price,
+                tp_price AS TP_Price,
+                sl_price AS SL_Price,
+                FORMAT('%.2f%%', pnl_percent) AS PnL,
+                status AS Status,
+                sector AS Sector,
+                subsector AS Subsector,
+                source_table AS Source,
+                FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', created_at) AS Insert_Date
+            FROM `{self.project_id}.{self.dataset_id}.stock_monitoring`
+            WHERE is_active = TRUE
+            ORDER BY created_at DESC
+        """
+        rows = await self._execute_query(query)
+        if not rows:
+            return {
+                "headers": ["Name", "Symbol", "Insert_Price", "Price", "TP_Price", "SL_Price", "PnL", "Status", "Sector", "Subsector", "Source", "Insert_Date"],
+                "rows": []
+            }
+
+        headers = list(rows[0].keys())
+        table_rows = [[str(r.get(h, "")) for h in headers] for r in rows]
+
+        return {"headers": headers, "rows": table_rows}

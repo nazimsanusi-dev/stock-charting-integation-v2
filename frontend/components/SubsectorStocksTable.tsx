@@ -90,6 +90,45 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
 
+  const [monitorStatus, setMonitorStatus] = useState<Record<string, "idle" | "loading" | "success">>({});
+
+  const handleAddToMonitoring = async (item: any) => {
+    const code = item.Code;
+    if (monitorStatus[code] === "loading") return;
+
+    // 1. Status Tukar ke Loading
+    setMonitorStatus((prev) => ({ ...prev, [code]: "loading" }));
+
+    try {
+      // 2. Hantar Payload Ringkas ke API
+      const res = await fetch("/api/monitoring/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: item.Code,
+          name: item.Name,
+          price: item.Price,
+          sector: item.Scraped_Sector || "-",
+          subsector: item.Scraped_Subsector || "-",
+          source_table: "Subsector Analysis",
+        }),
+      });
+
+      if (!res.ok) throw new Error("Gagal memasukkan rekod");
+
+      // 3. Status Tukar ke Success
+      setMonitorStatus((prev) => ({ ...prev, [code]: "success" }));
+
+      // 4. Reset semula ke '+' selepas 1.5 saat
+      setTimeout(() => {
+        setMonitorStatus((prev) => ({ ...prev, [code]: "idle" }));
+      }, 1500);
+    } catch (err) {
+      console.error("Gagal menambah ke database:", err);
+      setMonitorStatus((prev) => ({ ...prev, [code]: "idle" }));
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header Bar: Dropdown Subsektor, Input Min Price & Search */}
@@ -209,18 +248,22 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       <th className="py-2.5 px-3 text-right">MCap (M)</th>
                       <th className="py-2.5 px-3 text-left">Sector</th>
                       <th className="py-2.5 px-3 text-left">Subsector</th>
+                      {/* Kolum Tambahan: Tindakan Insert */}
+                      <th className="py-2.5 px-3 text-center sticky right-0 bg-gray-100 dark:bg-gray-800 z-10">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
-                    {paginatedStocks.map((item, idx) => {
+                    {paginatedStocks.map((item: any, idx: number) => {
                       const changeVal = parseFloat(
-                        item.Change_Percent.replace("%", "").replace("+", "")
+                        String(item.Change_Percent || "0").replace("%", "").replace("+", "")
                       );
                       const isPos = changeVal > 0;
                       const isNeg = changeVal < 0;
                       const isSelected = selectedStock?.Code === item.Code;
+                      const status = monitorStatus[item.Code] || "idle";
 
-                      // Warna latar solid untuk sel beku (elak teks tembus masa scroll)
                       const stickyBg = isSelected
                         ? "bg-amber-100/90 dark:bg-[#281e0f]"
                         : "bg-white dark:bg-[#111827] group-hover:bg-gray-100 dark:group-hover:bg-gray-800";
@@ -288,13 +331,40 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                           <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
                             {item.Scraped_Subsector || "-"}
                           </td>
+
+                          {/* Butang Tambah ke BigQuery */}
+                          <td className="py-2 px-3 text-center sticky right-0 bg-white/90 dark:bg-[#111827]/90 z-[5]">
+                            <button
+                              type="button"
+                              disabled={status === "loading"}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Elak tersentuh pilihan baris
+                                handleAddToMonitoring(item);
+                              }}
+                              className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all mx-auto ${
+                                status === "success"
+                                  ? "bg-emerald-500 text-white shadow-sm"
+                                  : status === "loading"
+                                  ? "bg-gray-200 dark:bg-slate-700 text-gray-400"
+                                  : "bg-[#26A69A]/15 text-[#26A69A] hover:bg-[#26A69A] hover:text-white border border-[#26A69A]/30"
+                              }`}
+                              title="Tambah ke Stock Monitoring"
+                            >
+                              {status === "loading" ? (
+                                <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                              ) : status === "success" ? (
+                                "✓"
+                              ) : (
+                                "+"
+                              )}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-
 
               {/* Pagination */}
               {stocks.length > pageSize && (

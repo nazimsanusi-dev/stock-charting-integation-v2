@@ -7,6 +7,7 @@ import type {
   SubsectorBulkOHLC,
   SubsectorHeatmapItem,
   SubsectorStockItem,
+  AddMonitoringPayload,
 } from "./types";
 
 // Matches NEXT_PUBLIC_API_URL in .env.example / .env.local
@@ -143,6 +144,31 @@ export const api = {
   subsectorSingleOHLC: async (subsectorId: number | string): Promise<ChartData> => {
     const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/${subsectorId}`);
     if (!res.ok) throw new Error("Gagal memuatkan data carta subsektor.");
+    return res.json();
+  },
+
+  addToMonitoring: async (payload: AddMonitoringPayload) => {
+    const res = await fetch(`${process.env.API_BASE_URL || ""}/api/monitoring/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Gagal menambah ke database");
+    }
+    return res.json();
+  },
+
+  monitoringTableData: async (): Promise<{ headers: string[]; rows: string[][] }> => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/monitoring/table`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Gagal memuatkan data monitoring");
+    }
     return res.json();
   },
 };

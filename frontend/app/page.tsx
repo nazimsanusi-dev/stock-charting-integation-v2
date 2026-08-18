@@ -20,8 +20,8 @@ import type {
   SubsectorBulkOHLC,
 } from "@/lib/types";
 
-interface ExtendedSidebarParams extends SidebarParams {
-  activeTab?: "subsector" | "sheets";
+export interface ExtendedSidebarParams extends SidebarParams {
+  activeTab?: "subsector" | "sheets" | "monitoring";
 }
 
 const DEFAULT_PARAMS: ExtendedSidebarParams = {

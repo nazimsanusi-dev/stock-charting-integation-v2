@@ -20,7 +20,7 @@ const TIMEFRAMES = [
 ] as const;
 
 interface ExtendedSidebarParams extends SidebarParams {
-  activeTab?: "subsector" | "sheets";
+  activeTab?: "subsector" | "sheets" | "monitoring";
 }
 
 interface Props {
@@ -206,6 +206,7 @@ export function Sidebar({ params, onChange }: Props) {
         >
           <span>🔥</span> Subsector Analysis
         </button>
+
         <button
           onClick={() => set({ activeTab: "sheets" })}
           className={`py-1.5 px-2 text-xs font-semibold rounded-md transition-colors text-left flex items-center gap-2 ${
@@ -215,6 +216,18 @@ export function Sidebar({ params, onChange }: Props) {
           }`}
         >
           <span>📋</span> Google Sheets Tracker
+        </button>
+
+        {/* Butang Baru: Stock Monitoring */}
+        <button
+          onClick={() => set({ activeTab: "monitoring" })}
+          className={`py-1.5 px-2 text-xs font-semibold rounded-md transition-colors text-left flex items-center gap-2 ${
+            activeTab === "monitoring"
+              ? "bg-white dark:bg-gray-700 text-[#26A69A] shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+          }`}
+        >
+          <span>🎯</span> Stock Monitoring
         </button>
       </div>
 
