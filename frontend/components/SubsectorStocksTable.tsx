@@ -101,7 +101,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
 
     try {
       // 2. Hantar Payload Ringkas ke API
-      const res = await fetch("/api/monitoring/add", {
+      const res = await fetch("https://stock-charting-integation-v2.nazimsanusi01.workers.dev/api/monitoring/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
