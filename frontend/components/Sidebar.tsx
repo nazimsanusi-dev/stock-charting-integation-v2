@@ -137,6 +137,8 @@ export function Sidebar({ params, onChange }: Props) {
       s.ticker.toLowerCase().includes(search.toLowerCase())
   );
 
+  const [showStocks, setShowStocks] = useState(false);
+
   const selectedTicker = params.selectedStocks[0]?.ticker ?? null;
 
   const selectStock = (s: Stock) => {
@@ -354,96 +356,120 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           )}
 
-          {/* 3. Stock List */}
-          <div className="flex flex-col gap-1">
+          {/* Header Seksyen Stocks (Boleh Klik untuk Buka / Tutup) */}
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="label mb-0">Stocks</label>
-              {params.worksheet && (
-                <button
-                  type="button"
-                  onClick={() => fetchStocks()}
-                  disabled={loadingStocks}
-                  title="Muat semula senarai Stocks"
-                  className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
-                >
-                  <span className={loadingStocks ? "animate-spin inline-block" : ""}>🔄</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowStocks(!showStocks)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-[#26A69A] dark:hover:text-[#26A69A] transition-colors group"
+              >
+                <span className="text-[10px] text-gray-400 group-hover:text-[#26A69A] transition-transform duration-200">
+                  {showStocks ? "▼" : "▶"}
+                </span>
+                <span>Stocks</span>
+                {selectedTicker && !showStocks && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#26A69A]/10 text-[#26A69A] rounded">
+                    {selectedTicker}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fetchStocks()}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                title="Muat semula senarai saham"
+              >
+                🔄
+              </button>
             </div>
 
-            <input
-              className="input"
-              placeholder="Search…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1">
-              {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
-              {stocksError && (
-                <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1 my-1">
-                  <span>⚠ {stocksError}</span>
-                  <button
-                    onClick={() => fetchStocks()}
-                    className="text-left underline font-medium hover:text-rose-600"
-                  >
-                    Cuba lagi
-                  </button>
-                </div>
-              )}
-              {filteredStocks.map((s) => {
-                const selected = selectedTicker === s.ticker;
-                return (
-                  <label
-                    key={s.ticker}
-                    className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1 rounded text-xs transition-colors ${
-                      selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <input
-                        type="radio"
-                        name="stock-select"
-                        className="accent-[#26A69A] shrink-0"
-                        checked={selected}
-                        onChange={() => selectStock(s)}
-                        onClick={() => selected && selectStock(s)}
-                      />
-                      <span
-                        className={`truncate ${
-                          selected ? "text-[#1a7a72] font-semibold" : "text-gray-700 dark:text-gray-300"
+            {/* Kandungan Carian & Senarai (Muncul hanya jika showStocks === true) */}
+            {showStocks && (
+              <div className="space-y-1.5 pt-1">
+                <input
+                  className="input w-full text-xs px-2.5 py-1.5 rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-[#26A69A]"
+                  placeholder="Search…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+
+                <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1 pr-1 custom-scrollbar">
+                  {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
+                  
+                  {stocksError && (
+                    <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1 my-1">
+                      <span>⚠ {stocksError}</span>
+                      <button
+                        onClick={() => fetchStocks()}
+                        className="text-left underline font-medium hover:text-rose-600"
+                      >
+                        Cuba lagi
+                      </button>
+                    </div>
+                  )}
+
+                  {filteredStocks.map((s) => {
+                    const selected = selectedTicker === s.ticker;
+                    const cleanChange = String(s.change ?? "").replace(/%/g, "");
+                    const numChange = Number(cleanChange);
+
+                    return (
+                      <label
+                        key={s.ticker}
+                        className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1.5 rounded text-xs transition-colors ${
+                          selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
                         }`}
                       >
-                        {s.name}
-                      </span>
-                    </div>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <input
+                            type="radio"
+                            name="stock-select"
+                            className="accent-[#26A69A] shrink-0"
+                            checked={selected}
+                            onChange={() => selectStock(s)}
+                            onClick={() => selected && selectStock(s)}
+                          />
+                          <span
+                            className={`truncate ${
+                              selected ? "text-[#1a7a72] dark:text-[#26A69A] font-semibold" : "text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {s.name}
+                          </span>
+                        </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
-                        {s.ticker}
-                      </span>
-                      {s.change !== undefined && s.change !== null && (
-                        <span
-                          className={`text-[11px] font-mono font-medium ${
-                            Number(s.change) > 0
-                              ? "text-emerald-500"
-                              : Number(s.change) < 0
-                              ? "text-red-500"
-                              : "text-gray-400 dark:text-gray-500"
-                          }`}
-                        >
-                          {Number(s.change) > 0 ? `+${s.change}%` : `${s.change}%`}
-                        </span>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-              {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
-                <p className="text-xs text-gray-400 py-1">
-                  {stocks.length ? "No matches" : "No stocks loaded"}
-                </p>
-              )}
-            </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
+                            {s.ticker}
+                          </span>
+                          {s.change !== undefined && s.change !== null && cleanChange !== "" && (
+                            <span
+                              className={`text-[11px] font-mono font-medium ${
+                                numChange > 0
+                                  ? "text-emerald-500"
+                                  : numChange < 0
+                                  ? "text-red-500"
+                                  : "text-gray-400 dark:text-gray-500"
+                              }`}
+                            >
+                              {numChange > 0 ? `+${cleanChange}%` : `${cleanChange}%`}
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                  {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
+                    <p className="text-xs text-gray-400 py-1">
+                      {stocks.length ? "No matches" : "No stocks loaded"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <hr className="border-gray-100 dark:border-gray-800" />

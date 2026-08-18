@@ -592,7 +592,7 @@ export const StockChart = memo(function StockChart({
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
     const timeScale = chart.timeScale();
-    const hitRadius = 16;
+    const hitRadius = 24;
 
     for (const d of drawingsRef.current) {
       if (d.type === "long") {
@@ -909,6 +909,18 @@ export const StockChart = memo(function StockChart({
             setHoveredHandle(hit);
           }
         }}
+        // Tangkap sentuhan jari terus pada peringkat kontena (Serta-merta aktif)
+        onTouchStart={(e) => {
+          if (e.touches.length === 1) {
+            const t = e.touches[0];
+            const hit = findHandleAt(t.clientX, t.clientY);
+            if (hit) {
+              setDraggingHandle(hit);
+            } else if (activeTool !== "none") {
+              handlePointerDown(t.clientX, t.clientY);
+            }
+          }
+        }}
         className="relative flex-1 w-full"
         style={{ minHeight: mini ? 200 : 550 }}
       >
@@ -921,16 +933,6 @@ export const StockChart = memo(function StockChart({
               if (e.button === 0) handlePointerDown(e.clientX, e.clientY);
             }}
             onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
-            onTouchStart={(e) => {
-              if (e.touches.length === 1) {
-                handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-              }
-            }}
-            onTouchMove={(e) => {
-              if (e.touches.length === 1) {
-                handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
-              }
-            }}
             className={`absolute inset-0 w-full h-full z-10 touch-none ${
               activeTool !== "none"
                 ? "cursor-crosshair pointer-events-auto"
