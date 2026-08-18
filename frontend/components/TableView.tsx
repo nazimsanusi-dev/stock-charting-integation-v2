@@ -387,10 +387,10 @@ export function TableView({ selectedSheet, worksheet }: Props) {
         {/* LAJUR KIRI: JADUAL + TAKE NOTE */}
         <div
           className={`flex flex-col gap-2.5 min-w-0 ${
-            showChart ? "xl:col-span-7" : "w-full"
+            showChart ? "xl:col-span-6" : "w-full"
           }`}
         >
-          {/* Kontena Jadual */}
+          {/* Kontena Jadual Bersama 2 Frozen Columns */}
           <div className="flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex-1">
             <div
               className={`overflow-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full ${
@@ -402,15 +402,24 @@ export function TableView({ selectedSheet, worksheet }: Props) {
               }`}
             >
               <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-[#182030]/95 backdrop-blur border-b border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-300">
+                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-[#182030] border-b border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-300">
                   <tr>
                     {headers.map((h, i) => {
                       const isSorted = sortCol === i;
+                      const isCol1 = i === 0;
+                      const isCol2 = i === 1;
+
                       return (
                         <th
                           key={i}
                           onClick={() => handleSort(i)}
-                          className="px-2.5 py-2 font-semibold text-[10px] uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:bg-gray-100/80 dark:hover:bg-slate-800/80 transition-colors"
+                          className={`px-2.5 py-2 font-semibold text-[10px] uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${
+                            isCol1
+                              ? "sticky left-0 z-30 bg-gray-50 dark:bg-[#182030] min-w-[95px] max-w-[95px]"
+                              : isCol2
+                              ? "sticky left-[95px] z-30 bg-gray-50 dark:bg-[#182030] min-w-[80px] max-w-[80px] border-r border-gray-200 dark:border-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)]"
+                              : ""
+                          }`}
                         >
                           <div className="flex items-center gap-1">
                             <span>{h}</span>
@@ -431,6 +440,14 @@ export function TableView({ selectedSheet, worksheet }: Props) {
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60">
                   {paginatedRows.map((row, ri) => {
                     const isSelected = selectedRowIndex === ri;
+
+                    // Warna latar belakang legap untuk sel beku (supaya teks tidak bertindih)
+                    const stickyCellBg = isSelected
+                      ? "bg-[#d2ece9] dark:bg-[#193734]"
+                      : ri % 2 === 0
+                      ? "bg-white dark:bg-[#121722]"
+                      : "bg-[#f8fafc] dark:bg-[#151b27]";
+
                     return (
                       <tr
                         key={ri}
@@ -443,14 +460,25 @@ export function TableView({ selectedSheet, worksheet }: Props) {
                             : "bg-gray-50/30 dark:bg-slate-900/30 hover:bg-gray-50/70 dark:hover:bg-slate-800/40"
                         }`}
                       >
-                        {headers.map((header, ci) => (
-                          <td
-                            key={ci}
-                            className="px-2.5 py-1.5 whitespace-nowrap text-gray-700 dark:text-slate-300"
-                          >
-                            {renderCellContent(header, row[ci] ?? "")}
-                          </td>
-                        ))}
+                        {headers.map((header, ci) => {
+                          const isCol1 = ci === 0;
+                          const isCol2 = ci === 1;
+
+                          return (
+                            <td
+                              key={ci}
+                              className={`px-2.5 py-1.5 whitespace-nowrap text-gray-700 dark:text-slate-300 ${
+                                isCol1
+                                  ? `sticky left-0 z-[5] min-w-[95px] max-w-[95px] truncate ${stickyCellBg}`
+                                  : isCol2
+                                  ? `sticky left-[95px] z-[5] min-w-[80px] max-w-[80px] border-r border-gray-200 dark:border-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)] ${stickyCellBg}`
+                                  : ""
+                              }`}
+                            >
+                              {renderCellContent(header, row[ci] ?? "")}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}
@@ -565,7 +593,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
 
         {/* LAJUR KANAN: STOCK CHART */}
         {showChart && (
-          <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[600px]">
+          <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[600px]">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-[#141a26]">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-xs text-gray-800 dark:text-gray-100 truncate max-w-[160px]">
