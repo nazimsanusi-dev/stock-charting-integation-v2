@@ -189,12 +189,18 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs whitespace-nowrap">
+              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+                <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
                   <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="py-2.5 px-3 text-left">Kod</th>
-                      <th className="py-2.5 px-3 text-left">Nama</th>
+                      {/* Kolum 1: Kod (Sticky Left-0) */}
+                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[85px] max-w-[85px]">
+                        Kod
+                      </th>
+                      {/* Kolum 2: Nama (Sticky Left-[85px] + Border & Shadow Separator) */}
+                      <th className="py-2.5 px-3 text-left sticky left-[85px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[130px] max-w-[130px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
+                        Nama
+                      </th>
                       <th className="py-2.5 px-2 text-center">Syariah</th>
                       <th className="py-2.5 px-3 text-right">Harga</th>
                       <th className="py-2.5 px-3 text-right">Perubahan</th>
@@ -214,23 +220,36 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       const isNeg = changeVal < 0;
                       const isSelected = selectedStock?.Code === item.Code;
 
+                      // Warna latar solid untuk sel beku (elak teks tembus masa scroll)
+                      const stickyBg = isSelected
+                        ? "bg-amber-100/90 dark:bg-[#281e0f]"
+                        : "bg-white dark:bg-[#111827] group-hover:bg-gray-100 dark:group-hover:bg-gray-800";
+
                       return (
                         <tr
                           key={idx}
                           onClick={() => setSelectedStock(item)}
-                          className={`cursor-pointer transition-colors ${
+                          className={`group cursor-pointer transition-colors ${
                             isSelected
                               ? "bg-amber-500/15 dark:bg-amber-500/20 font-semibold"
                               : "hover:bg-gray-100/70 dark:hover:bg-gray-800/50"
                           }`}
                         >
-                          <td className="py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100">
+                          {/* Kolum 1 Freeze */}
+                          <td
+                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[85px] max-w-[85px] ${stickyBg}`}
+                          >
                             {isSelected && <span className="text-amber-500 mr-1">▶</span>}
                             {item.Code}
                           </td>
-                          <td className="py-2 px-3 text-gray-800 dark:text-gray-200 truncate max-w-[120px]">
+
+                          {/* Kolum 2 Freeze */}
+                          <td
+                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[130px] max-w-[130px] sticky left-[85px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
+                          >
                             {item.Name}
                           </td>
+
                           <td className="py-2 px-2 text-center">
                             {item.Shariah === "Yes" ? (
                               <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
@@ -275,6 +294,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                   </tbody>
                 </table>
               </div>
+
 
               {/* Pagination */}
               {stocks.length > pageSize && (
