@@ -211,19 +211,20 @@ class BigQueryService:
 
         rows = await self._execute_query(f"""
             SELECT DISTINCT
-                TRIM(REGEXP_REPLACE(Name, r'\s+', ' ')) AS Name, 
+                REGEXP_REPLACE(TRIM(Name), r'\s+', ' ') AS Name, 
                 Code, 
                 Shariah, 
-                Price, 
-                Change, 
-                Change_Percent, 
-                Volume, 
-                MCap_M, 
-                PE, 
-                ROE, 
-                DY,
-                Scraped_Sector, 
-                Scraped_Subsector
+                SAFE_CAST(Price AS FLOAT64) AS Price, 
+                SAFE_CAST(Change AS FLOAT64) AS Change, 
+                -- Formatkan semula kepada nombor 2 perpuluhan bersama simbol %
+                FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
+                SAFE_CAST(Volume AS INT64) AS Volume, 
+                SAFE_CAST(MCap_M AS FLOAT64) AS MCap_M, 
+                SAFE_CAST(PE AS FLOAT64) AS PE, 
+                SAFE_CAST(ROE AS FLOAT64) AS ROE, 
+                SAFE_CAST(DY AS FLOAT64) AS DY,
+                TRIM(Scraped_Sector) AS Scraped_Sector, 
+                TRIM(Scraped_Subsector) AS Scraped_Subsector
             FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
             {where_sql}
             ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
