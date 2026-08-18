@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, memo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
 function formatDisplayDate(time: any): string {
@@ -39,6 +39,13 @@ function formatLwcTime(time: any): string {
     return time.split("T")[0];
   }
   return String(time);
+}
+
+function formatVolume(val: number | null | undefined): string {
+  if (val === null || val === undefined) return "-";
+  if (val >= 1e6) return `${(val / 1e6).toFixed(2)}M`;
+  if (val >= 1e3) return `${(val / 1e3).toFixed(1)}K`;
+  return val.toLocaleString();
 }
 
 const COLOR_PALETTES = {
@@ -102,6 +109,17 @@ type DragHandleTarget =
   | { type: "long"; id: string; handle: "tp" | "sl" }
   | { type: "range"; id: string; handle: "p1" | "p2" };
 
+interface HoverBarData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  change: number;
+  diff: number;
+  volume: number | null;
+}
+
 interface Props {
   data: ChartData;
   config: SidebarParams["chartConfig"];
@@ -121,6 +139,7 @@ export const StockChart = memo(function StockChart({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<any>(null);
   const mainSeriesRef = useRef<any>(null);
+  const volSeriesRef = useRef<any>(null);
   const lastTickerRef = useRef<string>("");
 
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
@@ -134,12 +153,36 @@ export const StockChart = memo(function StockChart({
   const [draggingHandle, setDraggingHandle] = useState<DragHandleTarget | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<DragHandleTarget | null>(null);
 
+  // State Hover Data OHLCV
+  const [hoverData, setHoverData] = useState<HoverBarData | null>(null);
+
   const C = COLOR_PALETTES[theme];
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   drawingsRef.current = drawings;
 
   const hasRange = drawings.some((d) => d.type === "range");
   const hasLong = drawings.some((d) => d.type === "long");
+
+  // Dapatkan lilin terakhir sebagai default apabila kursor tidak berada di atas carta
+  const latestCandle = useMemo(() => {
+    if (!data.ohlcv || data.ohlcv.length === 0) return null;
+    const last = data.ohlcv[data.ohlcv.length - 1];
+    const open = Number(last.open);
+    const close = Number(last.close);
+    const change = open !== 0 ? ((close - open) / open) * 100 : 0;
+    return {
+      time: formatDisplayDate(last.time),
+      open,
+      high: Number(last.high),
+      low: Number(last.low),
+      close,
+      change,
+      diff: close - open,
+      volume: Number(last.volume || 0),
+    };
+  }, [data.ohlcv]);
+
+  const activeBarDisplay = hoverData || latestCandle;
 
   // 1. Lukis Semula Canvas Overlay (Ultra-Sharp Retina HD)
   const redrawCanvas = useCallback(() => {
@@ -191,21 +234,21 @@ export const StockChart = memo(function StockChart({
         const boxWidth = Math.max(80, x2 - x1);
         const midX = Math.round(x1 + boxWidth / 2);
 
-        // Zon Sasaran Ambil Untung (TP)
+        // Zon TP
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1 + 0.5, yTp + 0.5, boxWidth, yEntry - yTp);
 
-        // Zon Sasaran Henti Rugi (SL)
+        // Zon SL
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1 + 0.5, yEntry + 0.5, boxWidth, ySl - yEntry);
 
-        // Garisan Harga Masuk (Entry)
+        // Garisan Entry
         ctx.strokeStyle = "#94a3b8";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
@@ -433,6 +476,9 @@ export const StockChart = memo(function StockChart({
               color: Number(b.close) >= Number(b.open) ? `${C.up}99` : `${C.down}99`,
             }))
           );
+          volSeriesRef.current = volSeries;
+        } else {
+          volSeriesRef.current = null;
         }
 
         if (data.indicators?.ema) {
@@ -534,8 +580,38 @@ export const StockChart = memo(function StockChart({
           redrawCanvasRef.current();
         });
 
-        chart.subscribeCrosshairMove(() => {
+        // Pantau Pergerakan Crosshair untuk Kemaskini OHLCV & % Perubahan secara Dinamik
+        chart.subscribeCrosshairMove((param: any) => {
           redrawCanvasRef.current();
+          if (!param || !param.time || !param.seriesData) {
+            setHoverData(null);
+            return;
+          }
+
+          const priceData = param.seriesData.get(mainSeriesRef.current);
+          if (priceData && priceData.open !== undefined) {
+            const volData = volSeriesRef.current ? param.seriesData.get(volSeriesRef.current) : null;
+            const open = Number(priceData.open);
+            const high = Number(priceData.high);
+            const low = Number(priceData.low);
+            const close = Number(priceData.close);
+            const change = open !== 0 ? ((close - open) / open) * 100 : 0;
+            const diff = close - open;
+            const volume = volData?.value !== undefined ? Number(volData.value) : null;
+
+            setHoverData({
+              time: formatDisplayDate(param.time),
+              open,
+              high,
+              low,
+              close,
+              change,
+              diff,
+              volume,
+            });
+          } else {
+            setHoverData(null);
+          }
         });
 
         if (ticker !== lastTickerRef.current && data.ohlcv.length > 0) {
@@ -635,7 +711,6 @@ export const StockChart = memo(function StockChart({
   const handlePointerDown = (clientX: number, clientY: number) => {
     if (mini) return;
 
-    // Semak pemegang boleh ubah terlebih dahulu
     const target = findHandleAt(clientX, clientY);
     if (target) {
       setDraggingHandle(target);
@@ -645,7 +720,6 @@ export const StockChart = memo(function StockChart({
     const coord = getCoordinatesRaw(clientX, clientY);
     if (!coord) return;
 
-    // Melukis Range Baharu (Hanya jika belum wujud)
     if (activeTool === "range" && !hasRange) {
       if (!rangeStart) {
         setRangeStart(coord);
@@ -673,7 +747,6 @@ export const StockChart = memo(function StockChart({
       return;
     }
 
-    // Melukis Long Position Baharu (Hanya jika belum wujud)
     if (activeTool === "long" && !hasLong) {
       const bars = data.ohlcv;
       const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
@@ -698,7 +771,6 @@ export const StockChart = memo(function StockChart({
   const handlePointerMove = useCallback((clientX: number, clientY: number) => {
     if (mini) return;
 
-    // Pantau hover pada pemegang semasa dalam mod Pointer
     if (!draggingHandle && activeTool === "none") {
       const hit = findHandleAt(clientX, clientY);
       setHoveredHandle(hit);
@@ -707,7 +779,6 @@ export const StockChart = memo(function StockChart({
     const coord = getCoordinatesRaw(clientX, clientY);
     if (!coord) return;
 
-    // Ubah suai nilai pemegang secara langsung semasa diheret
     if (draggingHandle) {
       setDrawings((prev) =>
         prev.map((d) => {
@@ -753,7 +824,6 @@ export const StockChart = memo(function StockChart({
     }
   }, [draggingHandle, activeTool, rangeStart, mini, data.ohlcv, findHandleAt]);
 
-  // Listener Seretan Global Window (Anti-Terputus)
   useEffect(() => {
     if (!draggingHandle) return;
 
@@ -783,11 +853,15 @@ export const StockChart = memo(function StockChart({
   return (
     <div className="flex flex-col h-full w-full select-none">
       {!mini && (
-        <div className="flex flex-wrap items-center justify-between px-2.5 py-1.5 bg-gray-100/90 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-[11px] gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-gray-400 mr-1 text-[10px]">TOOLS:</span>
+        /* ------------------------------------------------------------- */
+        /* TOOLBAR 1-BARIS PADAT: TOOLS (KIRI) + LIVE OHLCV (KANAN)      */
+        /* ------------------------------------------------------------- */
+        <div className="flex items-center justify-between px-2 py-1 bg-gray-100/90 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-[10px] gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          {/* BAHAGIAN KIRI: BUTANG ALATAN UKURAN & PADAM */}
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="font-bold text-gray-400 text-[9px] mr-0.5">TOOLS:</span>
 
-            {/* Butang Pointer */}
+            {/* Pointer */}
             <button
               type="button"
               onClick={() => {
@@ -795,16 +869,17 @@ export const StockChart = memo(function StockChart({
                 setRangeStart(null);
                 setRangeCurrent(null);
               }}
-              className={`px-2 py-1 rounded border transition ${
+              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
                 activeTool === "none"
                   ? "bg-gray-300 dark:bg-gray-700 font-bold border-gray-400 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
             >
-              👆 Pointer
+              <span>👆</span>
+              <span className="hidden sm:inline">Pointer</span>
             </button>
 
-            {/* Butang Range Tool (Dikunci jika sudah wujud) */}
+            {/* Range Tool */}
             <button
               type="button"
               disabled={hasRange}
@@ -814,23 +889,20 @@ export const StockChart = memo(function StockChart({
                 setRangeStart(null);
                 setRangeCurrent(null);
               }}
-              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
+              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
                 hasRange
                   ? "opacity-50 cursor-not-allowed bg-gray-200/50 dark:bg-gray-800/50 text-gray-400 border-transparent"
                   : activeTool === "range"
                   ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title={
-                hasRange
-                  ? "Measure Tool sedang aktif. Padam dahulu untuk membuat ukuran baharu."
-                  : "Klik P1 & P2 untuk membuat ukuran"
-              }
+              title={hasRange ? "Range tool sedang aktif" : "Ukur harga dan masa (P1 ke P2)"}
             >
-              📐 Price & Date Range {hasRange ? " (Aktif)" : rangeStart ? " (Pilih P2)" : ""}
+              <span>📐</span>
+              <span>Range{hasRange ? " (✓)" : rangeStart ? " (P2)" : ""}</span>
             </button>
 
-            {/* Butang Long Position (Dikunci jika sudah wujud) */}
+            {/* Long Tool */}
             <button
               type="button"
               disabled={hasLong}
@@ -838,25 +910,20 @@ export const StockChart = memo(function StockChart({
                 if (hasLong) return;
                 setActiveTool("long");
               }}
-              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
+              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
                 hasLong
                   ? "opacity-50 cursor-not-allowed bg-gray-200/50 dark:bg-gray-800/50 text-gray-400 border-transparent"
                   : activeTool === "long"
                   ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title={
-                hasLong
-                  ? "Long Position sedang aktif. Padam dahulu untuk membuat posisi baharu."
-                  : "Klik pada lilin untuk meletakkan Long Position"
-              }
+              title={hasLong ? "Long position sedang aktif" : "Letak posisi TP/SL"}
             >
-              📈 Long Position {hasLong ? " (Aktif)" : ""}
+              <span>📈</span>
+              <span>Long{hasLong ? " (✓)" : ""}</span>
             </button>
-          </div>
 
-          {/* Butang Pemadaman Khusus */}
-          <div className="flex items-center gap-1.5">
+            {/* Butang Padam */}
             {hasRange && (
               <button
                 type="button"
@@ -864,9 +931,10 @@ export const StockChart = memo(function StockChart({
                   setDrawings((prev) => prev.filter((d) => d.type !== "range"));
                   redrawCanvas();
                 }}
-                className="text-sky-500 hover:text-sky-600 dark:hover:text-sky-400 font-medium px-1.5 py-0.5 rounded hover:bg-sky-500/10 transition text-[10px] border border-sky-500/30"
+                className="text-sky-500 hover:text-sky-400 font-medium px-1 py-0.5 rounded hover:bg-sky-500/10 transition text-[9px] border border-sky-500/30"
+                title="Padam Range"
               >
-                🗑️ Padam Range
+                🗑️
               </button>
             )}
 
@@ -877,9 +945,10 @@ export const StockChart = memo(function StockChart({
                   setDrawings((prev) => prev.filter((d) => d.type !== "long"));
                   redrawCanvas();
                 }}
-                className="text-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium px-1.5 py-0.5 rounded hover:bg-emerald-500/10 transition text-[10px] border border-emerald-500/30"
+                className="text-emerald-500 hover:text-emerald-400 font-medium px-1 py-0.5 rounded hover:bg-emerald-500/10 transition text-[9px] border border-emerald-500/30"
+                title="Padam Long"
               >
-                🗑️ Padam Long
+                🗑️
               </button>
             )}
 
@@ -890,16 +959,52 @@ export const StockChart = memo(function StockChart({
                   setDrawings([]);
                   redrawCanvas();
                 }}
-                className="text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium px-2 py-0.5 rounded hover:bg-rose-500/10 transition text-[10px]"
+                className="text-rose-500 hover:text-rose-400 font-medium px-1 py-0.5 rounded hover:bg-rose-500/10 transition text-[9px]"
+                title="Padam Semua Lukisan"
               >
-                🗑️ Padam Semua
+                🗑️ Semua
               </button>
             )}
           </div>
+
+          {/* BAHAGIAN KANAN: LIVE DATA OHLCV & % CHANGES */}
+          {activeBarDisplay && (
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[9.5px] font-mono shrink-0 ml-auto pl-2 border-l border-gray-200 dark:border-gray-800">
+              <span className="text-gray-400 hidden xl:inline">{activeBarDisplay.time}</span>
+              <span className="text-gray-400">
+                O:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.open.toFixed(3)}</span>
+              </span>
+              <span className="text-gray-400">
+                H:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.high.toFixed(3)}</span>
+              </span>
+              <span className="text-gray-400">
+                L:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.low.toFixed(3)}</span>
+              </span>
+              <span className="text-gray-400">
+                C:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.close.toFixed(3)}</span>
+              </span>
+              <span
+                className={`font-bold ${
+                  activeBarDisplay.change >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                {activeBarDisplay.change >= 0
+                  ? `+${activeBarDisplay.change.toFixed(2)}%`
+                  : `${activeBarDisplay.change.toFixed(2)}%`}
+              </span>
+              {activeBarDisplay.volume !== null && (
+                <span className="text-gray-400 hidden md:inline">
+                  V:<span className="text-sky-600 dark:text-sky-400 ml-0.5">{formatVolume(activeBarDisplay.volume)}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Bekas Carta & Kanvas Pintar */}
+      {/* BEKAS CARTA & KANVAS PINTAR */}
       <div
         ref={containerRef}
         onWheel={() => redrawCanvasRef.current()}
@@ -909,7 +1014,7 @@ export const StockChart = memo(function StockChart({
             setHoveredHandle(hit);
           }
         }}
-        // Tangkap sentuhan jari terus pada peringkat kontena (Serta-merta aktif)
+        onMouseLeave={() => setHoverData(null)}
         onTouchStart={(e) => {
           if (e.touches.length === 1) {
             const t = e.touches[0];
