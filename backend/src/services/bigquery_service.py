@@ -107,6 +107,7 @@ class BigQueryService:
         self.dataset_id = dataset_id
         self.endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/queries"
         self.insert_endpoint = f"https://bigquery.googleapis.com/bigquery/v2/projects/{self.project_id}/datasets/{self.dataset_id}/tables/stock_monitoring/insertAll"
+        
 
     async def _execute_query(self, sql: str):
         payload = json.dumps({"query": sql, "useLegacySql": False})

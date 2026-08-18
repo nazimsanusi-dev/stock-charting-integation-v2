@@ -533,6 +533,11 @@ export default function Home() {
                 columns={params.gridColumns}
                 theme={params.theme}
               />
+            ) : params.activeTab === "monitoring" ? (
+              <TableView
+                selectedSheet={{ label: "Stock Monitoring (BigQuery)", url: "monitoring_db" }}
+                worksheet="Active Watchlist"
+              />
             ) : (
               <TableView
                 selectedSheet={params.selectedSheet}

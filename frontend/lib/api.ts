@@ -148,7 +148,7 @@ export const api = {
   },
 
   addToMonitoring: async (payload: AddMonitoringPayload) => {
-    const res = await fetch(`${process.env.API_BASE_URL || ""}/api/monitoring/add`, {
+    const res = await fetch(`${API_BASE_URL}/api/monitoring/add`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -162,7 +162,7 @@ export const api = {
   },
 
   monitoringTableData: async (): Promise<{ headers: string[]; rows: string[][] }> => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/monitoring/table`, {
+    const res = await fetch(`${API_BASE_URL}/api/monitoring/table`, {
       cache: "no-store",
     });
     if (!res.ok) {

@@ -129,12 +129,18 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     setCurrentPage(1);
   }, [PAGE_SIZE]);
 
+  const isMonitoring = selectedSheet?.url === "monitoring_db";
+
   const load = useCallback(async () => {
     if (!selectedSheet) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await api.tableData(selectedSheet.url, worksheet);
+      // Jika tab monitoring, tarik terus dari BigQuery
+      const data = isMonitoring
+        ? await api.monitoringTableData()
+        : await api.tableData(selectedSheet.url, worksheet);
+
       setHeaders(data.headers || []);
       setRows(data.rows || []);
       setSelectedRowIndex(0);
@@ -144,7 +150,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [selectedSheet?.url, worksheet]);
+  }, [selectedSheet?.url, worksheet, isMonitoring]);
 
   useEffect(() => {
     load();

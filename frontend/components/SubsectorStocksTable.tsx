@@ -232,12 +232,12 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
                   <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      {/* Kolum 1: Kod (Sticky Left-0) */}
-                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[85px] max-w-[85px]">
+                      {/* Kolum 1: Kod (Sticky Left) */}
+                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[80px] max-w-[80px]">
                         Kod
                       </th>
-                      {/* Kolum 2: Nama (Sticky Left-[85px] + Border & Shadow Separator) */}
-                      <th className="py-2.5 px-3 text-left sticky left-[85px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[130px] max-w-[130px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
+                      {/* Kolum 2: Nama (Sticky Left) */}
+                      <th className="py-2.5 px-3 text-left sticky left-[80px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
                         Nama
                       </th>
                       <th className="py-2.5 px-2 text-center">Syariah</th>
@@ -248,8 +248,8 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       <th className="py-2.5 px-3 text-right">MCap (M)</th>
                       <th className="py-2.5 px-3 text-left">Sector</th>
                       <th className="py-2.5 px-3 text-left">Subsector</th>
-                      {/* Kolum Tambahan: Tindakan Insert */}
-                      <th className="py-2.5 px-3 text-center sticky right-0 bg-gray-100 dark:bg-gray-800 z-10">
+                      {/* Kolum Action (Sticky Right) */}
+                      <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
                         Action
                       </th>
                     </tr>
@@ -280,7 +280,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                         >
                           {/* Kolum 1 Freeze */}
                           <td
-                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[85px] max-w-[85px] ${stickyBg}`}
+                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[80px] max-w-[80px] ${stickyBg}`}
                           >
                             {isSelected && <span className="text-amber-500 mr-1">▶</span>}
                             {item.Code}
@@ -288,7 +288,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
 
                           {/* Kolum 2 Freeze */}
                           <td
-                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[130px] max-w-[130px] sticky left-[85px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
+                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[80px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
                           >
                             {item.Name}
                           </td>
@@ -332,13 +332,15 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                             {item.Scraped_Subsector || "-"}
                           </td>
 
-                          {/* Butang Tambah ke BigQuery */}
-                          <td className="py-2 px-3 text-center sticky right-0 bg-white/90 dark:bg-[#111827]/90 z-[5]">
+                          {/* Action Button (Sticky Right) */}
+                          <td
+                            className={`py-1.5 px-2 text-center sticky right-0 z-[5] w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800 ${stickyBg}`}
+                          >
                             <button
                               type="button"
                               disabled={status === "loading"}
                               onClick={(e) => {
-                                e.stopPropagation(); // Elak tersentuh pilihan baris
+                                e.stopPropagation();
                                 handleAddToMonitoring(item);
                               }}
                               className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all mx-auto ${
