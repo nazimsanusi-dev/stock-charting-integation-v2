@@ -315,7 +315,7 @@ export default function Home() {
                     <div
                       className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full rounded-full"
                       style={{
-                        animation: "loadProgress35 3.5s ease-out forwards",
+                        animation: "loadProgress35 3.0s ease-out forwards",
                       }}
                     />
                   </div>

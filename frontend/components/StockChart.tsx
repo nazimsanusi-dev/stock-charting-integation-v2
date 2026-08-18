@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
+// Helper Penukar Format Tarikh Paparan (DD/MM/YYYY)
 function formatDisplayDate(time: any): string {
   if (!time) return "";
   let d: Date;
@@ -24,6 +25,7 @@ function formatDisplayDate(time: any): string {
   return `${day}/${month}/${year}`;
 }
 
+// Helper Format Standard Masa Lightweight Charts (YYYY-MM-DD)
 function formatLwcTime(time: any): string {
   if (!time) return "";
   if (typeof time === "number") {
@@ -98,6 +100,10 @@ interface RangeDrawing {
 
 type DrawingItem = LongPositionDrawing | RangeDrawing;
 
+type DragHandleTarget =
+  | { type: "long"; id: string; handle: "tp" | "sl" }
+  | { type: "range"; id: string; handle: "p1" | "p2" };
+
 interface Props {
   data: ChartData;
   config: SidebarParams["chartConfig"];
@@ -122,16 +128,19 @@ export const StockChart = memo(function StockChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
-  const isMouseDownRef = useRef<boolean>(false);
+  // State Ukuran
   const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
   const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
-  const [draggingHandle, setDraggingHandle] = useState<{ id: string; handle: "tp" | "sl" } | null>(null);
+
+  // State Interaktif Drag Handle (Long TP/SL & Range P1/P2)
+  const [draggingTarget, setDraggingTarget] = useState<DragHandleTarget | null>(null);
+  const [hoveredTarget, setHoveredTarget] = useState<DragHandleTarget | null>(null);
 
   const C = COLOR_PALETTES[theme];
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   drawingsRef.current = drawings;
 
-  // 1. Lukis Semula Canvas Overlay
+  // 1. Fungsi Melukis Semula Canvas Overlay (HD Retina + Penyelarasan Penuh X & Y)
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -142,36 +151,54 @@ export const StockChart = memo(function StockChart({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Sokongan High-DPI / Retina (Tajam & Bebas Pecah)
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const displayWidth = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+
+    if (displayWidth === 0 || displayHeight === 0) return;
+
+    canvas.width = Math.round(displayWidth * dpr);
+    canvas.height = Math.round(displayHeight * dpr);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     const timeScale = chart.timeScale();
 
     const drawItem = (d: DrawingItem) => {
+      // --- LUKISAN LONG POSITION ---
       if (d.type === "long") {
         const x1 = timeScale.timeToCoordinate(d.entryTime as any);
-        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 100 : null);
+        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 110 : null);
         const yEntry = series.priceToCoordinate(d.entryPrice);
         const yTp = series.priceToCoordinate(d.tpPrice);
         const ySl = series.priceToCoordinate(d.slPrice);
 
         if (x1 === null || yEntry === null || yTp === null || ySl === null) return;
 
-        const boxWidth = Math.max(80, (x2 ?? x1 + 100) - x1);
+        const boxWidth = Math.max(80, (x2 ?? x1 + 110) - x1);
+        const midX = x1 + boxWidth / 2;
 
+        // Zon Sasaran Ambil Untung (TP)
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yTp, boxWidth, yEntry - yTp);
 
+        // Zon Henti Rugi (SL)
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, yEntry, boxWidth, ySl - yEntry);
 
+        // Garisan Harga Masuk (Entry)
         ctx.strokeStyle = "#94a3b8";
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
@@ -180,15 +207,23 @@ export const StockChart = memo(function StockChart({
         ctx.stroke();
         ctx.setLineDash([]);
 
+        // Pemegang TP (Boleh Ditarik)
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
-        ctx.arc(x1 + boxWidth / 2, yTp, 6, 0, Math.PI * 2);
+        ctx.arc(midX, yTp, 6.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
+        // Pemegang SL (Boleh Ditarik)
         ctx.fillStyle = "#EF5350";
         ctx.beginPath();
-        ctx.arc(x1 + boxWidth / 2, ySl, 6, 0, Math.PI * 2);
+        ctx.arc(midX, ySl, 6.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
         const tpPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
         const slPct = (((d.entryPrice - d.slPrice) / d.entryPrice) * 100).toFixed(2);
@@ -203,6 +238,7 @@ export const StockChart = memo(function StockChart({
         ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
       }
 
+      // --- LUKISAN PRICE & DATE RANGE TOOL ---
       if (d.type === "range") {
         const x1 = timeScale.timeToCoordinate(d.startTime as any);
         const x2 = timeScale.timeToCoordinate(d.endTime as any);
@@ -233,9 +269,10 @@ export const StockChart = memo(function StockChart({
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
+        // Pin P1 (Boleh Ditarik untuk Ubah Titik Mula)
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
-        ctx.arc(x1, y1, 5, 0, Math.PI * 2);
+        ctx.arc(x1, y1, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.5;
@@ -249,9 +286,10 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = "#38BDF8";
         ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 9);
 
+        // Pin P2 (Boleh Ditarik untuk Ubah Titik Akhir)
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
-        ctx.arc(x2, y2, 5, 0, Math.PI * 2);
+        ctx.arc(x2, y2, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.5;
@@ -264,8 +302,9 @@ export const StockChart = memo(function StockChart({
         ctx.fillStyle = isUp ? "#34D399" : "#F87171";
         ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 19);
 
+        // Lencana Maklumat Peratusan & Tempoh
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
-        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Days`;
+        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Hari`;
 
         ctx.font = "bold 10px monospace";
         const textWidth = ctx.measureText(label).width;
@@ -284,13 +323,14 @@ export const StockChart = memo(function StockChart({
 
     drawingsRef.current.forEach(drawItem);
 
+    // Pratonton Langsung semasa drag ukuran
     if (rangeStart && rangeCurrent) {
       drawItem({
         id: "preview_range",
         type: "range",
-        startTime: rangeStart.timeStr,
+        startTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeStart.timeStr : rangeCurrent.timeStr,
         startPrice: rangeStart.price,
-        endTime: rangeCurrent.timeStr,
+        endTime: rangeStart.barIdx <= rangeCurrent.barIdx ? rangeCurrent.timeStr : rangeStart.timeStr,
         endPrice: rangeCurrent.price,
         barsCount: Math.abs(rangeCurrent.barIdx - rangeStart.barIdx) + 1,
       });
@@ -304,7 +344,7 @@ export const StockChart = memo(function StockChart({
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi TradingView Chart
+  // 2. Inisialisasi Carta TradingView
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -335,7 +375,7 @@ export const StockChart = memo(function StockChart({
             horzLines: { color: C.grid },
           },
           crosshair: { mode: CrosshairMode.Normal },
-          rightPriceScale: { borderColor: C.grid },
+          rightPriceScale: { borderColor: C.grid, autoScale: true },
           timeScale: { borderColor: C.grid, timeVisible: !mini },
           autoSize: true,
         });
@@ -363,6 +403,7 @@ export const StockChart = memo(function StockChart({
           }))
         );
 
+        // Volum
         if (config.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
@@ -383,6 +424,7 @@ export const StockChart = memo(function StockChart({
           );
         }
 
+        // EMA Indikator
         if (data.indicators?.ema) {
           Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
             const points = values
@@ -403,6 +445,7 @@ export const StockChart = memo(function StockChart({
           });
         }
 
+        // RSI
         if (!mini && config.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -432,6 +475,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
+        // MACD
         if (!mini && config.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -478,7 +522,12 @@ export const StockChart = memo(function StockChart({
           }
         }
 
+        // Penyelarasan Dinamik X & Y (Menyegerakkan pergerakan skala masa & harga)
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+          redrawCanvasRef.current();
+        });
+
+        chart.subscribeCrosshairMove(() => {
           redrawCanvasRef.current();
         });
 
@@ -502,7 +551,7 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, ticker]);
 
-  // 3. Helper Pengiraan Koordinat
+  // 3. Pengira Koordinat Selamat
   const getCoordinatesRaw = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -525,119 +574,97 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
-  const commitRangeDrawing = (
-    start: { price: number; timeStr: string; barIdx: number },
-    end: { price: number; timeStr: string; barIdx: number }
-  ) => {
-    const barsCount = Math.abs(end.barIdx - start.barIdx) + 1;
-    setDrawings((prev) => [
-      ...prev,
-      {
-        id: `range_${Date.now()}`,
-        type: "range",
-        startTime: start.timeStr,
-        startPrice: start.price,
-        endTime: end.timeStr,
-        endPrice: end.price,
-        barsCount,
-      },
-    ]);
-    setRangeStart(null);
-    setRangeCurrent(null);
-    setActiveTool("none");
-  };
+  // 4. Pengesan Sentuhan / Titik Pemegang (Hit-Testing untuk TP, SL, P1, P2)
+  const findHandleAt = (clientX: number, clientY: number): DragHandleTarget | null => {
+    const canvas = canvasRef.current;
+    const chart = chartRef.current;
+    const series = mainSeriesRef.current;
+    if (!canvas || !chart || !series) return null;
 
-  // 4. Desktop Handlers (Mouse Drag)
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0 || mini) return;
-    const coord = getCoordinatesRaw(e.clientX, e.clientY);
-    if (!coord) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+    const timeScale = chart.timeScale();
+    const hitRadius = 14;
 
-    isMouseDownRef.current = true;
+    for (const d of drawingsRef.current) {
+      if (d.type === "long") {
+        const x1 = timeScale.timeToCoordinate(d.entryTime as any);
+        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 110 : null);
+        const yTp = series.priceToCoordinate(d.tpPrice);
+        const ySl = series.priceToCoordinate(d.slPrice);
 
-    if (activeTool === "range") {
-      setRangeStart(coord);
-      setRangeCurrent(coord);
-      return;
-    }
-
-    if (activeTool === "long") {
-      const bars = data.ohlcv;
-      const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
-      const entryP = coord.price;
-
-      setDrawings((prev) => [
-        ...prev,
-        {
-          id: `long_${Date.now()}`,
-          type: "long",
-          entryTime: coord.timeStr,
-          entryPrice: entryP,
-          tpPrice: Number((entryP * 1.06).toFixed(3)),
-          slPrice: Number((entryP * 0.98).toFixed(3)),
-          endTime: formatLwcTime(futureBar?.time ?? coord.timeStr),
-        },
-      ]);
-      setActiveTool("none");
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (mini) return;
-    const coord = getCoordinatesRaw(e.clientX, e.clientY);
-    if (!coord) return;
-
-    if (draggingHandle) {
-      setDrawings((prev) =>
-        prev.map((d) => {
-          if (d.id === draggingHandle.id && d.type === "long") {
-            if (draggingHandle.handle === "tp") {
-              return { ...d, tpPrice: Math.max(d.entryPrice + 0.001, coord.price) };
-            }
-            if (draggingHandle.handle === "sl") {
-              return { ...d, slPrice: Math.min(d.entryPrice - 0.001, coord.price) };
-            }
+        if (x1 !== null && x2 !== null && yTp !== null && ySl !== null) {
+          const midX = x1 + Math.max(80, x2 - x1) / 2;
+          if (Math.hypot(mouseX - midX, mouseY - yTp) <= hitRadius) {
+            return { type: "long", id: d.id, handle: "tp" };
           }
-          return d;
-        })
-      );
-      return;
-    }
+          if (Math.hypot(mouseX - midX, mouseY - ySl) <= hitRadius) {
+            return { type: "long", id: d.id, handle: "sl" };
+          }
+        }
+      }
 
-    if (isMouseDownRef.current && rangeStart && activeTool === "range") {
-      setRangeCurrent(coord);
+      if (d.type === "range") {
+        const x1 = timeScale.timeToCoordinate(d.startTime as any);
+        const x2 = timeScale.timeToCoordinate(d.endTime as any);
+        const y1 = series.priceToCoordinate(d.startPrice);
+        const y2 = series.priceToCoordinate(d.endPrice);
+
+        if (x1 !== null && x2 !== null && y1 !== null && y2 !== null) {
+          if (Math.hypot(mouseX - x1, mouseY - y1) <= hitRadius) {
+            return { type: "range", id: d.id, handle: "p1" };
+          }
+          if (Math.hypot(mouseX - x2, mouseY - y2) <= hitRadius) {
+            return { type: "range", id: d.id, handle: "p2" };
+          }
+        }
+      }
     }
+    return null;
   };
 
-  const handleMouseUp = () => {
-    isMouseDownRef.current = false;
-    if (draggingHandle) {
-      setDraggingHandle(null);
-      return;
-    }
-
-    if (rangeStart && rangeCurrent && activeTool === "range") {
-      commitRangeDrawing(rangeStart, rangeCurrent);
-    }
-  };
-
-  // 5. Tablet/Mobile Handlers (Tap & Drag Friendly)
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length !== 1 || mini) return;
-    const t = e.touches[0];
-    const coord = getCoordinatesRaw(t.clientX, t.clientY);
+  // 5. Pengendali Acara Utama
+  const handlePointerDown = (clientX: number, clientY: number) => {
+    if (mini) return;
+    const coord = getCoordinatesRaw(clientX, clientY);
     if (!coord) return;
 
+    // Semak pemegang boleh tarik sedia ada
+    const target = findHandleAt(clientX, clientY);
+    if (target) {
+      setDraggingTarget(target);
+      return;
+    }
+
+    // Mod Ukuran
     if (activeTool === "range") {
       if (!rangeStart) {
         setRangeStart(coord);
         setRangeCurrent(coord);
       } else {
-        commitRangeDrawing(rangeStart, coord);
+        const barsCount = Math.abs(coord.barIdx - rangeStart.barIdx) + 1;
+        const isStartFirst = rangeStart.barIdx <= coord.barIdx;
+        setDrawings((prev) => [
+          ...prev,
+          {
+            id: `range_${Date.now()}`,
+            type: "range",
+            startTime: isStartFirst ? rangeStart.timeStr : coord.timeStr,
+            startPrice: rangeStart.price,
+            endTime: isStartFirst ? coord.timeStr : rangeStart.timeStr,
+            endPrice: coord.price,
+            barsCount,
+          },
+        ]);
+        setRangeStart(null);
+        setRangeCurrent(null);
+        setActiveTool("none");
       }
       return;
     }
 
+    // Mod Long Position
     if (activeTool === "long") {
       const bars = data.ohlcv;
       const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
@@ -659,14 +686,65 @@ export const StockChart = memo(function StockChart({
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length !== 1 || mini) return;
-    const t = e.touches[0];
-    const coord = getCoordinatesRaw(t.clientX, t.clientY);
+  const handlePointerMove = (clientX: number, clientY: number) => {
+    if (mini) return;
+    const coord = getCoordinatesRaw(clientX, clientY);
+
+    // Pantau kedudukan tetikus pada pemegang
+    if (!draggingTarget && activeTool === "none") {
+      const hit = findHandleAt(clientX, clientY);
+      setHoveredTarget(hit);
+    }
+
     if (!coord) return;
+
+    // Pelarasan dinamik pemegang yang sedang ditarik
+    if (draggingTarget) {
+      setDrawings((prev) =>
+        prev.map((d) => {
+          if (d.id === draggingTarget.id) {
+            if (d.type === "long" && draggingTarget.type === "long") {
+              if (draggingTarget.handle === "tp") {
+                return { ...d, tpPrice: Math.max(d.entryPrice + 0.001, coord.price) };
+              }
+              if (draggingTarget.handle === "sl") {
+                return { ...d, slPrice: Math.min(d.entryPrice - 0.001, coord.price) };
+              }
+            }
+            if (d.type === "range" && draggingTarget.type === "range") {
+              if (draggingTarget.handle === "p1") {
+                return {
+                  ...d,
+                  startTime: coord.timeStr,
+                  startPrice: coord.price,
+                  barsCount: Math.abs(coord.barIdx - (data.ohlcv.findIndex(b => formatLwcTime(b.time) === d.endTime) || coord.barIdx)) + 1,
+                };
+              }
+              if (draggingTarget.handle === "p2") {
+                return {
+                  ...d,
+                  endTime: coord.timeStr,
+                  endPrice: coord.price,
+                  barsCount: Math.abs(coord.barIdx - (data.ohlcv.findIndex(b => formatLwcTime(b.time) === d.startTime) || coord.barIdx)) + 1,
+                };
+              }
+            }
+          }
+          return d;
+        })
+      );
+      redrawCanvasRef.current();
+      return;
+    }
 
     if (rangeStart && activeTool === "range") {
       setRangeCurrent(coord);
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (draggingTarget) {
+      setDraggingTarget(null);
     }
   };
 
@@ -705,7 +783,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Drag tetikus (Desktop) atau Tap 2 titik (Tablet) untuk mengukur % harga"
+              title="Klik/Tap P1 dan P2 untuk mengukur jarak harga & lilin"
             >
               📐 Price & Date Range {rangeStart ? " (Pilih P2)" : ""}
             </button>
@@ -718,7 +796,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
                   : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
               }`}
-              title="Klik pada lilin untuk letak Long (Default TP +6%, SL -2%)"
+              title="Klik pada lilin untuk letak Long Position (Default TP +6%, SL -2%)"
             >
               📈 Long Position
             </button>
@@ -739,20 +817,34 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* Container Carta */}
-      <div className="relative flex-1 w-full" style={{ minHeight: mini ? 200 : 550 }}>
-        <div ref={containerRef} className="absolute inset-0 w-full h-full" />
-
+      {/* Bekas Carta & Kanvas Lukisan Interaktif */}
+      <div
+        ref={containerRef}
+        onWheel={() => redrawCanvasRef.current()}
+        className="relative flex-1 w-full"
+        style={{ minHeight: mini ? 200 : 550 }}
+      >
         {!mini && (
           <canvas
             ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
+            onMouseDown={(e) => {
+              if (e.button === 0) handlePointerDown(e.clientX, e.clientY);
+            }}
+            onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
+            onMouseUp={handlePointerUp}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+              }
+            }}
+            onTouchMove={(e) => {
+              if (e.touches.length === 1) {
+                handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+              }
+            }}
+            onTouchEnd={handlePointerUp}
             className={`absolute inset-0 w-full h-full z-10 touch-none ${
-              activeTool !== "none" || draggingHandle !== null
+              activeTool !== "none" || draggingTarget !== null || hoveredTarget !== null
                 ? "cursor-crosshair pointer-events-auto"
                 : "pointer-events-none"
             }`}
