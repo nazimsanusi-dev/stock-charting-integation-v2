@@ -20,9 +20,7 @@ interface NoteItem {
   updatedAt: string;
 }
 
-// -----------------------------------------------------------------------------
-// HELPER: PEMFORMATAN SEL PINTAR (BADGES, PERATUSAN & SIMBOL)
-// -----------------------------------------------------------------------------
+// Helper: Format Sel Pintar
 function renderCellContent(header: string, rawVal: string) {
   if (rawVal === undefined || rawVal === null || rawVal === "") {
     return <span className="text-gray-300 dark:text-gray-600">-</span>;
@@ -31,7 +29,7 @@ function renderCellContent(header: string, rawVal: string) {
   const val = String(rawVal).trim();
   const hLower = header.toLowerCase();
 
-  // 1. Boolean (TRUE / FALSE)
+  // Boolean
   if (val.toUpperCase() === "TRUE") {
     return (
       <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
@@ -47,7 +45,7 @@ function renderCellContent(header: string, rawVal: string) {
     );
   }
 
-  // 2. Peratusan (+ Hijau / - Merah)
+  // Peratusan
   if (hLower.includes("percent") || hLower.includes("%") || val.endsWith("%")) {
     const cleanNum = parseFloat(val.replace(/[%+]/g, ""));
     if (!isNaN(cleanNum)) {
@@ -69,7 +67,7 @@ function renderCellContent(header: string, rawVal: string) {
     }
   }
 
-  // 3. Simbol / Ticker Saham
+  // Simbol Saham
   if (hLower.includes("symbol") || hLower.includes("ticker") || hLower.includes("code") || val.includes(".KL")) {
     return (
       <span className="font-mono font-medium text-sky-600 dark:text-sky-400 bg-sky-500/10 dark:bg-sky-500/15 px-1.5 py-0.5 rounded border border-sky-500/20 text-[10px]">
@@ -78,7 +76,7 @@ function renderCellContent(header: string, rawVal: string) {
     );
   }
 
-  // 4. Tarikh
+  // Tarikh
   if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
     return (
       <span className="font-mono text-gray-500 dark:text-gray-400 text-[10px]">
@@ -87,13 +85,12 @@ function renderCellContent(header: string, rawVal: string) {
     );
   }
 
-  // 5. Nombor / Nilai Harga
+  // Angka
   const numVal = parseFloat(val);
   if (!isNaN(numVal) && !isNaN(Number(val))) {
     return <span className="font-mono text-[11px] text-gray-800 dark:text-gray-200">{val}</span>;
   }
 
-  // 6. Teks Biasa
   return <span className="font-medium text-[11px] text-gray-800 dark:text-gray-200">{val}</span>;
 }
 
@@ -106,39 +103,32 @@ export function TableView({ selectedSheet, worksheet }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [search, setSearch] = useState("");
 
-  // Layout Toggles
-  const [showChart, setShowChart] = useState(false);
+  // Default: Chart aktif secara automatik (Table + Chart Mode)
+  const [showChart, setShowChart] = useState(true);
   const [showNote, setShowNote] = useState(false);
 
-  // Pagination Dinamik
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Selected Row State
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(0);
 
-  // TakeNote State
   const [noteText, setNoteText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [notesList, setNotesList] = useState<NoteItem[]>([]);
 
-  // Chart Data State
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
 
-  // 1. Bilangan Baris Dinamik Mengikut Mod Paparan (Auto-Fit)
+  // Peraturan Paging Mengikut Mod
   const PAGE_SIZE = useMemo(() => {
-    if (showChart && !showNote) return 18; // 18 baris sejajar penuh dengan ketinggian carta di sebelah kanan
-    if (showChart && showNote) return 10;  // 10 baris untuk memberi ruang kotak Take Note di bawah
+    if (showChart && !showNote) return 19; // Mode: TABLE + CHART (+1 row)
+    if (showChart && showNote) return 12;  // Mode: TABLE + NOTE + CHART (+2 rows)
     if (!showChart && showNote) return 12;
-    return 18; // Default paparan jadual penuh
+    return 16;                             // Mode: TABLE ONLY (-2 rows)
   }, [showChart, showNote]);
 
-  // Reset semula ke Halaman 1 apabila saiz muka surat bertukar
   useEffect(() => {
     setCurrentPage(1);
   }, [PAGE_SIZE]);
 
-  // 2. Ambil Data Jadual dari Sheet
   const load = useCallback(async () => {
     if (!selectedSheet) return;
     setLoading(true);
@@ -160,7 +150,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     load();
   }, [load]);
 
-  // 3. Pengendali Susunan (Sort)
   const handleSort = (colIdx: number) => {
     if (sortCol === colIdx) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -171,7 +160,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     setCurrentPage(1);
   };
 
-  // 4. Carian Pantas
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return q
@@ -179,7 +167,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
       : rows;
   }, [rows, search]);
 
-  // 5. Susunan Data
   const sortedRows = useMemo(() => {
     if (sortCol === null) return filteredRows;
     return [...filteredRows].sort((a, b) => {
@@ -206,14 +193,12 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     });
   }, [filteredRows, sortCol, sortDir]);
 
-  // 6. Pengiraan Paging
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
     return sortedRows.slice(start, start + PAGE_SIZE);
   }, [sortedRows, currentPage, PAGE_SIZE]);
 
-  // 7. Maklumat Saham Dipilih
   const selectedRowData = paginatedRows[selectedRowIndex ?? 0] || sortedRows[0] || [];
   const symbolColIdx = headers.findIndex((h) =>
     ["symbol", "ticker", "code"].includes(h.toLowerCase())
@@ -223,7 +208,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
   const currentTicker = symbolColIdx !== -1 ? selectedRowData[symbolColIdx] : "0296.KL";
   const currentStockName = nameColIdx !== -1 ? selectedRowData[nameColIdx] : "Selected Stock";
 
-  // 8. Klik Baris: Auto Buka Carta & Muat Turun Data
   const handleRowClick = async (ri: number, row: string[]) => {
     setSelectedRowIndex(ri);
     setShowChart(true);
@@ -256,7 +240,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
     }
   }, [showChart, currentTicker, chartData]);
 
-  // 9. Simpan Nota
   const handleSaveNote = async () => {
     if (!noteText.trim()) return;
     setIsSavingNote(true);
@@ -316,9 +299,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
 
   return (
     <div className="flex flex-col h-full w-full space-y-2.5">
-      {/* ------------------------------------------------------------- */}
-      {/* TOOLBAR ATAS                                                  */}
-      {/* ------------------------------------------------------------- */}
+      {/* TOOLBAR ATAS */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100">
@@ -360,7 +341,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
             )}
           </div>
 
-          {/* Toggle Note */}
           <button
             type="button"
             onClick={() => setShowNote(!showNote)}
@@ -374,7 +354,6 @@ export function TableView({ selectedSheet, worksheet }: Props) {
             <span>Note</span>
           </button>
 
-          {/* Toggle Chart */}
           <button
             type="button"
             onClick={() => setShowChart(!showChart)}
@@ -399,9 +378,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* 2-COLUMN SPLIT VIEW (Nisbah Seimbang 58% : 42%)                */}
-      {/* ------------------------------------------------------------- */}
+      {/* STRUKTUR SPLIT VIEW */}
       <div
         className={`grid gap-3 items-start flex-1 ${
           showChart ? "grid-cols-1 xl:grid-cols-12" : "grid-cols-1"
@@ -418,10 +395,10 @@ export function TableView({ selectedSheet, worksheet }: Props) {
             <div
               className={`overflow-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full ${
                 showChart && !showNote
-                  ? "min-h-[530px] max-h-[530px]"
+                  ? "min-h-[560px] max-h-[560px]"
                   : showChart && showNote
-                  ? "max-h-[350px]"
-                  : "min-h-[530px]"
+                  ? "max-h-[370px]"
+                  : "min-h-[500px]"
               }`}
             >
               <table className="w-full text-left border-collapse">
@@ -492,7 +469,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
               </table>
             </div>
 
-            {/* Paging Footer Padat */}
+            {/* Paging Footer */}
             <div className="flex items-center justify-between px-3 py-1.5 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-[#141a26] text-[11px] text-gray-500 dark:text-gray-400 mt-auto">
               <span>
                 Baris {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
@@ -529,9 +506,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
             </div>
           </div>
 
-          {/* ----------------------------------------------------------- */}
-          {/* KOMPONEN TAKE NOTE                                          */}
-          {/* ----------------------------------------------------------- */}
+          {/* KOMPONEN TAKE NOTE */}
           {showNote && (
             <div className="flex flex-col p-3 bg-white dark:bg-[#121722] border border-amber-500/30 rounded-xl shadow-sm space-y-2">
               <div className="flex items-center justify-between">
@@ -588,11 +563,9 @@ export function TableView({ selectedSheet, worksheet }: Props) {
           )}
         </div>
 
-        {/* ------------------------------------------------------------- */}
-        {/* LAJUR KANAN: STOCK CHART                                      */}
-        {/* ------------------------------------------------------------- */}
+        {/* LAJUR KANAN: STOCK CHART */}
         {showChart && (
-          <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
+          <div className="xl:col-span-5 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[600px]">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-[#141a26]">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-xs text-gray-800 dark:text-gray-100 truncate max-w-[160px]">
