@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { ChartData, SidebarParams } from "@/lib/types";
 
-// Helper Penukar Format Tarikh Paparan (DD/MM/YYYY)
 function formatDisplayDate(time: any): string {
   if (!time) return "";
   let d: Date;
@@ -25,7 +24,6 @@ function formatDisplayDate(time: any): string {
   return `${day}/${month}/${year}`;
 }
 
-// Helper Format Standard Masa Lightweight Charts (YYYY-MM-DD)
 function formatLwcTime(time: any): string {
   if (!time) return "";
   if (typeof time === "number") {
@@ -128,19 +126,19 @@ export const StockChart = memo(function StockChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
 
-  // State Ukuran
+  // State Ukuran Baharu
   const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
   const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
 
-  // State Interaktif Drag Handle (Long TP/SL & Range P1/P2)
+  // State Handle Drag
   const [draggingTarget, setDraggingTarget] = useState<DragHandleTarget | null>(null);
-  const [hoveredTarget, setHoveredTarget] = useState<DragHandleTarget | null>(null);
+  const [hoveredHandle, setHoveredHandle] = useState<DragHandleTarget | null>(null);
 
   const C = COLOR_PALETTES[theme];
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   drawingsRef.current = drawings;
 
-  // 1. Fungsi Melukis Semula Canvas Overlay (HD Retina + Penyelarasan Penuh X & Y)
+  // 1. Fungsi Lukis Semula Canvas Overlay (Ultra-Sharp Retina Rendering)
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -151,19 +149,21 @@ export const StockChart = memo(function StockChart({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Sokongan High-DPI / Retina (Tajam & Bebas Pecah)
     const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-    const displayWidth = canvas.clientWidth;
-    const displayHeight = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
-    if (displayWidth === 0 || displayHeight === 0) return;
+    if (width === 0 || height === 0) return;
 
-    canvas.width = Math.round(displayWidth * dpr);
-    canvas.height = Math.round(displayHeight * dpr);
+    // Laraskan saiz fizikal dan logikal secara tepat
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+    }
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
@@ -173,53 +173,60 @@ export const StockChart = memo(function StockChart({
     const drawItem = (d: DrawingItem) => {
       // --- LUKISAN LONG POSITION ---
       if (d.type === "long") {
-        const x1 = timeScale.timeToCoordinate(d.entryTime as any);
-        const x2 = timeScale.timeToCoordinate(d.endTime as any) ?? (x1 !== null ? x1 + 110 : null);
-        const yEntry = series.priceToCoordinate(d.entryPrice);
-        const yTp = series.priceToCoordinate(d.tpPrice);
-        const ySl = series.priceToCoordinate(d.slPrice);
+        const rawX1 = timeScale.timeToCoordinate(d.entryTime as any);
+        const rawX2 = timeScale.timeToCoordinate(d.endTime as any) ?? (rawX1 !== null ? rawX1 + 110 : null);
+        const rawYEntry = series.priceToCoordinate(d.entryPrice);
+        const rawYTp = series.priceToCoordinate(d.tpPrice);
+        const rawYSl = series.priceToCoordinate(d.slPrice);
 
-        if (x1 === null || yEntry === null || yTp === null || ySl === null) return;
+        if (rawX1 === null || rawYEntry === null || rawYTp === null || rawYSl === null) return;
 
-        const boxWidth = Math.max(80, (x2 ?? x1 + 110) - x1);
-        const midX = x1 + boxWidth / 2;
+        const x1 = Math.round(rawX1);
+        const x2 = Math.round(rawX2 ?? rawX1 + 110);
+        const yEntry = Math.round(rawYEntry);
+        const yTp = Math.round(rawYTp);
+        const ySl = Math.round(rawYSl);
 
-        // Zon Sasaran Ambil Untung (TP)
+        const boxWidth = Math.max(80, x2 - x1);
+        const midX = Math.round(x1 + boxWidth / 2);
+
+        // Zon TP
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(x1, yTp, boxWidth, yEntry - yTp);
+        ctx.strokeRect(x1 + 0.5, yTp + 0.5, boxWidth, yEntry - yTp);
 
-        // Zon Henti Rugi (SL)
+        // Zon SL
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(x1, yEntry, boxWidth, ySl - yEntry);
+        ctx.strokeRect(x1 + 0.5, yEntry + 0.5, boxWidth, ySl - yEntry);
 
-        // Garisan Harga Masuk (Entry)
+        // Garisan Entry
         ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
-        ctx.moveTo(x1, yEntry);
-        ctx.lineTo(x1 + boxWidth, yEntry);
+        ctx.moveTo(x1, yEntry + 0.5);
+        ctx.lineTo(x1 + boxWidth, yEntry + 0.5);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Pemegang TP (Boleh Ditarik)
+        // Pemegang TP (Handle)
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
-        ctx.arc(midX, yTp, 6.5, 0, Math.PI * 2);
+        ctx.arc(midX, yTp, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Pemegang SL (Boleh Ditarik)
+        // Pemegang SL (Handle)
         ctx.fillStyle = "#EF5350";
         ctx.beginPath();
-        ctx.arc(midX, ySl, 6.5, 0, Math.PI * 2);
+        ctx.arc(midX, ySl, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2;
@@ -238,82 +245,87 @@ export const StockChart = memo(function StockChart({
         ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
       }
 
-      // --- LUKISAN PRICE & DATE RANGE TOOL ---
+      // --- LUKISAN PRICE & DATE RANGE ---
       if (d.type === "range") {
-        const x1 = timeScale.timeToCoordinate(d.startTime as any);
-        const x2 = timeScale.timeToCoordinate(d.endTime as any);
-        const y1 = series.priceToCoordinate(d.startPrice);
-        const y2 = series.priceToCoordinate(d.endPrice);
+        const rawX1 = timeScale.timeToCoordinate(d.startTime as any);
+        const rawX2 = timeScale.timeToCoordinate(d.endTime as any);
+        const rawY1 = series.priceToCoordinate(d.startPrice);
+        const rawY2 = series.priceToCoordinate(d.endPrice);
 
-        if (x1 === null || x2 === null || y1 === null || y2 === null) return;
+        if (rawX1 === null || rawX2 === null || rawY1 === null || rawY2 === null) return;
+
+        const x1 = Math.round(rawX1);
+        const x2 = Math.round(rawX2);
+        const y1 = Math.round(rawY1);
+        const y2 = Math.round(rawY2);
 
         const left = Math.min(x1, x2);
         const top = Math.min(y1, y2);
-        const width = Math.abs(x2 - x1);
-        const height = Math.abs(y2 - y1);
+        const boxW = Math.abs(x2 - x1);
+        const boxH = Math.abs(y2 - y1);
         const priceDiff = d.endPrice - d.startPrice;
         const isUp = priceDiff >= 0;
 
         ctx.fillStyle = isUp ? "rgba(38, 166, 154, 0.18)" : "rgba(239, 83, 80, 0.18)";
-        ctx.fillRect(left, top, width, height);
+        ctx.fillRect(left, top, boxW, boxH);
 
         ctx.strokeStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
-        ctx.strokeRect(left, top, width, height);
+        ctx.strokeRect(left + 0.5, top + 0.5, boxW, boxH);
         ctx.setLineDash([]);
 
         ctx.beginPath();
-        ctx.strokeStyle = isUp ? "rgba(38, 166, 154, 0.6)" : "rgba(239, 83, 80, 0.6)";
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = isUp ? "rgba(38, 166, 154, 0.7)" : "rgba(239, 83, 80, 0.7)";
+        ctx.moveTo(x1 + 0.5, y1 + 0.5);
+        ctx.lineTo(x2 + 0.5, y2 + 0.5);
         ctx.stroke();
 
-        // Pin P1 (Boleh Ditarik untuk Ubah Titik Mula)
+        // Pin P1 (Boleh Ubah)
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
         ctx.arc(x1, y1, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
 
         const p1Text = `P1: ${formatDisplayDate(d.startTime)}, RM${d.startPrice.toFixed(3)}`;
         ctx.font = "bold 9px monospace";
         const p1Width = ctx.measureText(p1Text).width;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-        ctx.fillRect(x1 - p1Width / 2 - 4, y1 - 20, p1Width + 8, 15);
+        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+        ctx.fillRect(x1 - p1Width / 2 - 4, y1 - 22, p1Width + 8, 16);
         ctx.fillStyle = "#38BDF8";
-        ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 9);
+        ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 10);
 
-        // Pin P2 (Boleh Ditarik untuk Ubah Titik Akhir)
+        // Pin P2 (Boleh Ubah)
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
         ctx.arc(x2, y2, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
 
         const p2Text = `P2: ${formatDisplayDate(d.endTime)}, RM${d.endPrice.toFixed(3)}`;
         const p2Width = ctx.measureText(p2Text).width;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-        ctx.fillRect(x2 - p2Width / 2 - 4, y2 + 8, p2Width + 8, 15);
+        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+        ctx.fillRect(x2 - p2Width / 2 - 4, y2 + 8, p2Width + 8, 16);
         ctx.fillStyle = isUp ? "#34D399" : "#F87171";
-        ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 19);
+        ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 20);
 
-        // Lencana Maklumat Peratusan & Tempoh
+        // Lencana Maklumat
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
         const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Hari`;
 
         ctx.font = "bold 10px monospace";
         const textWidth = ctx.measureText(label).width;
-        const badgeX = left + width / 2 - textWidth / 2 - 6;
-        const badgeY = top - 24 < 0 ? top + height + 6 : top - 24;
+        const badgeX = Math.round(left + boxW / 2 - textWidth / 2 - 6);
+        const badgeY = top - 26 < 0 ? top + boxH + 8 : top - 26;
 
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, textWidth + 12, 18, 4);
+        ctx.roundRect(badgeX, badgeY, textWidth + 12, 19, 4);
         ctx.fill();
 
         ctx.fillStyle = "#ffffff";
@@ -323,7 +335,6 @@ export const StockChart = memo(function StockChart({
 
     drawingsRef.current.forEach(drawItem);
 
-    // Pratonton Langsung semasa drag ukuran
     if (rangeStart && rangeCurrent) {
       drawItem({
         id: "preview_range",
@@ -344,7 +355,7 @@ export const StockChart = memo(function StockChart({
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi Carta TradingView
+  // 2. Inisialisasi TradingView Chart
   useEffect(() => {
     if (!containerRef.current || !data.ohlcv?.length) return;
 
@@ -424,7 +435,7 @@ export const StockChart = memo(function StockChart({
           );
         }
 
-        // EMA Indikator
+        // EMA
         if (data.indicators?.ema) {
           Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
             const points = values
@@ -522,7 +533,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        // Penyelarasan Dinamik X & Y (Menyegerakkan pergerakan skala masa & harga)
+        // Segerakkan Perubahan X & Y
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
           redrawCanvasRef.current();
         });
@@ -551,7 +562,7 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, ticker]);
 
-  // 3. Pengira Koordinat Selamat
+  // 3. Helper Penukaran Koordinat
   const getCoordinatesRaw = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -574,7 +585,7 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
-  // 4. Pengesan Sentuhan / Titik Pemegang (Hit-Testing untuk TP, SL, P1, P2)
+  // 4. Hit-Testing Pengesanan Pemegang (Handles)
   const findHandleAt = (clientX: number, clientY: number): DragHandleTarget | null => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -585,7 +596,7 @@ export const StockChart = memo(function StockChart({
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
     const timeScale = chart.timeScale();
-    const hitRadius = 14;
+    const hitRadius = 16;
 
     for (const d of drawingsRef.current) {
       if (d.type === "long") {
@@ -624,20 +635,20 @@ export const StockChart = memo(function StockChart({
     return null;
   };
 
-  // 5. Pengendali Acara Utama
+  // 5. Pengendali Pointer & Seretan Global
   const handlePointerDown = (clientX: number, clientY: number) => {
     if (mini) return;
     const coord = getCoordinatesRaw(clientX, clientY);
     if (!coord) return;
 
-    // Semak pemegang boleh tarik sedia ada
+    // Semak pemegang sedia ada terlebih dahulu (Boleh ubah dalam mod Pointer)
     const target = findHandleAt(clientX, clientY);
     if (target) {
       setDraggingTarget(target);
       return;
     }
 
-    // Mod Ukuran
+    // Cipta Range Tool baharu
     if (activeTool === "range") {
       if (!rangeStart) {
         setRangeStart(coord);
@@ -664,7 +675,7 @@ export const StockChart = memo(function StockChart({
       return;
     }
 
-    // Mod Long Position
+    // Cipta Long Position baharu
     if (activeTool === "long") {
       const bars = data.ohlcv;
       const futureBar = bars[Math.min(bars.length - 1, coord.barIdx + 20)];
@@ -686,19 +697,18 @@ export const StockChart = memo(function StockChart({
     }
   };
 
-  const handlePointerMove = (clientX: number, clientY: number) => {
+  const handlePointerMove = useCallback((clientX: number, clientY: number) => {
     if (mini) return;
     const coord = getCoordinatesRaw(clientX, clientY);
 
-    // Pantau kedudukan tetikus pada pemegang
     if (!draggingTarget && activeTool === "none") {
       const hit = findHandleAt(clientX, clientY);
-      setHoveredTarget(hit);
+      setHoveredHandle(hit);
     }
 
     if (!coord) return;
 
-    // Pelarasan dinamik pemegang yang sedang ditarik
+    // Ubah suai nilai pemegang secara langsung
     if (draggingTarget) {
       setDrawings((prev) =>
         prev.map((d) => {
@@ -713,19 +723,21 @@ export const StockChart = memo(function StockChart({
             }
             if (d.type === "range" && draggingTarget.type === "range") {
               if (draggingTarget.handle === "p1") {
+                const endIdx = data.ohlcv.findIndex((b) => formatLwcTime(b.time) === d.endTime);
                 return {
                   ...d,
                   startTime: coord.timeStr,
                   startPrice: coord.price,
-                  barsCount: Math.abs(coord.barIdx - (data.ohlcv.findIndex(b => formatLwcTime(b.time) === d.endTime) || coord.barIdx)) + 1,
+                  barsCount: Math.abs(coord.barIdx - (endIdx >= 0 ? endIdx : coord.barIdx)) + 1,
                 };
               }
               if (draggingTarget.handle === "p2") {
+                const startIdx = data.ohlcv.findIndex((b) => formatLwcTime(b.time) === d.startTime);
                 return {
                   ...d,
                   endTime: coord.timeStr,
                   endPrice: coord.price,
-                  barsCount: Math.abs(coord.barIdx - (data.ohlcv.findIndex(b => formatLwcTime(b.time) === d.startTime) || coord.barIdx)) + 1,
+                  barsCount: Math.abs(coord.barIdx - (startIdx >= 0 ? startIdx : coord.barIdx)) + 1,
                 };
               }
             }
@@ -740,13 +752,34 @@ export const StockChart = memo(function StockChart({
     if (rangeStart && activeTool === "range") {
       setRangeCurrent(coord);
     }
-  };
+  }, [draggingTarget, activeTool, rangeStart, mini, data.ohlcv]);
 
-  const handlePointerUp = () => {
-    if (draggingTarget) {
+  // Listener Seretan Global Window (Anti-Drop)
+  useEffect(() => {
+    if (!draggingTarget) return;
+
+    const onGlobalMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+      handlePointerMove(clientX, clientY);
+    };
+
+    const onGlobalUp = () => {
       setDraggingTarget(null);
-    }
-  };
+    };
+
+    window.addEventListener("mousemove", onGlobalMove);
+    window.addEventListener("mouseup", onGlobalUp);
+    window.addEventListener("touchmove", onGlobalMove);
+    window.addEventListener("touchend", onGlobalUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onGlobalMove);
+      window.removeEventListener("mouseup", onGlobalUp);
+      window.removeEventListener("touchmove", onGlobalMove);
+      window.removeEventListener("touchend", onGlobalUp);
+    };
+  }, [draggingTarget, handlePointerMove]);
 
   return (
     <div className="flex flex-col h-full w-full select-none">
@@ -817,7 +850,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* Bekas Carta & Kanvas Lukisan Interaktif */}
+      {/* Bekas Carta TV & Kanvas Pintar */}
       <div
         ref={containerRef}
         onWheel={() => redrawCanvasRef.current()}
@@ -831,7 +864,6 @@ export const StockChart = memo(function StockChart({
               if (e.button === 0) handlePointerDown(e.clientX, e.clientY);
             }}
             onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
-            onMouseUp={handlePointerUp}
             onTouchStart={(e) => {
               if (e.touches.length === 1) {
                 handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
@@ -842,9 +874,8 @@ export const StockChart = memo(function StockChart({
                 handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
               }
             }}
-            onTouchEnd={handlePointerUp}
             className={`absolute inset-0 w-full h-full z-10 touch-none ${
-              activeTool !== "none" || draggingTarget !== null || hoveredTarget !== null
+              activeTool !== "none" || draggingTarget !== null || hoveredHandle !== null
                 ? "cursor-crosshair pointer-events-auto"
                 : "pointer-events-none"
             }`}
