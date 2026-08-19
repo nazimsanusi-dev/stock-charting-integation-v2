@@ -536,37 +536,66 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           )}
 
-          {/* Timeframe & Combine Timeframe */}
-          {params.viewMode !== "table" && (
-            <>
-              <div className="flex flex-col gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    Combine Timeframes
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="accent-[#26A69A] h-3.5 w-3.5 cursor-pointer"
-                    checked={params.isCombineTimeframe}
-                    onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      set({
-                        isCombineTimeframe: isChecked,
-                        gridColumns: isChecked ? Math.min(params.gridColumns, 2) : params.gridColumns,
-                      });
-                    }}
-                  />
+        {/* Timeframe & Combine Timeframe */}
+        {params.viewMode !== "table" && (
+        <>
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-850/60 border border-gray-200 dark:border-gray-800 shadow-sm">
+                {/* Toggle Switch Header */}
+                <label className="flex items-center justify-between cursor-pointer select-none">
+                  <div className="flex items-center gap-2">
+                    {/* Split Screen SVG Icon */}
+                    <svg
+                      className="w-4 h-4 text-teal-600 dark:text-teal-400"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect width="18" height="18" x="3" y="3" rx="2" />
+                      <path d="M12 3v18" />
+                    </svg>
+                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                      Combine Timeframes
+                    </span>
+                  </div>
+
+                  <div className="relative inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={Boolean(params.isCombineTimeframe)}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        set({
+                          isCombineTimeframe: isChecked,
+                          timeframe: params.timeframe || "1d",
+                          secondaryTimeframe: isChecked
+                            ? params.secondaryTimeframe || "1wk"
+                            : params.secondaryTimeframe,
+                          gridColumns: isChecked ? Math.min(params.gridColumns || 2, 2) : params.gridColumns,
+                        });
+                      }}
+                    />
+                    <div className="w-8 h-4.5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#26A69A]"></div>
+                  </div>
                 </label>
 
-                {params.isCombineTimeframe && (
-                  <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <div>
-                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                {/* Dual View Dropdowns */}
+                {params.isCombineTimeframe ? (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200 dark:border-gray-700/60">
+                    {/* TF 1 (Left) */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <svg className="w-3 h-3 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="15 18 9 12 15 6" />
+                        </svg>
                         TF 1 (Left)
                       </span>
                       <select
-                        className="select text-xs mt-0.5 py-1 px-1.5"
-                        value={params.timeframe}
+                        className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs rounded-lg border border-gray-200 dark:border-gray-700 py-1.5 px-2 font-medium focus:ring-1 focus:ring-[#26A69A] focus:border-[#26A69A] outline-none shadow-sm cursor-pointer"
+                        value={params.timeframe || "1d"}
                         onChange={(e) => set({ timeframe: e.target.value })}
                       >
                         {TIMEFRAMES.map((t) => (
@@ -576,13 +605,18 @@ export function Sidebar({ params, onChange }: Props) {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+
+                    {/* TF 2 (Right) */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <svg className="w-3 h-3 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
                         TF 2 (Right)
                       </span>
                       <select
-                        className="select text-xs mt-0.5 py-1 px-1.5"
-                        value={params.secondaryTimeframe}
+                        className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs rounded-lg border border-gray-200 dark:border-gray-700 py-1.5 px-2 font-medium focus:ring-1 focus:ring-[#26A69A] focus:border-[#26A69A] outline-none shadow-sm cursor-pointer"
+                        value={params.secondaryTimeframe || "1wk"}
                         onChange={(e) => set({ secondaryTimeframe: e.target.value })}
                       >
                         {TIMEFRAMES.map((t) => (
@@ -593,29 +627,29 @@ export function Sidebar({ params, onChange }: Props) {
                       </select>
                     </div>
                   </div>
+                ) : (
+                  /* Single Timeframe Pill Selectors */
+                  <div className="flex gap-1 pt-1">
+                    {TIMEFRAMES.map((t) => {
+                      const isActive = (params.timeframe || "1d") === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => set({ timeframe: t.value })}
+                          className={`flex-1 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                            isActive
+                              ? "bg-[#26A69A] text-white border-[#26A69A] shadow-sm shadow-teal-500/20"
+                              : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                        >
+                          {t.label.slice(0, 1)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-
-              {!params.isCombineTimeframe && (
-                <div>
-                  <label className="label">Timeframe</label>
-                  <div className="flex gap-1">
-                    {TIMEFRAMES.map((t) => (
-                      <button
-                        key={t.value}
-                        onClick={() => set({ timeframe: t.value })}
-                        className={`flex-1 py-1 text-xs rounded border transition-colors ${
-                          params.timeframe === t.value
-                            ? "bg-[#26A69A] text-white border-[#26A69A]"
-                            : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
-                      >
-                        {t.label.slice(0, 1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div>
                 <label className="label">Period</label>
@@ -677,7 +711,7 @@ export function Sidebar({ params, onChange }: Props) {
             </>
           )}
         </>
-      )}
+            )}
 
       <div className="mt-auto text-xs text-gray-400 dark:text-gray-600 space-y-0.5">
         <p>Data: Yahoo Finance</p>
