@@ -536,16 +536,31 @@ export function Sidebar({ params, onChange }: Props) {
             </div>
           )}
 
-        {/* Timeframe & Combine Timeframe */}
-        {params.viewMode !== "table" && (
+          {/* Timeframe & Combine Timeframe */}
+      {params.viewMode !== "table" && (
         <>
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-850/60 border border-gray-200 dark:border-gray-800 shadow-sm">
+          {(() => {
+            // Cari value sebenar untuk 'Weekly' dari TIMEFRAMES (contoh: '1wk', '1w', atau 'W')
+            const weeklyVal =
+              TIMEFRAMES.find((t) => t.label.toLowerCase().includes("week"))?.value || "1wk";
+            const dailyVal =
+              TIMEFRAMES.find((t) => t.label.toLowerCase().includes("day"))?.value || "1d";
+
+            const isDark = params.theme === "dark";
+
+            return (
+              <div
+                className={`flex flex-col gap-2 p-2.5 rounded-xl border transition-colors ${
+                  isDark
+                    ? "bg-[#111827] border-gray-800 text-gray-100"
+                    : "bg-gray-50 border-gray-200 text-gray-800"
+                }`}
+              >
                 {/* Toggle Switch Header */}
                 <label className="flex items-center justify-between cursor-pointer select-none">
                   <div className="flex items-center gap-2">
-                    {/* Split Screen SVG Icon */}
                     <svg
-                      className="w-4 h-4 text-teal-600 dark:text-teal-400"
+                      className="w-4 h-4 text-[#26A69A]"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -556,7 +571,11 @@ export function Sidebar({ params, onChange }: Props) {
                       <rect width="18" height="18" x="3" y="3" rx="2" />
                       <path d="M12 3v18" />
                     </svg>
-                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                    <span
+                      className={`text-xs font-semibold ${
+                        isDark ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
                       Combine Timeframes
                     </span>
                   </div>
@@ -570,36 +589,64 @@ export function Sidebar({ params, onChange }: Props) {
                         const isChecked = e.target.checked;
                         set({
                           isCombineTimeframe: isChecked,
-                          timeframe: params.timeframe || "1d",
+                          timeframe: params.timeframe || dailyVal,
+                          // Paksa TF2 = Weekly bila diaktifkan jika nilainya sama dengan TF1 atau kosong
                           secondaryTimeframe: isChecked
-                            ? params.secondaryTimeframe || "1wk"
+                            ? params.secondaryTimeframe &&
+                              params.secondaryTimeframe !== (params.timeframe || dailyVal)
+                              ? params.secondaryTimeframe
+                              : weeklyVal
                             : params.secondaryTimeframe,
-                          gridColumns: isChecked ? Math.min(params.gridColumns || 2, 2) : params.gridColumns,
+                          gridColumns: isChecked
+                            ? Math.min(params.gridColumns || 2, 2)
+                            : params.gridColumns,
                         });
                       }}
                     />
-                    <div className="w-8 h-4.5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-[#26A69A]"></div>
+                    <div
+                      className={`w-8 h-4.5 rounded-full peer peer-focus:outline-none after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:after:translate-x-full peer-checked:bg-[#26A69A] ${
+                        isDark ? "bg-gray-700" : "bg-gray-300"
+                      }`}
+                    ></div>
                   </div>
                 </label>
 
                 {/* Dual View Dropdowns */}
                 {params.isCombineTimeframe ? (
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200 dark:border-gray-700/60">
+                  <div
+                    className={`grid grid-cols-2 gap-2 pt-2 border-t ${
+                      isDark ? "border-gray-800" : "border-gray-200"
+                    }`}
+                  >
                     {/* TF 1 (Left) */}
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-500 flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
                           <polyline points="15 18 9 12 15 6" />
                         </svg>
                         TF 1 (Left)
                       </span>
                       <select
-                        className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs rounded-lg border border-gray-200 dark:border-gray-700 py-1.5 px-2 font-medium focus:ring-1 focus:ring-[#26A69A] focus:border-[#26A69A] outline-none shadow-sm cursor-pointer"
-                        value={params.timeframe || "1d"}
+                        className={`w-full text-xs rounded-lg border py-1.5 px-2 font-medium outline-none cursor-pointer focus:ring-1 focus:ring-[#26A69A] ${
+                          isDark
+                            ? "bg-[#1f2937] border-gray-700 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900 shadow-sm"
+                        }`}
+                        value={params.timeframe || dailyVal}
                         onChange={(e) => set({ timeframe: e.target.value })}
                       >
                         {TIMEFRAMES.map((t) => (
-                          <option key={t.value} value={t.value}>
+                          <option
+                            key={t.value}
+                            value={t.value}
+                            className={isDark ? "bg-[#1f2937] text-white" : "bg-white text-black"}
+                          >
                             {t.label}
                           </option>
                         ))}
@@ -608,19 +655,33 @@ export function Sidebar({ params, onChange }: Props) {
 
                     {/* TF 2 (Right) */}
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                        <svg className="w-3 h-3 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
                           <polyline points="9 18 15 12 9 6" />
                         </svg>
                         TF 2 (Right)
                       </span>
                       <select
-                        className="w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs rounded-lg border border-gray-200 dark:border-gray-700 py-1.5 px-2 font-medium focus:ring-1 focus:ring-[#26A69A] focus:border-[#26A69A] outline-none shadow-sm cursor-pointer"
-                        value={params.secondaryTimeframe || "1wk"}
+                        className={`w-full text-xs rounded-lg border py-1.5 px-2 font-medium outline-none cursor-pointer focus:ring-1 focus:ring-[#26A69A] ${
+                          isDark
+                            ? "bg-[#1f2937] border-gray-700 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900 shadow-sm"
+                        }`}
+                        value={params.secondaryTimeframe || weeklyVal}
                         onChange={(e) => set({ secondaryTimeframe: e.target.value })}
                       >
                         {TIMEFRAMES.map((t) => (
-                          <option key={t.value} value={t.value}>
+                          <option
+                            key={t.value}
+                            value={t.value}
+                            className={isDark ? "bg-[#1f2937] text-white" : "bg-white text-black"}
+                          >
                             {t.label}
                           </option>
                         ))}
@@ -631,7 +692,7 @@ export function Sidebar({ params, onChange }: Props) {
                   /* Single Timeframe Pill Selectors */
                   <div className="flex gap-1 pt-1">
                     {TIMEFRAMES.map((t) => {
-                      const isActive = (params.timeframe || "1d") === t.value;
+                      const isActive = (params.timeframe || dailyVal) === t.value;
                       return (
                         <button
                           key={t.value}
@@ -640,7 +701,9 @@ export function Sidebar({ params, onChange }: Props) {
                           className={`flex-1 py-1 text-xs font-semibold rounded-lg border transition-all ${
                             isActive
                               ? "bg-[#26A69A] text-white border-[#26A69A] shadow-sm shadow-teal-500/20"
-                              : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                              : isDark
+                              ? "bg-[#1f2937] text-gray-300 border-gray-700 hover:border-gray-600"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           {t.label.slice(0, 1)}
@@ -650,68 +713,70 @@ export function Sidebar({ params, onChange }: Props) {
                   </div>
                 )}
               </div>
+            );
+          })()}
 
-              <div>
-                <label className="label">Period</label>
-                <select
-                  className="select"
-                  value={params.period}
-                  onChange={(e) => set({ period: e.target.value })}
-                >
-                  {PERIODS.map((p) => (
-                    <option key={p} value={p}>
-                      {PERIOD_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
+          <div>
+            <label className="label">Period</label>
+            <select
+              className="select"
+              value={params.period}
+              onChange={(e) => set({ period: e.target.value })}
+            >
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {PERIOD_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <hr className="border-gray-100 dark:border-gray-800" />
+
+          {/* Indicators */}
+          <div className="flex flex-col gap-2">
+            <label className="label">Indicators</label>
+            <div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
+              <div className="flex gap-1 mt-0.5">
+                <input
+                  className="input flex-1 text-xs"
+                  value={emaInput}
+                  onChange={(e) => setEmaInput(e.target.value)}
+                  onBlur={applyEma}
+                  onKeyDown={(e) => e.key === "Enter" && applyEma()}
+                  placeholder="5, 10, 20, 50, 100, 150, 200"
+                />
               </div>
+            </div>
 
-              <hr className="border-gray-100 dark:border-gray-800" />
-
-              {/* Indicators */}
-              <div className="flex flex-col gap-2">
-                <label className="label">Indicators</label>
-                <div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">EMA periods</span>
-                  <div className="flex gap-1 mt-0.5">
-                    <input
-                      className="input flex-1 text-xs"
-                      value={emaInput}
-                      onChange={(e) => setEmaInput(e.target.value)}
-                      onBlur={applyEma}
-                      onKeyDown={(e) => e.key === "Enter" && applyEma()}
-                      placeholder="5, 10, 20, 50, 100, 150, 200"
-                    />
-                  </div>
-                </div>
-
-                {(
-                  [
-                    ["showVolume", "Volume"],
-                    ["showRsi", "RSI (14)"],
-                    ["showMacd", "MACD"],
-                    ["showCvd", "CVD"],
-                    ["showCmf", "CMF (20)"],
-                  ] as [keyof SidebarParams["chartConfig"], string][]
-                ).map(([key, label]) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
-                  >
-                    <input
-                      type="checkbox"
-                      className="accent-[#26A69A]"
-                      checked={params.chartConfig[key] as boolean}
-                      onChange={(e) => setCfg({ [key]: e.target.checked })}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-        </>
-            )}
+            {(
+              [
+                ["showVolume", "Volume"],
+                ["showRsi", "RSI (14)"],
+                ["showMacd", "MACD"],
+                ["showCvd", "CVD"],
+                ["showCmf", "CMF (20)"],
+              ] as [keyof SidebarParams["chartConfig"], string][]
+            ).map(([key, label]) => (
+              <label
+                key={key}
+                className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
+              >
+                <input
+                  type="checkbox"
+                  className="accent-[#26A69A]"
+                  checked={params.chartConfig[key] as boolean}
+                  onChange={(e) => setCfg({ [key]: e.target.checked })}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+         </>
+        )}
+       </>
+      )}
 
       <div className="mt-auto text-xs text-gray-400 dark:text-gray-600 space-y-0.5">
         <p>Data: Yahoo Finance</p>

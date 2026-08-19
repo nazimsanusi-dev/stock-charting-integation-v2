@@ -35,7 +35,7 @@ const DEFAULT_PARAMS: ExtendedSidebarParams = {
   timeframe: "1d",
   period: "1y",
   isCombineTimeframe: false,
-  secondaryTimeframe: "1w",
+  secondaryTimeframe: "1wk",
   gridColumns: 2,
   chartConfig: {
     emaPeriods: [5, 10, 20, 50, 100, 200],
