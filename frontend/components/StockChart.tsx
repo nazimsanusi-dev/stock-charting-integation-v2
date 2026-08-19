@@ -668,7 +668,7 @@ export const StockChart = memo(function StockChart({
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
     const timeScale = chart.timeScale();
-    const hitRadius = 24;
+    const hitRadius = 16;
 
     for (const d of drawingsRef.current) {
       if (d.type === "long") {
