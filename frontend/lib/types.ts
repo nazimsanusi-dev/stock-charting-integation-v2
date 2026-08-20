@@ -115,6 +115,8 @@ export interface SubsectorStockItem {
   DY: string;
   Scraped_Sector: string;
   Scraped_Subsector: string;
+  marketCapClassification: string;
+  recommendation: string;
 }
 
 export interface AddMonitoringPayload {

@@ -33,6 +33,52 @@ const DEFAULT_CHART_CONFIG = {
   showCmf: true,
 };
 
+function renderRecommendationBadge(rec: string | null | undefined) {
+  if (!rec || rec === "-" || rec === "None") {
+    return <span className="text-gray-400 text-[10px]">-</span>;
+  }
+  const clean = rec.trim();
+  const lower = clean.toLowerCase();
+
+  let colorClass = "bg-gray-500/10 text-gray-400 border-gray-500/30";
+  if (lower.includes("buy")) {
+    colorClass = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold";
+  } else if (lower.includes("hold") || lower.includes("neutral")) {
+    colorClass = "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-medium";
+  } else if (lower.includes("sell") || lower.includes("underperform")) {
+    colorClass = "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold";
+  }
+
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] border ${colorClass}`}>
+      {clean}
+    </span>
+  );
+}
+
+function renderCapClassBadge(capClass: string | null | undefined) {
+  if (!capClass || capClass === "-" || capClass === "None") {
+    return <span className="text-gray-400 text-[10px]">-</span>;
+  }
+  const formatted = capClass.replace(/_/g, " ").trim();
+  const lower = formatted.toLowerCase();
+
+  let colorClass = "bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20";
+  if (lower.includes("mega") || lower.includes("large")) {
+    colorClass = "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30 font-semibold";
+  } else if (lower.includes("mid")) {
+    colorClass = "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30";
+  } else if (lower.includes("small") || lower.includes("micro") || lower.includes("nano")) {
+    colorClass = "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30";
+  }
+
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[9px] border whitespace-nowrap ${colorClass}`}>
+      {formatted}
+    </span>
+  );
+}
+
 export function SubsectorStocksTable({
   subsectors,
   theme = "dark",
@@ -69,7 +115,6 @@ export function SubsectorStocksTable({
     }
   };
 
-  // Reset semula penapis & muat turun data apabila pasaran atau subsektor bertukar
   useEffect(() => {
     setSelectedSubsector("");
     setSearchQuery("");
@@ -85,7 +130,6 @@ export function SubsectorStocksTable({
     loadStocks(selectedSubsector, searchQuery, minPrice);
   };
 
-  // Format ticker untuk charting (Bursa tambah .KL, US kekal ticker asal)
   const activeTicker = selectedStock?.Code
     ? market === "US"
       ? selectedStock.Code.replace(".KL", "").trim().toUpperCase()
@@ -145,7 +189,7 @@ export function SubsectorStocksTable({
 
   return (
     <div className="space-y-4">
-      {/* Header Bar: Dropdown Subsektor/Industri, Input Min Price & Search */}
+      {/* Header Bar */}
       <form
         onSubmit={handleFilterSubmit}
         className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800"
@@ -247,21 +291,36 @@ export function SubsectorStocksTable({
                   <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                     <tr>
                       {/* Kolum 1: Kod (Sticky Left) */}
-                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[80px] max-w-[80px]">
+                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
                         {market === "US" ? "Symbol" : "Kod"}
                       </th>
                       {/* Kolum 2: Nama (Sticky Left) */}
-                      <th className="py-2.5 px-3 text-left sticky left-[80px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
+                      <th className="py-2.5 px-3 text-left sticky left-[75px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
                         Nama
                       </th>
                       <th className="py-2.5 px-2 text-center">Syariah</th>
                       <th className="py-2.5 px-3 text-right">Harga</th>
-                      <th className="py-2.5 px-3 text-right">Perubahan</th>
-                      <th className="py-2.5 px-3 text-right">Change %</th>
-                      <th className="py-2.5 px-3 text-right">Volume</th>
-                      <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                      <th className="py-2.5 px-3 text-left">Sector</th>
-                      <th className="py-2.5 px-3 text-left">{market === "US" ? "Industry" : "Subsector"}</th>
+
+                      {/* Kolum Khas Mengikut Pasaran */}
+                      {market === "US" ? (
+                        <>
+                          <th className="py-2.5 px-3 text-center">Rec.</th>
+                          <th className="py-2.5 px-3 text-center">Cap Class</th>
+                          <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                          <th className="py-2.5 px-3 text-left">Sector</th>
+                          <th className="py-2.5 px-3 text-left">Industry</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="py-2.5 px-3 text-right">Perubahan</th>
+                          <th className="py-2.5 px-3 text-right">Change %</th>
+                          <th className="py-2.5 px-3 text-right">Volume</th>
+                          <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                          <th className="py-2.5 px-3 text-left">Sector</th>
+                          <th className="py-2.5 px-3 text-left">Subsector</th>
+                        </>
+                      )}
+
                       {/* Kolum Action (Sticky Right) */}
                       <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
                         Action
@@ -294,7 +353,7 @@ export function SubsectorStocksTable({
                         >
                           {/* Kolum 1 Freeze */}
                           <td
-                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[80px] max-w-[80px] ${stickyBg}`}
+                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[75px] max-w-[75px] ${stickyBg}`}
                           >
                             {isSelected && <span className="text-amber-500 mr-1">▶</span>}
                             {item.Code}
@@ -302,7 +361,7 @@ export function SubsectorStocksTable({
 
                           {/* Kolum 2 Freeze */}
                           <td
-                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[80px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
+                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[75px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
                           >
                             {item.Name}
                           </td>
@@ -316,35 +375,60 @@ export function SubsectorStocksTable({
                               <span className="text-[10px] text-gray-400">-</span>
                             )}
                           </td>
+
                           <td className="py-2 px-3 text-right font-mono font-semibold text-gray-900 dark:text-gray-100">
-                            {item.Price}
+                            {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
                           </td>
-                          <td
-                            className={`py-2 px-3 text-right font-mono font-medium ${
-                              isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                            }`}
-                          >
-                            {item.Change ?? "-"}
-                          </td>
-                          <td
-                            className={`py-2 px-3 text-right font-mono font-bold ${
-                              isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                            }`}
-                          >
-                            {item.Change_Percent ?? "-"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                            {item.Volume ?? "-"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                            {item.MCap_M ?? "-"}
-                          </td>
-                          <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
-                            {item.Scraped_Sector || "-"}
-                          </td>
-                          <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
-                            {item.Scraped_Subsector || "-"}
-                          </td>
+
+                          {/* Data Paparan Bersyarat (US vs MY) */}
+                          {market === "US" ? (
+                            <>
+                              <td className="py-2 px-3 text-center">
+                                {renderRecommendationBadge(item.recommendation)}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                {renderCapClassBadge(item.marketCapClassification)}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                {item.MCap_M !== null && item.MCap_M !== undefined ? Number(item.MCap_M).toLocaleString() : "-"}
+                              </td>
+                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
+                                {item.Scraped_Sector || "-"}
+                              </td>
+                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                                {item.Scraped_Subsector || "-"}
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td
+                                className={`py-2 px-3 text-right font-mono font-medium ${
+                                  isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                                }`}
+                              >
+                                {item.Change ?? "-"}
+                              </td>
+                              <td
+                                className={`py-2 px-3 text-right font-mono font-bold ${
+                                  isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                                }`}
+                              >
+                                {item.Change_Percent ?? "-"}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
+                                {item.Volume ?? "-"}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                {item.MCap_M ?? "-"}
+                              </td>
+                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
+                                {item.Scraped_Sector || "-"}
+                              </td>
+                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                                {item.Scraped_Subsector || "-"}
+                              </td>
+                            </>
+                          )}
 
                           {/* Action Button (Sticky Right) */}
                           <td
@@ -415,7 +499,7 @@ export function SubsectorStocksTable({
           )}
         </div>
 
-        {/* Bahagian Kanan: Carta Saham (TradingView Lightweight) */}
+        {/* Bahagian Kanan: Carta Saham */}
         <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
           {selectedStock ? (
             <>
@@ -433,10 +517,19 @@ export function SubsectorStocksTable({
                         [S]
                       </span>
                     )}
+                    {market === "US" && selectedStock.recommendation && (
+                      renderRecommendationBadge(selectedStock.recommendation)
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                     <span>Harga: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
-                    {selectedStock.Change_Percent && (
+                    {market === "US" && selectedStock.marketCapClassification && (
+                      <>
+                        <span>•</span>
+                        <span>Cap: <strong className="text-gray-800 dark:text-gray-200">{selectedStock.marketCapClassification.replace(/_/g, " ")}</strong></span>
+                      </>
+                    )}
+                    {market !== "US" && selectedStock.Change_Percent && (
                       <>
                         <span>•</span>
                         <span
@@ -452,7 +545,9 @@ export function SubsectorStocksTable({
                 </div>
 
                 <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
-                  <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume ?? "-"}</span></div>
+                  {market !== "US" && (
+                    <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume ?? "-"}</span></div>
+                  )}
                   <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">{currencySymbol}{selectedStock.MCap_M ?? "-"}M</span></div>
                 </div>
               </div>

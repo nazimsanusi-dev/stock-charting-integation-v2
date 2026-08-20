@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { useState, useEffect, useMemo } from "react";
+import { api, MarketType } from "@/lib/api";
 import type { SubsectorRank, ChartData, IndicatorData } from "@/lib/types";
 import dynamic from "next/dynamic";
 
@@ -20,7 +20,20 @@ const StockChart = dynamic(
 interface Props {
   data: SubsectorRank[];
   theme?: "light" | "dark";
+  market?: MarketType;
 }
+
+type SortField =
+  | "rank"
+  | "subsector_name"
+  | "status"
+  | "score"
+  | "return_5d"
+  | "return_20d"
+  | "close_index"
+  | "num_stocks";
+
+type SortDirection = "asc" | "desc";
 
 const DEFAULT_CHART_CONFIG = {
   emaPeriods: [10, 20, 50, 100],
@@ -142,21 +155,29 @@ function computeClientIndicators(ohlcv: any[]): IndicatorData {
   } as unknown as IndicatorData;
 }
 
-export function RankingTable({ data, theme = "dark" }: Props) {
+export function RankingTable({ data, theme = "dark", market = "MY" }: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<SubsectorRank | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 12;
 
+  // Sorting State
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [chartLoading, setChartLoading] = useState<boolean>(false);
   const [chartError, setChartError] = useState<string | null>(null);
 
+  // Set default selection when data changes
   useEffect(() => {
-    if (data && data.length > 0 && !selectedSubsector) {
+    if (data && data.length > 0) {
       setSelectedSubsector(data[0]);
+    } else {
+      setSelectedSubsector(null);
     }
-  }, [data, selectedSubsector]);
+    setCurrentPage(1);
+  }, [data, market]);
 
   useEffect(() => {
     if (!selectedSubsector) return;
@@ -166,7 +187,7 @@ export function RankingTable({ data, theme = "dark" }: Props) {
     setChartError(null);
 
     api
-      .subsectorSingleOHLC(selectedSubsector.subsector_id)
+      .subsectorSingleOHLC(selectedSubsector.subsector_id, market)
       .then((res: any) => {
         if (!isMounted) return;
 
@@ -202,24 +223,88 @@ export function RankingTable({ data, theme = "dark" }: Props) {
     return () => {
       isMounted = false;
     };
-  }, [selectedSubsector]);
+  }, [selectedSubsector, market]);
 
-  const filteredData = (data || []).filter((item) =>
-    (item?.subsector_name || "").toLowerCase().includes(searchQuery.trim().toLowerCase())
-  );
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortField(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection(field === "rank" ? "asc" : "desc");
+    }
+    setCurrentPage(1);
+  };
 
-  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+  const processedData = useMemo(() => {
+    let result = (data || []).filter((item) =>
+      (item?.subsector_name || "")
+        .toLowerCase()
+        .includes(searchQuery.trim().toLowerCase())
+    );
+
+    if (sortField) {
+      result = [...result].sort((a: any, b: any) => {
+        let valA = a[sortField];
+        let valB = b[sortField];
+
+        if (
+          [
+            "rank",
+            "score",
+            "return_5d",
+            "return_20d",
+            "close_index",
+            "num_stocks",
+          ].includes(sortField)
+        ) {
+          valA = parseNum(valA);
+          valB = parseNum(valB);
+        } else {
+          valA = String(valA || "").toLowerCase();
+          valB = String(valB || "").toLowerCase();
+        }
+
+        if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [data, searchQuery, sortField, sortDirection]);
+
+  const totalPages = Math.ceil(processedData.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+  const paginatedData = processedData.slice(startIndex, startIndex + pageSize);
+
+  const renderSortIndicator = (field: SortField) => {
+    if (sortField !== field) {
+      return <span className="text-gray-400 dark:text-gray-600 ml-1">↕</span>;
+    }
+    return (
+      <span className="text-blue-500 font-bold ml-1">
+        {sortDirection === "asc" ? "▲" : "▼"}
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-4">
-      {/* Search Header */}
-      <div className="flex items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
+      {/* Search & Sort Controls Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Cari nama subsektor..."
+            placeholder={
+              market === "US"
+                ? "Cari nama industri US..."
+                : "Cari nama subsektor..."
+            }
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -228,9 +313,23 @@ export function RankingTable({ data, theme = "dark" }: Props) {
             className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-48 sm:w-64"
           />
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Jumlah: {filteredData.length} subsektor
+            Jumlah: {processedData.length}{" "}
+            {market === "US" ? "industri" : "subsektor"}
           </span>
         </div>
+
+        {sortField && (
+          <button
+            type="button"
+            onClick={() => {
+              setSortField(null);
+              setSortDirection("asc");
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
+          >
+            Reset Susunan
+          </button>
+        )}
       </div>
 
       {/* 2-Column Split View */}
@@ -240,21 +339,63 @@ export function RankingTable({ data, theme = "dark" }: Props) {
           <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
+                <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800 select-none">
                   <tr>
-                    <th className="py-2.5 px-3 text-center">Rank</th>
-                    <th className="py-2.5 px-3 text-left">Subsektor</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                    <th className="py-2.5 px-3 text-right">Score</th>
-                    <th className="py-2.5 px-3 text-right">5D %</th>
-                    <th className="py-2.5 px-3 text-right">20D %</th>
-                    <th className="py-2.5 px-3 text-right">Close Index</th>
-                    <th className="py-2.5 px-3 text-right">Saham</th>
+                    <th
+                      onClick={() => handleSort("rank")}
+                      className="py-2.5 px-3 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      Rank {renderSortIndicator("rank")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("subsector_name")}
+                      className="py-2.5 px-3 text-left cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      {market === "US" ? "Industri" : "Subsektor"}{" "}
+                      {renderSortIndicator("subsector_name")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("status")}
+                      className="py-2.5 px-3 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      Status {renderSortIndicator("status")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("score")}
+                      className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      Score {renderSortIndicator("score")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("return_5d")}
+                      className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      5D % {renderSortIndicator("return_5d")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("return_20d")}
+                      className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      20D % {renderSortIndicator("return_20d")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("close_index")}
+                      className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      Close {renderSortIndicator("close_index")}
+                    </th>
+                    <th
+                      onClick={() => handleSort("num_stocks")}
+                      className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      Saham {renderSortIndicator("num_stocks")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                   {paginatedData.map((item) => {
-                    const isSelected = selectedSubsector?.subsector_id === item.subsector_id;
+                    const isSelected =
+                      selectedSubsector?.subsector_id === item.subsector_id;
                     const r5d = parseNum(item.return_5d);
                     const r20d = parseNum(item.return_20d);
                     const is5dPos = r5d >= 0;
@@ -284,7 +425,9 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 font-medium text-gray-900 dark:text-gray-100">
-                          {isSelected && <span className="text-blue-500 mr-1">▶</span>}
+                          {isSelected && (
+                            <span className="text-blue-500 mr-1">▶</span>
+                          )}
                           {item.subsector_name}
                         </td>
                         <td className="py-2.5 px-3 text-center">
@@ -308,8 +451,11 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                             is5dPos ? "text-emerald-500" : "text-rose-500"
                           }`}
                         >
-                          {item.return_5d !== undefined && item.return_5d !== null
-                            ? `${is5dPos ? "+" : ""}${formatNum(item.return_5d)}%`
+                          {item.return_5d !== undefined &&
+                          item.return_5d !== null
+                            ? `${is5dPos ? "+" : ""}${formatNum(
+                                item.return_5d
+                              )}%`
                             : "-"}
                         </td>
                         <td
@@ -317,8 +463,11 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                             is20dPos ? "text-emerald-500" : "text-rose-500"
                           }`}
                         >
-                          {item.return_20d !== undefined && item.return_20d !== null
-                            ? `${is20dPos ? "+" : ""}${formatNum(item.return_20d)}%`
+                          {item.return_20d !== undefined &&
+                          item.return_20d !== null
+                            ? `${is20dPos ? "+" : ""}${formatNum(
+                                item.return_20d
+                              )}%`
                             : "-"}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
@@ -335,10 +484,12 @@ export function RankingTable({ data, theme = "dark" }: Props) {
             </div>
 
             {/* Pagination */}
-            {filteredData.length > pageSize && (
+            {processedData.length > pageSize && (
               <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                 <div>
-                  {startIndex + 1}–{Math.min(startIndex + pageSize, filteredData.length)} dari {filteredData.length} subsektor
+                  {startIndex + 1}–
+                  {Math.min(startIndex + pageSize, processedData.length)} dari{" "}
+                  {processedData.length} {market === "US" ? "industri" : "subsektor"}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -354,7 +505,9 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
@@ -388,7 +541,12 @@ export function RankingTable({ data, theme = "dark" }: Props) {
                       </strong>
                     </span>
                     <span>•</span>
-                    <span>Close: <strong className="text-gray-800 dark:text-gray-200">{formatNum(selectedSubsector.close_index)}</strong></span>
+                    <span>
+                      Close:{" "}
+                      <strong className="text-gray-800 dark:text-gray-200">
+                        {formatNum(selectedSubsector.close_index)}
+                      </strong>
+                    </span>
                     <span>•</span>
                     <span>{selectedSubsector.num_stocks ?? 0} saham</span>
                   </div>
@@ -431,7 +589,8 @@ export function RankingTable({ data, theme = "dark" }: Props) {
               <div className="flex-1 p-2 min-h-[520px]">
                 {chartLoading ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                    <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta indeks...
+                    <span className="animate-spin inline-block mr-2">⏳</span>{" "}
+                    Memuatkan carta indeks...
                   </div>
                 ) : chartError ? (
                   <div className="h-full flex items-center justify-center text-xs text-rose-500">
@@ -453,7 +612,7 @@ export function RankingTable({ data, theme = "dark" }: Props) {
             </>
           ) : (
             <div className="h-full min-h-[450px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
-              Pilih mana-mana baris subsektor di sebelah kiri untuk melihat carta.
+              Pilih mana-mana baris di sebelah kiri untuk melihat carta.
             </div>
           )}
         </div>
