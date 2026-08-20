@@ -20,7 +20,7 @@ const TIMEFRAMES = [
 ] as const;
 
 interface ExtendedSidebarParams extends SidebarParams {
-  activeTab?: "subsector" | "sheets" | "monitoring";
+  activeTab?: "subsector" | "sheets" | "monitoring" | "us_subsector";
 }
 
 interface Props {
@@ -204,7 +204,18 @@ export function Sidebar({ params, onChange }: Props) {
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
           }`}
         >
-          <span>🔥</span> Subsector Analysis
+          <span>🇲🇾</span>Bursa Subsector Analysis
+        </button>
+
+        <button
+          onClick={() => set({ activeTab: "us_subsector" })}
+          className={`py-1.5 px-2 text-xs font-semibold rounded-md transition-colors text-left flex items-center gap-2 ${
+            activeTab === "us_subsector"
+              ? "bg-white dark:bg-gray-700 text-[#26A69A] shadow-sm"
+              : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+          }`}
+        >
+          <span>🇺🇸</span> US Subsector Analysis
         </button>
 
         <button

@@ -10,6 +10,8 @@ import type {
   AddMonitoringPayload,
 } from "./types";
 
+export type MarketType = "MY" | "US";
+
 // Matches NEXT_PUBLIC_API_URL in .env.example / .env.local
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -91,10 +93,11 @@ export const api = {
   },
 
   /**
-   * Tarik senarai ranking subsektor terkini
+   * Tarik senarai ranking subsektor terkini (MY / US)
    */
-  async subsectorRanks(): Promise<SubsectorRank[]> {
-    const res = await fetch(`${API_BASE_URL}/api/subsector_ranks`, {
+  async subsectorRanks(market: MarketType = "MY"): Promise<SubsectorRank[]> {
+    const params = new URLSearchParams({ market });
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ranks?${params.toString()}`, {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("Gagal mengambil data subsector_ranks");
@@ -102,10 +105,11 @@ export const api = {
   },
 
   /**
-   * Tarik data pukal OHLC (Base 100) bagi semua subsektor
+   * Tarik data pukal OHLC (Base 100) bagi semua subsektor (MY / US)
    */
-  async subsectorBulkOHLC(): Promise<SubsectorBulkOHLC> {
-    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/bulk`, {
+  async subsectorBulkOHLC(market: MarketType = "MY"): Promise<SubsectorBulkOHLC> {
+    const params = new URLSearchParams({ market });
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/bulk?${params.toString()}`, {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("Gagal mengambil data subsector_ohlc");
@@ -113,22 +117,27 @@ export const api = {
   },
 
   /**
-   * Tarik data gabungan sektor/subsektor untuk Heatmap
+   * Tarik data gabungan sektor/subsektor untuk Heatmap (MY / US)
    */
-  async subsectorHeatmap(): Promise<SubsectorHeatmapItem[]> {
-    const res = await fetch(`${API_BASE_URL}/api/subsector_heatmap`, {
+  async subsectorHeatmap(market: MarketType = "MY"): Promise<SubsectorHeatmapItem[]> {
+    const params = new URLSearchParams({ market });
+    const res = await fetch(`${API_BASE_URL}/api/subsector_heatmap?${params.toString()}`, {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("Gagal mengambil data subsector_heatmap");
     return res.json();
   },
 
+  /**
+   * Tarik senarai saham di bawah subsektor (MY / US)
+   */
   async subsectorStocks(
     subsectorName: string = "",
     search: string = "",
-    minPrice: string = "0.3"
+    minPrice: string = "0.3",
+    market: MarketType = "MY",
   ): Promise<SubsectorStockItem[]> {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ market });
     if (subsectorName && subsectorName !== "All Stock") params.set("subsector", subsectorName);
     if (search) params.set("search", search);
     if (minPrice) params.set("min_price", minPrice);
@@ -141,8 +150,17 @@ export const api = {
     return data.stocks ?? [];
   },
 
-  subsectorSingleOHLC: async (subsectorId: number | string): Promise<ChartData> => {
-    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/${subsectorId}`);
+  /**
+   * Tarik data tunggal OHLC bagi subsektor tertentu (MY / US)
+   */
+  subsectorSingleOHLC: async (
+    subsectorId: number | string,
+    market: MarketType = "MY",
+  ): Promise<ChartData> => {
+    const params = new URLSearchParams({ market });
+    const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/${subsectorId}?${params.toString()}`, {
+      cache: "no-store",
+    });
     if (!res.ok) throw new Error("Gagal memuatkan data carta subsektor.");
     return res.json();
   },

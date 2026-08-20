@@ -11,7 +11,7 @@ import { SubsectorHeatmap } from "@/components/SubsectorHeatmap";
 import { SubsectorChartGrid } from "@/components/SubsectorChartGrid";
 import { SubsectorStocksTable } from "@/components/SubsectorStocksTable";
 
-import { api } from "@/lib/api";
+import { api, MarketType } from "@/lib/api";
 import { useChartData } from "@/hooks/useChartData";
 import type {
   SidebarParams,
@@ -21,7 +21,7 @@ import type {
 } from "@/lib/types";
 
 export interface ExtendedSidebarParams extends SidebarParams {
-  activeTab?: "subsector" | "sheets" | "monitoring";
+  activeTab?: "subsector" | "sheets" | "monitoring" | "us_subsector";
 }
 
 const DEFAULT_PARAMS: ExtendedSidebarParams = {
@@ -155,14 +155,14 @@ function SingleView({ params }: { params: ExtendedSidebarParams }) {
 export default function Home() {
   const [params, setParams] = useState<ExtendedSidebarParams>(DEFAULT_PARAMS);
 
-  // States untuk Subsector Analysis
+  // States untuk Subsector Analysis (Bursa & US)
   const [ranksData, setRanksData] = useState<SubsectorRank[]>([]);
   const [heatmapData, setHeatmapData] = useState<SubsectorHeatmapItem[]>([]);
   const [ohlcBulkData, setOhlcBulkData] = useState<SubsectorBulkOHLC>({});
   const [loadingSubsector, setLoadingSubsector] = useState<boolean>(true);
   const [subsectorError, setSubsectorError] = useState<string | null>(null);
 
-  // States untuk Hide/Unhide Section (Semua Default: Tutup / False)
+  // States untuk Hide/Unhide Section (Default: Tutup / False)
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [showRanking, setShowRanking] = useState<boolean>(false);
   const [showStocksTable, setShowStocksTable] = useState<boolean>(false);
@@ -178,37 +178,39 @@ export default function Home() {
   }, [params.theme]);
 
   const activeTab = params.activeTab ?? "subsector";
+  const currentMarket: MarketType = activeTab === "us_subsector" ? "US" : "MY";
+  const isSubsectorView = activeTab === "subsector" || activeTab === "us_subsector";
 
-  // Fungsi Panggilan API Subsektor
+  // Fungsi Panggilan API Subsektor Dinamik mengikut Pasaran (MY / US)
   const fetchSubsectorData = useCallback(async () => {
     setLoadingSubsector(true);
     setSubsectorError(null);
 
     try {
       const [ranks, heatmap, ohlcBulk] = await Promise.all([
-        api.subsectorRanks(),
-        api.subsectorHeatmap(),
-        api.subsectorBulkOHLC(),
+        api.subsectorRanks(currentMarket),
+        api.subsectorHeatmap(currentMarket),
+        api.subsectorBulkOHLC(currentMarket),
       ]);
 
       setRanksData(Array.isArray(ranks) ? ranks : []);
       setHeatmapData(Array.isArray(heatmap) ? heatmap : []);
       setOhlcBulkData(ohlcBulk && typeof ohlcBulk === "object" ? ohlcBulk : {});
     } catch (err: any) {
-      console.error("Failed to fetch subsector data:", err);
+      console.error(`Failed to fetch ${currentMarket} subsector data:`, err);
       setSubsectorError(
-        err?.message || "Gagal mengambil data subsektor dari server. Sila semak sambungan API."
+        err?.message || `Gagal mengambil data pasaran ${currentMarket} dari server. Sila semak sambungan API.`
       );
     } finally {
       setLoadingSubsector(false);
     }
-  }, []);
+  }, [currentMarket]);
 
   useEffect(() => {
-    if (activeTab === "subsector") {
+    if (isSubsectorView) {
       fetchSubsectorData();
     }
-  }, [activeTab, fetchSubsectorData]);
+  }, [isSubsectorView, fetchSubsectorData]);
 
   // Pantau Posisi Skrol
   const handleScroll = () => {
@@ -246,18 +248,25 @@ export default function Home() {
         onScroll={handleScroll}
         className="flex flex-col flex-1 min-w-0 overflow-y-auto bg-white dark:bg-gray-950 p-4 sm:p-6 space-y-6 scroll-smooth"
       >
-        {activeTab === "subsector" ? (
+        {isSubsectorView ? (
           /* ================================================================
-              MAIN PAGE: SUBSECTOR ANALYSIS (END-TO-END FULL WIDTH)
+              MAIN PAGE: SUBSECTOR ANALYSIS (BURSA & US SHARIAH)
              ================================================================ */
           <div className="space-y-6 w-full">
             <header className="border-b border-gray-200 dark:border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Analisis & Ranking Subsektor Pasaran
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                  <span>{currentMarket === "US" ? "🇺🇸" : "🇲🇾"}</span>
+                  <span>
+                    {currentMarket === "US"
+                      ? "Analisis & Ranking Industri Pasaran US"
+                      : "Analisis & Ranking Subsektor Pasaran Bursa"}
+                  </span>
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Data dikemas kini secara automatik dari BigQuery
+                  {currentMarket === "US"
+                    ? "Data industri US Shariah dikemas kini dari BigQuery (us_stocks_data)"
+                    : "Data subsektor Bursa Malaysia dikemas kini dari BigQuery (bursa_dataset)"}
                 </p>
               </div>
 
@@ -288,7 +297,6 @@ export default function Home() {
 
             {loadingSubsector ? (
               <div className="flex flex-col items-center justify-center p-16 space-y-4">
-                {/* Keyframes 3.5 Saat */}
                 <style>{`
                   @keyframes loadProgress35 {
                     0% { width: 0%; }
@@ -302,7 +310,7 @@ export default function Home() {
                   <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                     <span className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
-                      Memuatkan data subsektor...
+                      Memuatkan data {currentMarket === "US" ? "industri US" : "subsektor Bursa"}...
                     </span>
                     <span className="text-[10px] font-mono tracking-wider text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
                       BIGQUERY API
@@ -311,7 +319,6 @@ export default function Home() {
 
                   {/* Progress Bar Container */}
                   <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 overflow-hidden relative">
-                    {/* Bar bergerak dari 0% ke 100% selama 3.5s */}
                     <div
                       className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 h-full rounded-full"
                       style={{
@@ -322,14 +329,14 @@ export default function Home() {
                 </div>
 
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center max-w-xs leading-relaxed">
-                  Menyusun ranking momentum, indeks Base 100, & data lilin pasaran semasa.
+                  Menyusun ranking momentum, indeks Base 100, & data lilin pasaran {currentMarket}.
                 </p>
               </div>
             ) : subsectorError ? (
               <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
                 <div className="text-3xl">⚠️</div>
                 <div className="text-rose-600 dark:text-rose-400 font-semibold text-base">
-                  Ralat Memuatkan Data Subsektor
+                  Ralat Memuatkan Data {currentMarket === "US" ? "Industri US" : "Subsektor"}
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-md">
                   {subsectorError}
@@ -366,7 +373,7 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        Heatmap Subsektor
+                        {currentMarket === "US" ? "Heatmap Industri US" : "Heatmap Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -404,7 +411,7 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        Ranking Subsektor
+                        {currentMarket === "US" ? "Ranking Industri US" : "Ranking Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -442,7 +449,9 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        Senarai Saham Mengikut Subsektor
+                        {currentMarket === "US"
+                          ? "Senarai Saham Mengikut Industri US"
+                          : "Senarai Saham Mengikut Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -466,7 +475,11 @@ export default function Home() {
 
                   {showStocksTable && (
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                      <SubsectorStocksTable subsectors={ranksData} theme={params.theme} />
+                      <SubsectorStocksTable
+                        subsectors={ranksData}
+                        theme={params.theme}
+                        market={currentMarket}
+                      />
                     </div>
                   )}
                 </section>
@@ -480,7 +493,9 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        Carta Indeks Subsektor
+                        {currentMarket === "US"
+                          ? "Carta Indeks Industri US"
+                          : "Carta Indeks Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -517,7 +532,7 @@ export default function Home() {
           </div>
         ) : (
           /* ================================================================
-              SECONDARY TAB: GOOGLE SHEETS TRACKER
+              SECONDARY TAB: GOOGLE SHEETS & MONITORING TRACKER
              ================================================================ */
           <div className="w-full">
             {params.viewMode === "single" ? (

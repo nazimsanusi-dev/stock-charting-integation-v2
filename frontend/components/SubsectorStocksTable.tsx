@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, MarketType } from "@/lib/api";
 import { useChartData } from "@/hooks/useChartData";
 import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
 import dynamic from "next/dynamic";
@@ -21,6 +21,7 @@ const StockChart = dynamic(
 interface Props {
   subsectors: SubsectorRank[];
   theme?: "dark" | "light";
+  market?: MarketType;
 }
 
 const DEFAULT_CHART_CONFIG = {
@@ -32,10 +33,14 @@ const DEFAULT_CHART_CONFIG = {
   showCmf: true,
 };
 
-export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
+export function SubsectorStocksTable({
+  subsectors,
+  theme = "dark",
+  market = "MY",
+}: Props) {
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [minPrice, setMinPrice] = useState<string>("0.3");
+  const [minPrice, setMinPrice] = useState<string>(market === "US" ? "1.0" : "0.3");
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
   const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -48,7 +53,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.subsectorStocks(subName, search, minP);
+      const data = await api.subsectorStocks(subName, search, minP, market);
       setStocks(data);
       setCurrentPage(1);
       if (data && data.length > 0) {
@@ -64,17 +69,27 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     }
   };
 
+  // Reset semula penapis & muat turun data apabila pasaran atau subsektor bertukar
+  useEffect(() => {
+    setSelectedSubsector("");
+    setSearchQuery("");
+    setMinPrice(market === "US" ? "1.0" : "0.3");
+  }, [market]);
+
   useEffect(() => {
     loadStocks(selectedSubsector, searchQuery, minPrice);
-  }, [selectedSubsector]);
+  }, [selectedSubsector, market]);
 
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loadStocks(selectedSubsector, searchQuery, minPrice);
   };
 
+  // Format ticker untuk charting (Bursa tambah .KL, US kekal ticker asal)
   const activeTicker = selectedStock?.Code
-    ? selectedStock.Code.includes(".KL")
+    ? market === "US"
+      ? selectedStock.Code.replace(".KL", "").trim().toUpperCase()
+      : selectedStock.Code.includes(".KL")
       ? selectedStock.Code
       : `${selectedStock.Code}.KL`
     : null;
@@ -96,11 +111,9 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     const code = item.Code;
     if (monitorStatus[code] === "loading") return;
 
-    // 1. Status Tukar ke Loading
     setMonitorStatus((prev) => ({ ...prev, [code]: "loading" }));
 
     try {
-      // 2. Hantar Payload Ringkas ke API
       const res = await fetch("https://stock-charting-integation-v2.nazimsanusi01.workers.dev/api/monitoring/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,16 +123,15 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           price: item.Price,
           sector: item.Scraped_Sector || "-",
           subsector: item.Scraped_Subsector || "-",
-          source_table: "Subsector Analysis",
+          source_table: market === "US" ? "US Subsector Analysis" : "Subsector Analysis",
+          market: market,
         }),
       });
 
       if (!res.ok) throw new Error("Gagal memasukkan rekod");
 
-      // 3. Status Tukar ke Success
       setMonitorStatus((prev) => ({ ...prev, [code]: "success" }));
 
-      // 4. Reset semula ke '+' selepas 1.5 saat
       setTimeout(() => {
         setMonitorStatus((prev) => ({ ...prev, [code]: "idle" }));
       }, 1500);
@@ -129,18 +141,20 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
     }
   };
 
+  const currencySymbol = market === "US" ? "$" : "RM";
+
   return (
     <div className="space-y-4">
-      {/* Header Bar: Dropdown Subsektor, Input Min Price & Search */}
+      {/* Header Bar: Dropdown Subsektor/Industri, Input Min Price & Search */}
       <form
         onSubmit={handleFilterSubmit}
         className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800"
       >
         <div className="flex flex-wrap items-center gap-3">
-          {/* Dropdown Subsektor */}
+          {/* Dropdown Subsektor / Industri */}
           <div className="flex items-center gap-1.5">
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Subsektor:
+              {market === "US" ? "Industri:" : "Subsektor:"}
             </label>
             <select
               value={selectedSubsector}
@@ -160,13 +174,13 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           {/* Filter Min Price */}
           <div className="flex items-center gap-1.5">
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              Min Price (RM):
+              Min Price ({currencySymbol}):
             </label>
             <input
               type="number"
               step="0.01"
               min="0"
-              placeholder="0.30"
+              placeholder={market === "US" ? "1.00" : "0.30"}
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
               className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 w-20 font-mono focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
@@ -177,7 +191,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
           <div className="flex items-center gap-1.5">
             <input
               type="text"
-              placeholder="Cari kod atau nama..."
+              placeholder={market === "US" ? "Cari Symbol / Syarikat US..." : "Cari kod atau nama..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#26A69A] w-36 sm:w-48"
@@ -224,7 +238,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
             </div>
           ) : stocks.length === 0 ? (
             <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
-              Tiada saham melepasi kriteria penapisan (Min Price: RM{minPrice || "0"}).
+              Tiada saham melepasi kriteria penapisan (Min Price: {currencySymbol}{minPrice || "0"}).
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
@@ -234,7 +248,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                     <tr>
                       {/* Kolum 1: Kod (Sticky Left) */}
                       <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[80px] max-w-[80px]">
-                        Kod
+                        {market === "US" ? "Symbol" : "Kod"}
                       </th>
                       {/* Kolum 2: Nama (Sticky Left) */}
                       <th className="py-2.5 px-3 text-left sticky left-[80px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
@@ -247,7 +261,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       <th className="py-2.5 px-3 text-right">Volume</th>
                       <th className="py-2.5 px-3 text-right">MCap (M)</th>
                       <th className="py-2.5 px-3 text-left">Sector</th>
-                      <th className="py-2.5 px-3 text-left">Subsector</th>
+                      <th className="py-2.5 px-3 text-left">{market === "US" ? "Industry" : "Subsector"}</th>
                       {/* Kolum Action (Sticky Right) */}
                       <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
                         Action
@@ -310,20 +324,20 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                               isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
                             }`}
                           >
-                            {item.Change}
+                            {item.Change ?? "-"}
                           </td>
                           <td
                             className={`py-2 px-3 text-right font-mono font-bold ${
                               isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
                             }`}
                           >
-                            {item.Change_Percent}
+                            {item.Change_Percent ?? "-"}
                           </td>
                           <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                            {item.Volume}
+                            {item.Volume ?? "-"}
                           </td>
                           <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                            {item.MCap_M}
+                            {item.MCap_M ?? "-"}
                           </td>
                           <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
                             {item.Scraped_Sector || "-"}
@@ -412,7 +426,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                       {selectedStock.Name}
                     </h3>
                     <span className="text-xs font-mono font-bold text-amber-500 dark:text-amber-400">
-                      {selectedStock.Code}.KL
+                      {activeTicker}
                     </span>
                     {selectedStock.Shariah === "Yes" && (
                       <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/30">
@@ -421,21 +435,25 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    <span>Harga: <strong className="text-gray-800 dark:text-gray-200">RM{selectedStock.Price}</strong></span>
-                    <span>•</span>
-                    <span
-                      className={`font-semibold ${
-                        parseFloat(selectedStock.Change_Percent) >= 0 ? "text-emerald-500" : "text-rose-500"
-                      }`}
-                    >
-                      {selectedStock.Change_Percent} ({selectedStock.Change})
-                    </span>
+                    <span>Harga: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
+                    {selectedStock.Change_Percent && (
+                      <>
+                        <span>•</span>
+                        <span
+                          className={`font-semibold ${
+                            parseFloat(String(selectedStock.Change_Percent)) >= 0 ? "text-emerald-500" : "text-rose-500"
+                          }`}
+                        >
+                          {selectedStock.Change_Percent} ({selectedStock.Change ?? "-"})
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
-                  <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume}</span></div>
-                  <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">RM{selectedStock.MCap_M}M</span></div>
+                  <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume ?? "-"}</span></div>
+                  <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">{currencySymbol}{selectedStock.MCap_M ?? "-"}M</span></div>
                 </div>
               </div>
 
@@ -458,7 +476,7 @@ export function SubsectorStocksTable({ subsectors, theme = "dark" }: Props) {
                 ) : chart.data ? (
                   <StockChart
                     data={chart.data}
-                    ticker={`${selectedStock.Code}.KL`}
+                    ticker={activeTicker || ""}
                     config={DEFAULT_CHART_CONFIG}
                     theme={theme}
                   />

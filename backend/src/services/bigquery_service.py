@@ -146,24 +146,55 @@ class BigQueryService:
             rows.append(row_dict)
         return rows
 
-    async def get_subsector_ranks(self):
-        return await self._execute_query("""
+    async def get_subsector_ranks(self, market: str = "MY"):
+        table = (
+            "etl-stock-screener-bursa.us_stocks_data.us_subsector_ranks"
+            if market.upper() == "US"
+            else "etl-stock-screener-bursa.bursa_dataset.subsector_ranks"
+        )
+
+        return await self._execute_query(f"""
             SELECT date, rank, subsector_id, subsector_name, score, status, return_20d, return_5d, close_index, num_stocks
-            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks`
+            FROM `{table}`
             ORDER BY rank ASC
         """)
 
-    async def get_subsector_heatmap(self):
-        return await self._execute_query("""
-            SELECT subsector_id, subsector_name, s.sector_name as sector_name, score, return_5d, return_20d, num_stocks
-            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks` sr
-            JOIN `etl-stock-screener-bursa.bursa_dataset.subsectors` s ON s.id = sr.subsector_id
-        """)
+    async def get_subsector_heatmap(self, market: str = "MY"):
+        if market.upper() == "US":
+            # US data: sector terus diambil dari jadual shariah_stocks
+            return await self._execute_query("""
+                SELECT 
+                    sr.subsector_id, 
+                    sr.subsector_name, 
+                    COALESCE(s.sector, 'General') as sector_name, 
+                    sr.score, 
+                    sr.return_5d, 
+                    sr.return_20d, 
+                    sr.num_stocks
+                FROM `etl-stock-screener-bursa.us_stocks_data.us_subsector_ranks` sr
+                LEFT JOIN (
+                    SELECT DISTINCT industry, sector 
+                    FROM `etl-stock-screener-bursa.us_stocks_data.shariah_stocks`
+                ) s ON s.industry = sr.subsector_name
+            """)
+        else:
+            # Bursa data
+            return await self._execute_query("""
+                SELECT subsector_id, subsector_name, s.sector_name as sector_name, score, return_5d, return_20d, num_stocks
+                FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ranks` sr
+                JOIN `etl-stock-screener-bursa.bursa_dataset.subsectors` s ON s.id = sr.subsector_id
+            """)
 
-    async def get_subsector_bulk_ohlc(self):
-        rows = await self._execute_query("""
+    async def get_subsector_bulk_ohlc(self, market: str = "MY"):
+        table = (
+            "etl-stock-screener-bursa.us_stocks_data.us_subsector_ohlc"
+            if market.upper() == "US"
+            else "etl-stock-screener-bursa.bursa_dataset.subsector_ohlc"
+        )
+
+        rows = await self._execute_query(f"""
             SELECT subsector_id, date, open, high, low, close
-            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
+            FROM `{table}`
             ORDER BY date ASC
         """)
         if not rows:
@@ -177,10 +208,18 @@ class BigQueryService:
             grouped[sid].append(r)
         return grouped
 
-    async def get_subsector_single_ohlc(self, subsector_id: int | str):
+    async def get_subsector_single_ohlc(
+        self, subsector_id: int | str, market: str = "MY"
+    ):
+        table = (
+            "etl-stock-screener-bursa.us_stocks_data.us_subsector_ohlc"
+            if market.upper() == "US"
+            else "etl-stock-screener-bursa.bursa_dataset.subsector_ohlc"
+        )
+
         query = f"""
             SELECT date, open, high, low, close
-            FROM `etl-stock-screener-bursa.bursa_dataset.subsector_ohlc`
+            FROM `{table}`
             WHERE subsector_id = {int(subsector_id)}
             ORDER BY date ASC
         """
@@ -189,43 +228,109 @@ class BigQueryService:
             return []
         return rows
 
-    async def get_stocks_by_subsector(self, subsector_name: str = "", search: str = "", min_price: float = 0.3):
+    async def get_stocks_by_subsector(
+        self,
+        subsector_name: str = "",
+        search: str = "",
+        min_price: float = 0.3,
+        market: str = "MY",
+    ):
         where_clauses = []
 
-        if subsector_name and subsector_name not in ["All Stock", "all", ""]:
-            clean_sub = subsector_name.replace("'", "\\'").strip()
-            where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
+        if market.upper() == "US":
+            # Query untuk US Shariah Stocks
+            if subsector_name and subsector_name not in [
+                "All Stock",
+                "all",
+                "",
+            ]:
+                clean_sub = subsector_name.replace("'", "\\'").strip()
+                where_clauses.append(f"industry = '{clean_sub}'")
 
-        if search and search.strip():
-            clean_search = search.replace("'", "\\'").strip().lower()
-            where_clauses.append(
-                f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE '%{clean_search}%')"
+            if search and search.strip():
+                clean_search = search.replace("'", "\\'").strip().lower()
+                where_clauses.append(
+                    f"(LOWER(name) LIKE '%{clean_search}%' OR LOWER(id) LIKE"
+                    f" '%{clean_search}%')"
+                )
+
+            if min_price is not None and min_price > 0:
+                where_clauses.append(
+                    f"SAFE_CAST(currentPrice AS FLOAT64) >= {min_price}"
+                )
+
+            where_sql = (
+                f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
             )
 
-        if min_price is not None and min_price > 0:
-            where_clauses.append(f"SAFE_CAST(Price AS FLOAT64) >= {min_price}")
+            query = f"""
+                SELECT DISTINCT
+                    TRIM(name) AS Name, 
+                    id AS Code, 
+                    'Yes' AS Shariah, 
+                    SAFE_CAST(currentPrice AS FLOAT64) AS Price, 
+                    0.0 AS Change, 
+                    '0.00%' AS Change_Percent, 
+                    0 AS Volume, 
+                    ROUND(SAFE_CAST(marketCapitalization AS FLOAT64) / 1000000, 2) AS MCap_M, 
+                    NULL AS PE, 
+                    NULL AS ROE, 
+                    NULL AS DY,
+                    TRIM(sector) AS Scraped_Sector, 
+                    TRIM(industry) AS Scraped_Subsector,
+                    marketCapClassification,
+                    analyst_recommendation_weighted_avg AS recommendation
+                FROM `etl-stock-screener-bursa.us_stocks_data.shariah_stocks`
+                {where_sql}
+                ORDER BY Price DESC
+            """
+        else:
+            # Query asal untuk Bursa Malaysia Stocks
+            if subsector_name and subsector_name not in [
+                "All Stock",
+                "all",
+                "",
+            ]:
+                clean_sub = subsector_name.replace("'", "\\'").strip()
+                where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
 
-        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+            if search and search.strip():
+                clean_search = search.replace("'", "\\'").strip().lower()
+                where_clauses.append(
+                    f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE"
+                    f" '%{clean_search}%')"
+                )
 
-        rows = await self._execute_query(f"""
-            SELECT DISTINCT
-                REGEXP_REPLACE(TRIM(Name), r'\\s+', ' ') AS Name, 
-                Code, 
-                Shariah, 
-                SAFE_CAST(Price AS FLOAT64) AS Price, 
-                SAFE_CAST(Change AS FLOAT64) AS Change, 
-                FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
-                SAFE_CAST(Volume AS INT64) AS Volume, 
-                SAFE_CAST(MCap_M AS FLOAT64) AS MCap_M, 
-                SAFE_CAST(PE AS FLOAT64) AS PE, 
-                SAFE_CAST(ROE AS FLOAT64) AS ROE, 
-                SAFE_CAST(DY AS FLOAT64) AS DY,
-                TRIM(Scraped_Sector) AS Scraped_Sector, 
-                TRIM(Scraped_Subsector) AS Scraped_Subsector
-            FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
-            {where_sql}
-            ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
-        """)
+            if min_price is not None and min_price > 0:
+                where_clauses.append(
+                    f"SAFE_CAST(Price AS FLOAT64) >= {min_price}"
+                )
+
+            where_sql = (
+                f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+            )
+
+            query = f"""
+                SELECT DISTINCT
+                    REGEXP_REPLACE(TRIM(Name), r'\\s+', ' ') AS Name, 
+                    Code, 
+                    Shariah, 
+                    SAFE_CAST(Price AS FLOAT64) AS Price, 
+                    SAFE_CAST(Change AS FLOAT64) AS Change, 
+                    FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
+                    SAFE_CAST(Volume AS INT64) AS Volume, 
+                    SAFE_CAST(MCap_M AS FLOAT64) AS MCap_M, 
+                    SAFE_CAST(PE AS FLOAT64) AS PE, 
+                    SAFE_CAST(ROE AS FLOAT64) AS ROE, 
+                    SAFE_CAST(DY AS FLOAT64) AS DY,
+                    TRIM(Scraped_Sector) AS Scraped_Sector, 
+                    TRIM(Scraped_Subsector) AS Scraped_Subsector
+                FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
+                {where_sql}
+                ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
+            """
+
+        rows = await self._execute_query(query)
         return rows or []
 
     async def insert_stock_monitoring(self, payload: dict) -> dict:
