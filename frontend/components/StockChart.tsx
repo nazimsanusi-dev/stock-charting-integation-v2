@@ -474,6 +474,7 @@ export const StockChart = memo(function StockChart({
           volSeriesRef.current = null;
         }
 
+        // EMA
         if (data.indicators?.ema && config?.emaPeriods) {
           config.emaPeriods.forEach((period, idx) => {
             const values = (data.indicators?.ema as any)?.[String(period)];
@@ -498,6 +499,7 @@ export const StockChart = memo(function StockChart({
           });
         }
 
+        // RSI
         if (!mini && config?.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -526,6 +528,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
+        // MACD
         if (!mini && config?.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
@@ -567,6 +570,39 @@ export const StockChart = memo(function StockChart({
               });
               s.setData(sigPoints);
             }
+          }
+        }
+
+        // CMF
+        if (!mini && config?.showCmf && data.indicators?.cmf) {
+          const cmfPoints = data.indicators.cmf
+            .map((v, i) =>
+              v !== null && v !== undefined && !isNaN(Number(v))
+                ? { time: times[i] as any, value: Number(v) }
+                : null
+            )
+            .filter(Boolean) as any[];
+
+          if (cmfPoints.length) {
+            const cmfPane = chart.addPane();
+            const cmfSeries = cmfPane.addSeries(LineSeries, {
+              color: C.cmf || "#4CAF50",
+              lineWidth: 1,
+              title: "CMF",
+              priceLineVisible: false,
+              lastValueVisible: true,
+            });
+            cmfSeries.setData(cmfPoints);
+
+            // Garisan Paras Sifar (Zero Level Line)
+            const zeroLine = cmfPane.addSeries(LineSeries, {
+              color: C.level || "#94A3B8",
+              lineWidth: 1,
+              lineStyle: 2,
+              priceLineVisible: false,
+              lastValueVisible: false,
+            });
+            zeroLine.setData(cmfPoints.map((p) => ({ time: p.time, value: 0 })));
           }
         }
 
