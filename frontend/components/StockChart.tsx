@@ -1053,7 +1053,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* BEKAS CARTA & KANVAS PINTAR */}
+      {/* BEKAS CARTA & KANVAS PINTAR (OPTIMUM DESKTOP & TABLET) */}
       <div
         ref={containerRef}
         onWheel={() => redrawCanvasRef.current()}
@@ -1075,7 +1075,7 @@ export const StockChart = memo(function StockChart({
             }
           }
         }}
-        className="relative flex-1 min-h-[380px] sm:min-h-[440px] md:min-h-[480px] w-full overflow-hidden"
+        className="relative flex-1 min-h-0 w-full h-full overflow-hidden"
       >
         {!mini && (
           <canvas

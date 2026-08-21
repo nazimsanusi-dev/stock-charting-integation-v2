@@ -1,9 +1,8 @@
 "use client";
 
 import { StockChart } from "@/components/StockChart";
-import { OHLCSummary } from "@/components/OHLCSummary";
 import { useChartData } from "@/hooks/useChartData";
-import type { ChartConfig, OHLCVBar } from "@/lib/types";
+import type { ChartConfig } from "@/lib/types";
 
 interface StockCardProps {
   stock: { name: string; ticker: string };
@@ -13,22 +12,6 @@ interface StockCardProps {
   isCombine: boolean;
   config: ChartConfig;
   theme?: "light" | "dark";
-}
-
-// Helper to safely extract latest bar and previous close price
-function extractBars(chartData: any): { lastBar: OHLCVBar | null; prevClose: number | null } {
-  if (!chartData) return { lastBar: null, prevClose: null };
-
-  const bars: OHLCVBar[] = Array.isArray(chartData)
-    ? chartData
-    : chartData.ohlcv || chartData.bars || chartData.candles || [];
-
-  if (!bars || bars.length === 0) return { lastBar: null, prevClose: null };
-
-  const lastBar = bars[bars.length - 1];
-  const prevBar = bars.length > 1 ? bars[bars.length - 2] : null;
-
-  return { lastBar, prevClose: prevBar ? prevBar.close : null };
 }
 
 function StockCard({
@@ -51,48 +34,44 @@ function StockCard({
     config.emaPeriods
   );
 
-  const primaryBars = extractBars(primaryData.data);
-  const secondaryBars = extractBars(secondaryData.data);
-
   return (
-    <div className="flex flex-col border border-gray-200 dark:border-gray-800 rounded-lg p-3 bg-white dark:bg-gray-900 shadow-sm h-[520px]">
-      {/* Top Header */}
-      <div className="flex justify-between items-center mb-1 px-1">
-        <span className="font-bold text-gray-800 dark:text-gray-100 text-sm truncate">
-          {stock.name}
+    <div className="flex flex-col border border-gray-200 dark:border-gray-800 rounded-xl p-2.5 bg-white dark:bg-[#121722] shadow-sm h-[580px] sm:h-[620px] w-full overflow-hidden">
+      {/* Top Header Ringkas */}
+      <div className="flex justify-between items-center px-2 py-1 mb-1 border-b border-gray-100 dark:border-gray-800/80">
+        <div className="flex items-center gap-2 truncate">
+          <span className="font-bold text-gray-900 dark:text-gray-100 text-xs sm:text-sm truncate">
+            {stock.name}
+          </span>
+          <span className="text-[11px] font-mono font-semibold text-amber-500 dark:text-amber-400">
+            {stock.ticker}
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 uppercase">
+          {isCombine ? `${timeframe.toUpperCase()} / ${secondaryTimeframe.toUpperCase()}` : timeframe.toUpperCase()}
         </span>
-        <span className="text-xs font-mono text-gray-500 dark:text-gray-400">{stock.ticker}</span>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col w-full">
         {isCombine ? (
           /* Side-by-Side View for 2 Timeframes */
-          <div className="grid grid-cols-2 gap-2 h-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 h-full w-full">
             {/* TF 1 */}
-            <div className="flex flex-col h-full border-r border-gray-100 dark:border-gray-800 pr-1 overflow-hidden">
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-0.5">
+            <div className="flex flex-col h-full border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800/80 pr-0 md:pr-1 overflow-hidden">
+              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 px-2 py-0.5">
                 TF 1: {timeframe.toUpperCase()}
               </span>
 
-              {primaryBars.lastBar && (
-                <OHLCSummary
-                  bar={primaryBars.lastBar}
-                  ticker={stock.ticker}
-                  prevClose={primaryBars.prevClose}
-                />
-              )}
-
               {primaryData.loading ? (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                  Loading...
+                  <span className="animate-spin mr-1.5">⏳</span> Memuatkan...
                 </div>
               ) : primaryData.data ? (
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 w-full">
                   <StockChart
                     data={primaryData.data}
                     config={config}
                     ticker={stock.ticker}
-                    mini
+                    mini={false}
                     theme={theme}
                   />
                 </div>
@@ -100,30 +79,22 @@ function StockCard({
             </div>
 
             {/* TF 2 */}
-            <div className="flex flex-col h-full pl-1 overflow-hidden">
-              <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-0.5">
+            <div className="flex flex-col h-full pl-0 md:pl-1 overflow-hidden">
+              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 px-2 py-0.5">
                 TF 2: {secondaryTimeframe.toUpperCase()}
               </span>
 
-              {secondaryBars.lastBar && (
-                <OHLCSummary
-                  bar={secondaryBars.lastBar}
-                  ticker={stock.ticker}
-                  prevClose={secondaryBars.prevClose}
-                />
-              )}
-
               {secondaryData.loading ? (
                 <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                  Loading...
+                  <span className="animate-spin mr-1.5">⏳</span> Memuatkan...
                 </div>
               ) : secondaryData.data ? (
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 w-full">
                   <StockChart
                     data={secondaryData.data}
                     config={config}
                     ticker={stock.ticker}
-                    mini
+                    mini={false}
                     theme={theme}
                   />
                 </div>
@@ -131,27 +102,19 @@ function StockCard({
             </div>
           </div>
         ) : (
-          /* Standard Single Chart View */
-          <div className="flex flex-col h-full">
-            {primaryBars.lastBar && (
-              <OHLCSummary
-                bar={primaryBars.lastBar}
-                ticker={stock.ticker}
-                prevClose={primaryBars.prevClose}
-              />
-            )}
-
+          /* Standard Single Chart View dengan Toolbar Lengkap */
+          <div className="flex flex-col h-full w-full">
             {primaryData.loading ? (
               <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                Loading...
+                <span className="animate-spin mr-1.5">⏳</span> Memuatkan data carta...
               </div>
             ) : primaryData.data ? (
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 w-full">
                 <StockChart
                   data={primaryData.data}
                   config={config}
                   ticker={stock.ticker}
-                  mini
+                  mini={false}
                   theme={theme}
                 />
               </div>
@@ -187,7 +150,7 @@ export function GridView({
   if (!stocks.length) {
     return (
       <div className="flex flex-1 items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
-        No stocks selected for grid view.
+        Tiada saham dipilih untuk Paparan Grid.
       </div>
     );
   }
@@ -197,13 +160,13 @@ export function GridView({
   const gridClass =
     {
       1: "grid-cols-1",
-      2: "grid-cols-2",
-      3: "grid-cols-3",
-      4: "grid-cols-4",
-    }[activeColumns] || "grid-cols-2";
+      2: "grid-cols-1 lg:grid-cols-2",
+      3: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3",
+      4: "grid-cols-1 md:grid-cols-2 2xl:grid-cols-4",
+    }[activeColumns] || "grid-cols-1 lg:grid-cols-2";
 
   return (
-    <div className={`grid ${gridClass} gap-4 w-full`}>
+    <div className={`grid ${gridClass} gap-4 w-full pb-8`}>
       {stocks.map((stock) => (
         <StockCard
           key={stock.ticker}

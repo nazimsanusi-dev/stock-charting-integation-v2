@@ -151,11 +151,11 @@ function SingleStockGridCard({
 
   return (
     <div
-      className={`flex flex-col h-[390px] rounded-xl overflow-hidden shadow-sm border transition-all ${
+      className={`flex flex-col h-[480px] sm:h-[520px] rounded-xl overflow-hidden shadow-sm border transition-all ${
         isDark ? "bg-[#121722] border-gray-800" : "bg-white border-gray-200"
       }`}
     >
-      {/* 1. Header Kad Saham (Ketinggian tetap ~36px) */}
+      {/* 1. Header Kad Saham */}
       <div
         className={`shrink-0 flex items-center justify-between px-3 py-2 border-b ${
           isDark
@@ -217,8 +217,8 @@ function SingleStockGridCard({
         </div>
       </div>
 
-      {/* 2. Badan Carta: flex-1 + min-h-0 membolehkan carta mengisi baki ruang secara tepat */}
-      <div className="flex-1 min-h-[400px] sm:min-h-[480px] w-full p-1.5 relative">
+      {/* 2. Badan Carta: Memenuhi baki ruang kad dengan selamat tanpa overflow */}
+      <div className="flex-1 min-h-0 w-full p-1 relative overflow-hidden">
         {loading ? (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...
@@ -780,11 +780,11 @@ export function SubsectorStocksTable({
             )}
           </div>
 
-          {/* Bahagian Kanan: Carta Saham Pilihan */}
-          <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
+          {/* Bahagian Kanan: Carta Saham Pilihan (Split View) */}
+          <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm h-[560px] xl:h-[620px]">
             {selectedStock ? (
               <>
-                <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+                <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between shrink-0">
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
@@ -833,7 +833,7 @@ export function SubsectorStocksTable({
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col w-full p-2 min-h-[520px] relative">
+                <div className="flex-1 min-h-0 w-full p-2 relative overflow-hidden">
                   {chart.loading ? (
                     <div className="h-full flex items-center justify-center text-xs text-gray-400">
                       <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
