@@ -91,40 +91,57 @@ export function Sidebar({ params, onChange }: Props) {
     }
   }, [params, onChange]);
 
-  // 3. Fetch Stocks (Boleh dipanggil semula)
-  const fetchStocks = useCallback(async (targetUrl?: string, targetWs?: string) => {
-    const url = targetUrl || params.selectedSheet?.url;
-    const ws = targetWs || params.worksheet;
-    if (!url || !ws) return;
+  const fetchStocks = useCallback(
+    async (targetUrl?: string, targetWs?: string) => {
+      const url = targetUrl || params.selectedSheet?.url;
+      const ws = targetWs || params.worksheet;
+      if (!url || !ws) return;
 
-    setStocks([]);
-    setLoadingStocks(true);
-    setStocksError(null);
-
-    try {
-      const r = await api.stocks(url, ws);
-      setStocks(r.stocks);
-      onChange({ ...params, allStocks: r.stocks });
-    } catch (err: any) {
-      setStocksError(err?.message || "Gagal memuatkan senarai stok.");
       setStocks([]);
-      onChange({ ...params, allStocks: [] });
-    } finally {
-      setLoadingStocks(false);
-    }
-  }, [params, onChange]);
+      setLoadingStocks(true);
+      setStocksError(null);
 
-  // Effects permulaan
+      try {
+        const r = await api.stocks(url, ws);
+        
+        // Tapis baris header yang tidak sah (cth: "YTD%", "TICKER", dsb.)
+        const cleanStocks = (r.stocks || []).filter((s: any) => {
+          const ticker = String(s.ticker || "").toUpperCase().trim();
+          const change = String(s.change || "").toUpperCase().trim();
+          return (
+            ticker !== "" &&
+            ticker !== "TICKER" &&
+            ticker !== "CODE" // && change !== "YTD%"
+          );
+        });
+
+        setStocks(cleanStocks);
+        onChange({ ...params, allStocks: cleanStocks });
+      } catch (err: any) {
+        setStocksError(err?.message || "Gagal memuatkan senarai stok.");
+        setStocks([]);
+        onChange({ ...params, allStocks: [] });
+      } finally {
+        setLoadingStocks(false);
+      }
+    },
+    [params.selectedSheet?.url, params.worksheet, onChange] // Elak letak seluruh `params` untuk cegah re-render berulang
+  );
+
+  // Effects Permulaan & Pertukaran
   useEffect(() => {
     fetchSheets();
   }, []); // eslint-disable-line
 
+  // Apabila Sheet bertukar -> Kosongkan senarai lama & ambil Worksheet baharu
   useEffect(() => {
     if (params.selectedSheet?.url) {
+      setStocks([]);
       fetchWorksheets(params.selectedSheet.url);
     }
   }, [params.selectedSheet?.url]); // eslint-disable-line
 
+  // Apabila Worksheet sah tersedia -> Ambil senarai saham
   useEffect(() => {
     if (params.selectedSheet?.url && params.worksheet) {
       fetchStocks(params.selectedSheet.url, params.worksheet);
@@ -179,7 +196,7 @@ export function Sidebar({ params, onChange }: Props) {
   }
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0">
+    <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700/60 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">
@@ -449,113 +466,112 @@ export function Sidebar({ params, onChange }: Props) {
               </button>
             </div>
 
-            {/* Kandungan Carian & Senarai Saham */}
+            {/* Kandungan Carian & Senarai (Muncul hanya jika showStocks === true) */}
             {showStocks && (
-                <div className="space-y-2 pt-1.5">
-                  {/* Input Carian Moden Bersama Ikon */}
-                  <div className="relative">
-                    <svg
-                      className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    <input
-                      className="w-full text-xs pl-8 pr-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/90 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/40 transition-all font-medium"
-                      placeholder="Cari simbol atau nama..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Senarai Saham dengan Scrollbar Halus Gelap */}
-                  <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700/60 [&::-webkit-scrollbar-thumb]:rounded-full">
-                    {loadingStocks && (
-                      <div className="flex items-center gap-2 py-3 px-2 text-xs text-gray-400">
-                        <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                        <span>Memuatkan senarai saham...</span>
-                      </div>
-                    )}
-
-                    {stocksError && (
-                      <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-400 flex flex-col gap-1 my-1">
-                        <span>⚠ {stocksError}</span>
-                        <button
-                          onClick={() => fetchStocks()}
-                          className="text-left underline text-xs font-semibold hover:text-rose-300 w-fit"
-                        >
-                          Cuba lagi
-                        </button>
-                      </div>
-                    )}
-
-                    {filteredStocks.map((s) => {
-                      const selected = selectedTicker === s.ticker;
-                      const cleanChange = String(s.change ?? "").replace(/%/g, "");
-                      const numChange = Number(cleanChange);
-                      const isPos = numChange > 0;
-                      const isNeg = numChange < 0;
-
-                      return (
-                        <div
-                          key={s.ticker}
-                          onClick={() => selectStock(s)}
-                          className={`group flex items-center justify-between gap-2 cursor-pointer py-1.5 px-2.5 rounded-lg text-xs transition-all select-none border ${
-                            selected
-                              ? "bg-teal-500/15 border-teal-500/40 text-teal-400 font-semibold shadow-xs"
-                              : "border-transparent hover:bg-gray-100 dark:hover:bg-gray-800/60 text-gray-700 dark:text-gray-300"
-                          }`}
-                        >
-                          {/* Kiri: Indicator Dot + Kod & Nama Saham */}
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                selected
-                                  ? "bg-teal-400 ring-2 ring-teal-400/30"
-                                  : "bg-transparent group-hover:bg-gray-500"
-                              }`}
-                            />
-
-                            <div className="flex items-baseline gap-1.5 min-w-0 truncate">
-                              <span className="font-semibold truncate text-gray-800 dark:text-gray-100">
-                                {s.name}
-                              </span>
-                              <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 shrink-0">
-                                {s.ticker}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Kanan: Lencana % Perubahan */}
-                          {s.change !== undefined && s.change !== null && cleanChange !== "" && (
-                            <span
-                              className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 border ${
-                                isPos
-                                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                                  : isNeg
-                                  ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
-                                  : "text-gray-400 bg-gray-500/10 border-gray-500/20"
-                              }`}
-                            >
-                              {isPos ? `+${cleanChange}%` : `${cleanChange}%`}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 py-3 text-center">
-                        {stocks.length ? "Tiada padanan ditemui" : "Tiada saham dimuatkan"}
-                      </p>
-                    )}
-                  </div>
+              <div className="space-y-1.5 pt-1">
+                {/* Input Carian Padat */}
+                <div className="relative">
+                  <svg
+                    className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    className="w-full text-[11px] pl-8 pr-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/90 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-teal-500 transition-all font-medium"
+                    placeholder="Cari simbol atau nama..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-              )}
+
+                {/* Senarai Saham Interaktif */}
+                <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700/60 [&::-webkit-scrollbar-thumb]:rounded-full">
+                  {loadingStocks && (
+                    <div className="flex items-center gap-2 py-3 px-2 text-xs text-gray-400">
+                      <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                      <span>Memuatkan senarai saham...</span>
+                    </div>
+                  )}
+
+                  {stocksError && (
+                    <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-400 flex flex-col gap-1 my-1">
+                      <span>⚠ {stocksError}</span>
+                      <button
+                        type="button"
+                        onClick={() => fetchStocks()}
+                        className="text-left underline text-xs font-semibold hover:text-rose-300 w-fit"
+                      >
+                        Cuba lagi
+                      </button>
+                    </div>
+                  )}
+
+                  {filteredStocks.map((s) => {
+                    const selected = selectedTicker === s.ticker;
+                    
+                    // Bersihkan data perubahan peratus
+                    const rawChangeStr = String(s.change ?? "").replace(/%/g, "").trim();
+                    const numChange = parseFloat(rawChangeStr);
+                    const hasValidNum = !isNaN(numChange);
+                    const isPos = hasValidNum && numChange > 0;
+                    const isNeg = hasValidNum && numChange < 0;
+
+                    return (
+                      <div
+                        key={s.ticker}
+                        onClick={() => selectStock(s)}
+                        className={`flex items-center justify-between gap-1.5 cursor-pointer py-1.5 px-2 rounded-md text-xs transition-all select-none border ${
+                          selected
+                            ? "bg-teal-500/15 border-teal-500/40 text-teal-400 font-semibold shadow-xs"
+                            : "border-transparent hover:bg-gray-100 dark:hover:bg-gray-800/60 text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {/* Kiri: Nama Saham & Kod Ticker */}
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              selected ? "bg-teal-400" : "bg-transparent"
+                            }`}
+                          />
+                          <span className="font-medium truncate text-gray-800 dark:text-gray-200 text-xs">
+                            {s.name}
+                          </span>
+                          <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 shrink-0">
+                            {s.ticker}
+                          </span>
+                        </div>
+
+                        {/* Kanan: Peratus Perubahan Sahaja (Bukan Header YTD%) */}
+                        {hasValidNum && (
+                          <span
+                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 border ${
+                              isPos
+                                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                : isNeg
+                                ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+                                : "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                            }`}
+                          >
+                            {isPos ? `+${numChange.toFixed(2)}%` : `${numChange.toFixed(2)}%`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 py-3 text-center">
+                      {stocks.length ? "Tiada padanan carian" : "Tiada saham dalam sheet ini"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <hr className="border-gray-100 dark:border-gray-800" />
