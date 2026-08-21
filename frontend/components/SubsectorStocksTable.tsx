@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api, MarketType } from "@/lib/api";
 import { useChartData } from "@/hooks/useChartData";
-import type { SubsectorRank, SubsectorStockItem } from "@/lib/types";
+import type { SubsectorRank, SubsectorStockItem, ChartData } from "@/lib/types";
 import dynamic from "next/dynamic";
 
 const StockChart = dynamic(
@@ -11,7 +11,7 @@ const StockChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full min-h-[500px] flex items-center justify-center text-xs text-gray-400">
+      <div className="h-full min-h-[300px] flex items-center justify-center text-xs text-gray-400">
         <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
       </div>
     ),
@@ -32,6 +32,7 @@ const DEFAULT_CHART_CONFIG = {
   showCvd: false,
   showCmf: true,
 };
+
 
 function renderRecommendationBadge(rec: string | null | undefined) {
   if (!rec || rec === "-" || rec === "None") {
@@ -79,6 +80,133 @@ function renderCapClassBadge(capClass: string | null | undefined) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Sub-Komponen: Kad Carta Individu untuk Mod Grid Semua Carta
+// ─────────────────────────────────────────────────────────────
+function SingleStockGridCard({
+  item,
+  market,
+  theme,
+  currencySymbol,
+  onAddToMonitoring,
+  monitorStatus,
+}: {
+  item: SubsectorStockItem;
+  market: MarketType;
+  theme: "dark" | "light";
+  currencySymbol: string;
+  onAddToMonitoring: (item: any) => void;
+  monitorStatus: string;
+}) {
+  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const formattedTicker = item.Code
+    ? market === "US"
+      ? item.Code.replace(".KL", "").trim().toUpperCase()
+      : item.Code.includes(".KL")
+      ? item.Code
+      : `${item.Code}.KL`
+    : "";
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!formattedTicker) return;
+
+    setLoading(true);
+    setError(null);
+
+    api
+      .getChartData(formattedTicker, "1d", "1y", DEFAULT_CHART_CONFIG.emaPeriods)
+      .then((res) => {
+        if (isMounted) setChartData(res);
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error(`Gagal memuatkan carta ${formattedTicker}:`, err);
+          setError("Data tidak tersedia");
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [formattedTicker, market]);
+
+  return (
+    <div className="flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
+      {/* Header Kad Saham */}
+      <div className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-850/80 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-1.5 truncate max-w-[70%]">
+          <span className="font-mono font-bold text-xs text-amber-500 dark:text-amber-400">
+            {item.Code}
+          </span>
+          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
+            {item.Name}
+          </span>
+          {item.Shariah === "Yes" && (
+            <span className="px-1 py-0.2 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+              [S]
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-xs text-gray-900 dark:text-gray-100">
+            {currencySymbol}
+            {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
+          </span>
+          <button
+            type="button"
+            disabled={monitorStatus === "loading"}
+            onClick={() => onAddToMonitoring(item)}
+            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+              monitorStatus === "success"
+                ? "bg-emerald-500 text-white"
+                : monitorStatus === "loading"
+                ? "bg-gray-200 dark:bg-slate-700 text-gray-400"
+                : "bg-[#26A69A]/15 text-[#26A69A] hover:bg-[#26A69A] hover:text-white"
+            }`}
+            title="Tambah ke Stock Monitoring"
+          >
+            {monitorStatus === "loading" ? (
+              <span className="w-2.5 h-2.5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+            ) : monitorStatus === "success" ? (
+              "✓"
+            ) : (
+              "+"
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Bahagian Carta Saham */}
+      <div className="h-[280px] p-2">
+        {loading ? (
+          <div className="h-full flex items-center justify-center text-xs text-gray-400">
+            <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...
+          </div>
+        ) : error || !chartData ? (
+          <div className="h-full flex items-center justify-center text-xs text-rose-500">
+            {error || "Tiada data carta"}
+          </div>
+        ) : (
+          <StockChart
+            data={chartData}
+            ticker={formattedTicker}
+            config={DEFAULT_CHART_CONFIG}
+            theme={theme}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SubsectorStocksTable({
   subsectors,
   theme = "dark",
@@ -92,8 +220,16 @@ export function SubsectorStocksTable({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Mod Paparan: "split" (Jadual Kiri + Carta Kanan) | "grid" (Grid Semua Carta Saham)
+  const [viewMode, setViewMode] = useState<"split" | "grid">("split");
+
+  // Pagination State Jadual
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 16;
+
+  // Pagination State Grid Semua Carta
+  const [gridPage, setGridPage] = useState<number>(1);
+  const gridPageSize = 6;
 
   const loadStocks = async (subName: string, search: string, minP: string) => {
     setLoading(true);
@@ -102,6 +238,7 @@ export function SubsectorStocksTable({
       const data = await api.subsectorStocks(subName, search, minP, market);
       setStocks(data);
       setCurrentPage(1);
+      setGridPage(1);
       if (data && data.length > 0) {
         setSelectedStock(data[0]);
       } else {
@@ -145,9 +282,17 @@ export function SubsectorStocksTable({
     DEFAULT_CHART_CONFIG.emaPeriods
   );
 
+  // Pagination Jadual
   const totalPages = Math.ceil(stocks.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
+
+  // Pagination Grid
+  const totalGridPages = Math.ceil(stocks.length / gridPageSize) || 1;
+  const paginatedGridStocks = useMemo(() => {
+    const start = (gridPage - 1) * gridPageSize;
+    return stocks.slice(start, start + gridPageSize);
+  }, [stocks, gridPage]);
 
   const [monitorStatus, setMonitorStatus] = useState<Record<string, "idle" | "loading" | "success">>({});
 
@@ -189,7 +334,9 @@ export function SubsectorStocksTable({
 
   return (
     <div className="space-y-4">
-      {/* Header Bar */}
+      {/* ─────────────────────────────────────────────────────────────
+          1. Header & Bar Tapisan (Filter Bar)
+      ───────────────────────────────────────────────────────────── */}
       <form
         onSubmit={handleFilterSubmit}
         className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 bg-gray-100/60 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-200 dark:border-gray-800"
@@ -204,7 +351,7 @@ export function SubsectorStocksTable({
               value={selectedSubsector}
               onChange={(e) => setSelectedSubsector(e.target.value)}
               disabled={loading}
-              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium"
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium cursor-pointer"
             >
               <option value="">#0 All Stock (Semua Saham)</option>
               {subsectors.map((s) => (
@@ -242,6 +389,7 @@ export function SubsectorStocksTable({
             />
           </div>
 
+          {/* Butang Tapis & Cari */}
           <button
             type="submit"
             disabled={loading}
@@ -249,8 +397,42 @@ export function SubsectorStocksTable({
           >
             Tapis & Cari
           </button>
+
+          {/* ⭐ BUTANG BARU: PAPAR SEMUA CARTA / JADUAL */}
+          <button
+            type="button"
+            disabled={loading || stocks.length === 0}
+            onClick={() => setViewMode((prev) => (prev === "split" ? "grid" : "split"))}
+            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition shadow-sm flex items-center gap-1.5 ${
+              viewMode === "grid"
+                ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-amber-500"
+            }`}
+            title="Tukar paparan antara jadual dan grid semua carta"
+          >
+            {viewMode === "grid" ? (
+              <>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M3 9h18M9 21V9" />
+                </svg>
+                <span>Paparan Jadual</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect width="7" height="7" x="3" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="14" rx="1" />
+                  <rect width="7" height="7" x="3" y="14" rx="1" />
+                </svg>
+                <span>Papar Semua Carta ({stocks.length})</span>
+              </>
+            )}
+          </button>
         </div>
 
+        {/* Butang Refresh */}
         <button
           type="button"
           onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
@@ -261,233 +443,67 @@ export function SubsectorStocksTable({
         </button>
       </form>
 
-      {/* 2-Column Split View */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* Bahagian Kiri: Jadual Saham */}
-        <div className="xl:col-span-6 flex flex-col space-y-2">
+      {/* ─────────────────────────────────────────────────────────────
+          2. KANDUNGAN UTAMA (MOD GRID vs MOD SPLIT)
+      ───────────────────────────────────────────────────────────── */}
+      {viewMode === "grid" ? (
+        /* ═════════════════════════════════════════════════════════════
+           MOD A: GRID SEMUA CARTA SAHAM
+        ═════════════════════════════════════════════════════════════ */
+        <div className="space-y-4">
           {loading ? (
             <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
               <span className="animate-spin inline-block mr-2 text-base">⏳</span>
-              Memuatkan senarai saham...
+              Memuatkan senarai carta...
             </div>
           ) : error ? (
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
-              {error} -{" "}
-              <button
-                onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
-                className="underline font-bold"
-              >
-                Cuba Lagi
-              </button>
+              {error}
             </div>
           ) : stocks.length === 0 ? (
-            <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
-              Tiada saham melepasi kriteria penapisan (Min Price: {currencySymbol}{minPrice || "0"}).
+            <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
+              Tiada saham melepasi kriteria penapisan.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
-              <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
-                <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
-                  <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      {/* Kolum 1: Kod (Sticky Left) */}
-                      <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
-                        {market === "US" ? "Symbol" : "Kod"}
-                      </th>
-                      {/* Kolum 2: Nama (Sticky Left) */}
-                      <th className="py-2.5 px-3 text-left sticky left-[75px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
-                        Nama
-                      </th>
-                      <th className="py-2.5 px-2 text-center">Syariah</th>
-                      <th className="py-2.5 px-3 text-right">Harga</th>
-
-                      {/* Kolum Khas Mengikut Pasaran */}
-                      {market === "US" ? (
-                        <>
-                          <th className="py-2.5 px-3 text-center">Rec.</th>
-                          <th className="py-2.5 px-3 text-center">Cap Class</th>
-                          <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                          <th className="py-2.5 px-3 text-left">Sector</th>
-                          <th className="py-2.5 px-3 text-left">Industry</th>
-                        </>
-                      ) : (
-                        <>
-                          <th className="py-2.5 px-3 text-right">Perubahan</th>
-                          <th className="py-2.5 px-3 text-right">Change %</th>
-                          <th className="py-2.5 px-3 text-right">Volume</th>
-                          <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                          <th className="py-2.5 px-3 text-left">Sector</th>
-                          <th className="py-2.5 px-3 text-left">Subsector</th>
-                        </>
-                      )}
-
-                      {/* Kolum Action (Sticky Right) */}
-                      <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
-                    {paginatedStocks.map((item: any, idx: number) => {
-                      const changeVal = parseFloat(
-                        String(item.Change_Percent || "0").replace("%", "").replace("+", "")
-                      );
-                      const isPos = changeVal > 0;
-                      const isNeg = changeVal < 0;
-                      const isSelected = selectedStock?.Code === item.Code;
-                      const status = monitorStatus[item.Code] || "idle";
-
-                      const stickyBg = isSelected
-                        ? "bg-amber-100/90 dark:bg-[#281e0f]"
-                        : "bg-white dark:bg-[#111827] group-hover:bg-gray-100 dark:group-hover:bg-gray-800";
-
-                      return (
-                        <tr
-                          key={idx}
-                          onClick={() => setSelectedStock(item)}
-                          className={`group cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-amber-500/15 dark:bg-amber-500/20 font-semibold"
-                              : "hover:bg-gray-100/70 dark:hover:bg-gray-800/50"
-                          }`}
-                        >
-                          {/* Kolum 1 Freeze */}
-                          <td
-                            className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[75px] max-w-[75px] ${stickyBg}`}
-                          >
-                            {isSelected && <span className="text-amber-500 mr-1">▶</span>}
-                            {item.Code}
-                          </td>
-
-                          {/* Kolum 2 Freeze */}
-                          <td
-                            className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[75px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
-                          >
-                            {item.Name}
-                          </td>
-
-                          <td className="py-2 px-2 text-center">
-                            {item.Shariah === "Yes" ? (
-                              <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
-                                [S]
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-400">-</span>
-                            )}
-                          </td>
-
-                          <td className="py-2 px-3 text-right font-mono font-semibold text-gray-900 dark:text-gray-100">
-                            {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
-                          </td>
-
-                          {/* Data Paparan Bersyarat (US vs MY) */}
-                          {market === "US" ? (
-                            <>
-                              <td className="py-2 px-3 text-center">
-                                {renderRecommendationBadge(item.recommendation)}
-                              </td>
-                              <td className="py-2 px-3 text-center">
-                                {renderCapClassBadge(item.marketCapClassification)}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                                {item.MCap_M !== null && item.MCap_M !== undefined ? Number(item.MCap_M).toLocaleString() : "-"}
-                              </td>
-                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
-                                {item.Scraped_Sector || "-"}
-                              </td>
-                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
-                                {item.Scraped_Subsector || "-"}
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td
-                                className={`py-2 px-3 text-right font-mono font-medium ${
-                                  isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                                }`}
-                              >
-                                {item.Change ?? "-"}
-                              </td>
-                              <td
-                                className={`py-2 px-3 text-right font-mono font-bold ${
-                                  isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
-                                }`}
-                              >
-                                {item.Change_Percent ?? "-"}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
-                                {item.Volume ?? "-"}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
-                                {item.MCap_M ?? "-"}
-                              </td>
-                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
-                                {item.Scraped_Sector || "-"}
-                              </td>
-                              <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
-                                {item.Scraped_Subsector || "-"}
-                              </td>
-                            </>
-                          )}
-
-                          {/* Action Button (Sticky Right) */}
-                          <td
-                            className={`py-1.5 px-2 text-center sticky right-0 z-[5] w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800 ${stickyBg}`}
-                          >
-                            <button
-                              type="button"
-                              disabled={status === "loading"}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddToMonitoring(item);
-                              }}
-                              className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all mx-auto ${
-                                status === "success"
-                                  ? "bg-emerald-500 text-white shadow-sm"
-                                  : status === "loading"
-                                  ? "bg-gray-200 dark:bg-slate-700 text-gray-400"
-                                  : "bg-[#26A69A]/15 text-[#26A69A] hover:bg-[#26A69A] hover:text-white border border-[#26A69A]/30"
-                              }`}
-                              title="Tambah ke Stock Monitoring"
-                            >
-                              {status === "loading" ? (
-                                <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                              ) : status === "success" ? (
-                                "✓"
-                              ) : (
-                                "+"
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            <>
+              {/* Grid 2 / 3 Kolum */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {paginatedGridStocks.map((item) => (
+                  <SingleStockGridCard
+                    key={item.Code}
+                    item={item}
+                    market={market}
+                    theme={theme}
+                    currencySymbol={currencySymbol}
+                    onAddToMonitoring={handleAddToMonitoring}
+                    monitorStatus={monitorStatus[item.Code] || "idle"}
+                  />
+                ))}
               </div>
 
-              {/* Pagination */}
-              {stocks.length > pageSize && (
-                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
+              {/* Pagination Grid */}
+              {totalGridPages > 1 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-800 rounded-xl text-[11px] text-gray-500 dark:text-gray-400">
                   <div>
-                    {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length} saham
+                    Menunjukkan {(gridPage - 1) * gridPageSize + 1}–
+                    {Math.min(gridPage * gridPageSize, stocks.length)} daripada {stocks.length} carta saham
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
+                      onClick={() => setGridPage((p) => Math.max(1, p - 1))}
+                      disabled={gridPage === 1}
                       className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       ◀ Prev
                     </button>
                     <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {currentPage}/{totalPages}
+                      {gridPage}/{totalGridPages}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => setGridPage((p) => Math.min(totalGridPages, p + 1))}
+                      disabled={gridPage === totalGridPages}
                       className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Next ▶
@@ -495,100 +511,341 @@ export function SubsectorStocksTable({
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
-
-        {/* Bahagian Kanan: Carta Saham */}
-        <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
-          {selectedStock ? (
-            <>
-              <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                      {selectedStock.Name}
-                    </h3>
-                    <span className="text-xs font-mono font-bold text-amber-500 dark:text-amber-400">
-                      {activeTicker}
-                    </span>
-                    {selectedStock.Shariah === "Yes" && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/30">
-                        [S]
-                      </span>
-                    )}
-                    {market === "US" && selectedStock.recommendation && (
-                      renderRecommendationBadge(selectedStock.recommendation)
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    <span>Harga: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
-                    {market === "US" && selectedStock.marketCapClassification && (
-                      <>
-                        <span>•</span>
-                        <span>Cap: <strong className="text-gray-800 dark:text-gray-200">{selectedStock.marketCapClassification.replace(/_/g, " ")}</strong></span>
-                      </>
-                    )}
-                    {market !== "US" && selectedStock.Change_Percent && (
-                      <>
-                        <span>•</span>
-                        <span
-                          className={`font-semibold ${
-                            parseFloat(String(selectedStock.Change_Percent)) >= 0 ? "text-emerald-500" : "text-rose-500"
-                          }`}
-                        >
-                          {selectedStock.Change_Percent} ({selectedStock.Change ?? "-"})
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
-                  {market !== "US" && (
-                    <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume ?? "-"}</span></div>
-                  )}
-                  <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">{currencySymbol}{selectedStock.MCap_M ?? "-"}M</span></div>
-                </div>
+      ) : (
+        /* ═════════════════════════════════════════════════════════════
+           MOD B: SPLIT VIEW (JADUAL KIRI + CARTA KANAN)
+        ═════════════════════════════════════════════════════════════ */
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+          {/* Bahagian Kiri: Jadual Saham */}
+          <div className="xl:col-span-6 flex flex-col space-y-2">
+            {loading ? (
+              <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
+                <span className="animate-spin inline-block mr-2 text-base">⏳</span>
+                Memuatkan senarai saham...
               </div>
+            ) : error ? (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
+                {error} -{" "}
+                <button
+                  onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
+                  className="underline font-bold"
+                >
+                  Cuba Lagi
+                </button>
+              </div>
+            ) : stocks.length === 0 ? (
+              <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
+                Tiada saham melepasi kriteria penapisan (Min Price: {currencySymbol}{minPrice || "0"}).
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
+                <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+                  <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+                    <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
+                      <tr>
+                        {/* Kolum 1: Kod (Sticky Left) */}
+                        <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
+                          {market === "US" ? "Symbol" : "Kod"}
+                        </th>
+                        {/* Kolum 2: Nama (Sticky Left) */}
+                        <th className="py-2.5 px-3 text-left sticky left-[75px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
+                          Nama
+                        </th>
+                        <th className="py-2.5 px-2 text-center">Syariah</th>
+                        <th className="py-2.5 px-3 text-right">Harga</th>
 
-              <div className="flex-1 p-2 min-h-[520px]">
-                {chart.loading ? (
-                  <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                    <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
-                  </div>
-                ) : chart.error ? (
-                  <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-2">
-                    <p className="text-xs text-rose-500">{chart.error}</p>
-                    <button
-                      type="button"
-                      onClick={chart.refetch}
-                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs"
-                    >
-                      🔄 Cuba Semula
-                    </button>
-                  </div>
-                ) : chart.data ? (
-                  <StockChart
-                    data={chart.data}
-                    ticker={activeTicker || ""}
-                    config={DEFAULT_CHART_CONFIG}
-                    theme={theme}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                    Tiada data carta didapati.
+                        {/* Kolum Khas Mengikut Pasaran */}
+                        {market === "US" ? (
+                          <>
+                            <th className="py-2.5 px-3 text-center">Rec.</th>
+                            <th className="py-2.5 px-3 text-center">Cap Class</th>
+                            <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                            <th className="py-2.5 px-3 text-left">Sector</th>
+                            <th className="py-2.5 px-3 text-left">Industry</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="py-2.5 px-3 text-right">Perubahan</th>
+                            <th className="py-2.5 px-3 text-right">Change %</th>
+                            <th className="py-2.5 px-3 text-right">Volume</th>
+                            <th className="py-2.5 px-3 text-right">MCap (M)</th>
+                            <th className="py-2.5 px-3 text-left">Sector</th>
+                            <th className="py-2.5 px-3 text-left">Subsector</th>
+                          </>
+                        )}
+
+                        {/* Kolum Action (Sticky Right) */}
+                        <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
+                      {paginatedStocks.map((item: any, idx: number) => {
+                        const changeVal = parseFloat(
+                          String(item.Change_Percent || "0").replace("%", "").replace("+", "")
+                        );
+                        const isPos = changeVal > 0;
+                        const isNeg = changeVal < 0;
+                        const isSelected = selectedStock?.Code === item.Code;
+                        const status = monitorStatus[item.Code] || "idle";
+
+                        const stickyBg = isSelected
+                          ? "bg-amber-100/90 dark:bg-[#281e0f]"
+                          : "bg-white dark:bg-[#111827] group-hover:bg-gray-100 dark:group-hover:bg-gray-800";
+
+                        return (
+                          <tr
+                            key={idx}
+                            onClick={() => setSelectedStock(item)}
+                            className={`group cursor-pointer transition-colors ${
+                              isSelected
+                                ? "bg-amber-500/15 dark:bg-amber-500/20 font-semibold"
+                                : "hover:bg-gray-100/70 dark:hover:bg-gray-800/50"
+                            }`}
+                          >
+                            {/* Kolum 1 Freeze */}
+                            <td
+                              className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[75px] max-w-[75px] ${stickyBg}`}
+                            >
+                              {isSelected && <span className="text-amber-500 mr-1">▶</span>}
+                              {item.Code}
+                            </td>
+
+                            {/* Kolum 2 Freeze */}
+                            <td
+                              className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[75px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
+                            >
+                              {item.Name}
+                            </td>
+
+                            <td className="py-2 px-2 text-center">
+                              {item.Shariah === "Yes" ? (
+                                <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/30">
+                                  [S]
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400">-</span>
+                              )}
+                            </td>
+
+                            <td className="py-2 px-3 text-right font-mono font-semibold text-gray-900 dark:text-gray-100">
+                              {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
+                            </td>
+
+                            {/* Data Paparan Bersyarat (US vs MY) */}
+                            {market === "US" ? (
+                              <>
+                                <td className="py-2 px-3 text-center">
+                                  {renderRecommendationBadge(item.recommendation)}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {renderCapClassBadge(item.marketCapClassification)}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                  {item.MCap_M !== null && item.MCap_M !== undefined ? Number(item.MCap_M).toLocaleString() : "-"}
+                                </td>
+                                <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
+                                  {item.Scraped_Sector || "-"}
+                                </td>
+                                <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                                  {item.Scraped_Subsector || "-"}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td
+                                  className={`py-2 px-3 text-right font-mono font-medium ${
+                                    isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                                  }`}
+                                >
+                                  {item.Change ?? "-"}
+                                </td>
+                                <td
+                                  className={`py-2 px-3 text-right font-mono font-bold ${
+                                    isPos ? "text-emerald-500" : isNeg ? "text-rose-500" : "text-gray-400"
+                                  }`}
+                                >
+                                  {item.Change_Percent ?? "-"}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-gray-500 dark:text-gray-400">
+                                  {item.Volume ?? "-"}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                  {item.MCap_M ?? "-"}
+                                </td>
+                                <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
+                                  {item.Scraped_Sector || "-"}
+                                </td>
+                                <td className="py-2 px-3 text-left text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                                  {item.Scraped_Subsector || "-"}
+                                </td>
+                              </>
+                            )}
+
+                            {/* Action Button (Sticky Right) */}
+                            <td
+                              className={`py-1.5 px-2 text-center sticky right-0 z-[5] w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800 ${stickyBg}`}
+                            >
+                              <button
+                                type="button"
+                                disabled={status === "loading"}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddToMonitoring(item);
+                                }}
+                                className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold transition-all mx-auto ${
+                                  status === "success"
+                                    ? "bg-emerald-500 text-white shadow-sm"
+                                    : status === "loading"
+                                    ? "bg-gray-200 dark:bg-slate-700 text-gray-400"
+                                    : "bg-[#26A69A]/15 text-[#26A69A] hover:bg-[#26A69A] hover:text-white border border-[#26A69A]/30"
+                                }`}
+                                title="Tambah ke Stock Monitoring"
+                              >
+                                {status === "loading" ? (
+                                  <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                                ) : status === "success" ? (
+                                  "✓"
+                                ) : (
+                                  "+"
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {stocks.length > pageSize && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
+                    <div>
+                      {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length} saham
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ◀ Prev
+                      </button>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {currentPage}/{totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Next ▶
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="h-full min-h-[450px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
-              Pilih mana-mana baris saham di sebelah kiri untuk melihat carta.
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Bahagian Kanan: Carta Saham Terpilih */}
+          <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
+            {selectedStock ? (
+              <>
+                <div className="p-3 bg-gray-50 dark:bg-slate-900/70 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        {selectedStock.Name}
+                      </h3>
+                      <span className="text-xs font-mono font-bold text-amber-500 dark:text-amber-400">
+                        {activeTicker}
+                      </span>
+                      {selectedStock.Shariah === "Yes" && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/30">
+                          [S]
+                        </span>
+                      )}
+                      {market === "US" && selectedStock.recommendation && (
+                        renderRecommendationBadge(selectedStock.recommendation)
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                      <span>Harga: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
+                      {market === "US" && selectedStock.marketCapClassification && (
+                        <>
+                          <span>•</span>
+                          <span>Cap: <strong className="text-gray-800 dark:text-gray-200">{selectedStock.marketCapClassification.replace(/_/g, " ")}</strong></span>
+                        </>
+                      )}
+                      {market !== "US" && selectedStock.Change_Percent && (
+                        <>
+                          <span>•</span>
+                          <span
+                            className={`font-semibold ${
+                              parseFloat(String(selectedStock.Change_Percent)) >= 0 ? "text-emerald-500" : "text-rose-500"
+                            }`}
+                          >
+                            {selectedStock.Change_Percent} ({selectedStock.Change ?? "-"})
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right text-[11px] text-gray-500 dark:text-slate-400">
+                    {market !== "US" && (
+                      <div>Vol: <span className="font-mono text-gray-700 dark:text-gray-300">{selectedStock.Volume ?? "-"}</span></div>
+                    )}
+                    <div>MCap: <span className="font-mono text-gray-700 dark:text-gray-300">{currencySymbol}{selectedStock.MCap_M ?? "-"}M</span></div>
+                  </div>
+                </div>
+
+                <div className="flex-1 p-2 min-h-[520px]">
+                  {chart.loading ? (
+                    <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                      <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...
+                    </div>
+                  ) : chart.error ? (
+                    <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-2">
+                      <p className="text-xs text-rose-500">{chart.error}</p>
+                      <button
+                        type="button"
+                        onClick={chart.refetch}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs"
+                      >
+                        🔄 Cuba Semula
+                      </button>
+                    </div>
+                  ) : chart.data ? (
+                    <StockChart
+                      data={chart.data}
+                      ticker={activeTicker || ""}
+                      config={DEFAULT_CHART_CONFIG}
+                      theme={theme}
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                      Tiada data carta didapati.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="h-full min-h-[450px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
+                Pilih mana-mana baris saham di sebelah kiri untuk melihat carta.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
