@@ -218,7 +218,7 @@ function SingleStockGridCard({
       </div>
 
       {/* 2. Badan Carta: flex-1 + min-h-0 membolehkan carta mengisi baki ruang secara tepat */}
-      <div className="flex-1 min-h-0 w-full p-1.5 relative">
+      <div className="flex-1 min-h-[400px] sm:min-h-[480px] w-full p-1.5 relative">
         {loading ? (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...

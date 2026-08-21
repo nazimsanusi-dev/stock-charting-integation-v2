@@ -1075,7 +1075,7 @@ export const StockChart = memo(function StockChart({
             }
           }
         }}
-        className="relative flex-1 min-h-0 w-full overflow-hidden"
+        className="relative flex-1 min-h-[380px] sm:min-h-[440px] md:min-h-[480px] w-full overflow-hidden"
       >
         {!mini && (
           <canvas
