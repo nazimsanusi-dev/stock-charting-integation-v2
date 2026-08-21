@@ -854,13 +854,11 @@ export const StockChart = memo(function StockChart({
     <div className="flex flex-col h-full w-full select-none">
       {!mini && (
         /* ------------------------------------------------------------- */
-        /* TOOLBAR 1-BARIS PADAT: TOOLS (KIRI) + LIVE OHLCV (KANAN)      */
+        /* TOOLBAR 1-BARIS PADAT & RESPONSIF (TOOLS + LIVE OHLCV)        */
         /* ------------------------------------------------------------- */
-        <div className="flex items-center justify-between px-2 py-1 bg-gray-100/90 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-[10px] gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          {/* BAHAGIAN KIRI: BUTANG ALATAN UKURAN & PADAM */}
+        <div className="flex items-center justify-between px-2 py-1 bg-gray-50/90 dark:bg-[#131924] border-b border-gray-200 dark:border-gray-800/80 text-[10px] gap-1.5 select-none min-h-[28px] overflow-hidden">
+          {/* BAHAGIAN KIRI: BUTANG ALATAN UKURAN (COMPACT ICONS) */}
           <div className="flex items-center gap-1 shrink-0">
-            <span className="font-bold text-gray-400 text-[9px] mr-0.5">TOOLS:</span>
-
             {/* Pointer */}
             <button
               type="button"
@@ -869,14 +867,17 @@ export const StockChart = memo(function StockChart({
                 setRangeStart(null);
                 setRangeCurrent(null);
               }}
-              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
+              className={`px-1.5 py-0.5 rounded transition flex items-center gap-1 text-[9.5px] ${
                 activeTool === "none"
-                  ? "bg-gray-300 dark:bg-gray-700 font-bold border-gray-400 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                  : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+                  ? "bg-gray-200 dark:bg-gray-700/80 font-bold text-gray-900 dark:text-gray-100 shadow-xs"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
+              title="Pointer Mode"
             >
-              <span>👆</span>
-              <span className="hidden sm:inline">Pointer</span>
+              <svg className="w-3 h-3 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="m3 3 7 18 3-7 7-3L3 3z" />
+              </svg>
+              <span className="hidden xl:inline">Pointer</span>
             </button>
 
             {/* Range Tool */}
@@ -889,17 +890,22 @@ export const StockChart = memo(function StockChart({
                 setRangeStart(null);
                 setRangeCurrent(null);
               }}
-              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
+              className={`px-1.5 py-0.5 rounded transition flex items-center gap-1 text-[9.5px] ${
                 hasRange
-                  ? "opacity-50 cursor-not-allowed bg-gray-200/50 dark:bg-gray-800/50 text-gray-400 border-transparent"
+                  ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400"
                   : activeTool === "range"
-                  ? "bg-sky-500/20 text-sky-400 border-sky-500 font-bold"
-                  : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+                  ? "bg-sky-500/20 text-sky-400 border border-sky-500/40 font-bold"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
-              title={hasRange ? "Range tool sedang aktif" : "Ukur harga dan masa (P1 ke P2)"}
+              title={hasRange ? "Range tool aktif" : "Ukur harga dan masa"}
             >
-              <span>📐</span>
-              <span>Range{hasRange ? " (✓)" : rangeStart ? " (P2)" : ""}</span>
+              <svg className="w-3 h-3 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.3 8.7 8.7 21.3c-1 1-2.5 1-3.4 0l-2.6-2.6c-1-1-1-2.5 0-3.4L15.3 2.7c1-1 2.5-1 3.4 0l2.6 2.6c1 1 1 2.4 0 3.4Z" />
+                <path d="m7.5 10.5 2 2" />
+                <path d="m10.5 7.5 2 2" />
+                <path d="m13.5 4.5 2 2" />
+              </svg>
+              <span className="hidden xl:inline">Range{hasRange ? " (✓)" : rangeStart ? " (P2)" : ""}</span>
             </button>
 
             {/* Long Tool */}
@@ -910,17 +916,20 @@ export const StockChart = memo(function StockChart({
                 if (hasLong) return;
                 setActiveTool("long");
               }}
-              className={`px-1.5 py-0.5 rounded border transition flex items-center gap-0.5 text-[9.5px] ${
+              className={`px-1.5 py-0.5 rounded transition flex items-center gap-1 text-[9.5px] ${
                 hasLong
-                  ? "opacity-50 cursor-not-allowed bg-gray-200/50 dark:bg-gray-800/50 text-gray-400 border-transparent"
+                  ? "opacity-40 cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400"
                   : activeTool === "long"
-                  ? "bg-[#26A69A]/20 text-[#26A69A] border-[#26A69A] font-bold"
-                  : "border-transparent text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
-              title={hasLong ? "Long position sedang aktif" : "Letak posisi TP/SL"}
+              title={hasLong ? "Posisi Long aktif" : "Letak posisi TP/SL"}
             >
-              <span>📈</span>
-              <span>Long{hasLong ? " (✓)" : ""}</span>
+              <svg className="w-3 h-3 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                <polyline points="16 7 22 7 22 13" />
+              </svg>
+              <span className="hidden xl:inline">Long{hasLong ? " (✓)" : ""}</span>
             </button>
 
             {/* Butang Padam */}
@@ -931,10 +940,10 @@ export const StockChart = memo(function StockChart({
                   setDrawings((prev) => prev.filter((d) => d.type !== "range"));
                   redrawCanvas();
                 }}
-                className="text-sky-500 hover:text-sky-400 font-medium px-1 py-0.5 rounded hover:bg-sky-500/10 transition text-[9px] border border-sky-500/30"
+                className="text-sky-400 hover:text-sky-300 px-1 py-0.5 rounded bg-sky-500/10 hover:bg-sky-500/20 transition text-[9px]"
                 title="Padam Range"
               >
-                🗑️
+                ✕ Range
               </button>
             )}
 
@@ -945,10 +954,10 @@ export const StockChart = memo(function StockChart({
                   setDrawings((prev) => prev.filter((d) => d.type !== "long"));
                   redrawCanvas();
                 }}
-                className="text-emerald-500 hover:text-emerald-400 font-medium px-1 py-0.5 rounded hover:bg-emerald-500/10 transition text-[9px] border border-emerald-500/30"
+                className="text-emerald-400 hover:text-emerald-300 px-1 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 transition text-[9px]"
                 title="Padam Long"
               >
-                🗑️
+                ✕ Long
               </button>
             )}
 
@@ -959,44 +968,50 @@ export const StockChart = memo(function StockChart({
                   setDrawings([]);
                   redrawCanvas();
                 }}
-                className="text-rose-500 hover:text-rose-400 font-medium px-1 py-0.5 rounded hover:bg-rose-500/10 transition text-[9px]"
+                className="text-rose-400 hover:text-rose-300 px-1 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 transition text-[9px]"
                 title="Padam Semua Lukisan"
               >
-                🗑️ Semua
+                ✕ Clear
               </button>
             )}
           </div>
 
-          {/* BAHAGIAN KANAN: LIVE DATA OHLCV & % CHANGES */}
+          {/* BAHAGIAN KANAN: LIVE DATA OHLCV (PADAT & BEBAS BERTINDIH) */}
           {activeBarDisplay && (
-            <div className="flex items-center gap-1.5 sm:gap-2 text-[9.5px] font-mono shrink-0 ml-auto pl-2 border-l border-gray-200 dark:border-gray-800">
-              <span className="text-gray-400 hidden xl:inline">{activeBarDisplay.time}</span>
-              <span className="text-gray-400">
-                O:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.open.toFixed(3)}</span>
-              </span>
-              <span className="text-gray-400">
-                H:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.high.toFixed(3)}</span>
-              </span>
-              <span className="text-gray-400">
-                L:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.low.toFixed(3)}</span>
-              </span>
-              <span className="text-gray-400">
-                C:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.close.toFixed(3)}</span>
-              </span>
+            <div className="flex items-center gap-1.5 text-[9px] sm:text-[9.5px] font-mono shrink-0 ml-auto pl-1.5 border-l border-gray-200 dark:border-gray-800">
+              <span className="text-gray-500 hidden 2xl:inline">{activeBarDisplay.time}</span>
+              
+              <div className="flex items-center gap-1.5 text-gray-400">
+                <span className="hidden sm:inline">
+                  O:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.open.toFixed(2)}</span>
+                </span>
+                <span className="hidden sm:inline">
+                  H:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.high.toFixed(2)}</span>
+                </span>
+                <span className="hidden sm:inline">
+                  L:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.low.toFixed(2)}</span>
+                </span>
+                <span>
+                  C:<span className="text-gray-900 dark:text-gray-100 font-semibold ml-0.5">{activeBarDisplay.close.toFixed(2)}</span>
+                </span>
+              </div>
+
+              {/* Peratus Perubahan (Sentiasa Dipaparkan) */}
               <span
-                className={`font-bold ${
+                className={`font-bold px-1 rounded ${
                   activeBarDisplay.change >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-rose-600 dark:text-rose-400"
+                    ? "text-emerald-500 bg-emerald-500/10"
+                    : "text-rose-500 bg-rose-500/10"
                 }`}
               >
                 {activeBarDisplay.change >= 0
                   ? `+${activeBarDisplay.change.toFixed(2)}%`
                   : `${activeBarDisplay.change.toFixed(2)}%`}
               </span>
+
               {activeBarDisplay.volume !== null && (
-                <span className="text-gray-400 hidden md:inline">
-                  V:<span className="text-sky-600 dark:text-sky-400 ml-0.5">{formatVolume(activeBarDisplay.volume)}</span>
+                <span className="text-gray-500 hidden xl:inline">
+                  V:<span className="text-sky-500 ml-0.5">{formatVolume(activeBarDisplay.volume)}</span>
                 </span>
               )}
             </div>

@@ -24,6 +24,7 @@ interface Props {
   market?: MarketType;
 }
 
+// Konfigurasi carta paparan penuh (Split View)
 const DEFAULT_CHART_CONFIG = {
   emaPeriods: [5, 10, 20, 50, 100, 200],
   showVolume: true,
@@ -33,6 +34,15 @@ const DEFAULT_CHART_CONFIG = {
   showCmf: true,
 };
 
+// Konfigurasi ringkas & kemas khas untuk paparan Grid (elak garisan berserabut)
+const GRID_CHART_CONFIG = {
+  emaPeriods: [10, 20, 50],
+  showVolume: true,
+  showRsi: false,
+  showMacd: false,
+  showCvd: false,
+  showCmf: false,
+};
 
 function renderRecommendationBadge(rec: string | null | undefined) {
   if (!rec || rec === "-" || rec === "None") {
@@ -81,7 +91,7 @@ function renderCapClassBadge(capClass: string | null | undefined) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Sub-Komponen: Kad Carta Individu untuk Mod Grid Semua Carta
+// Sub-Komponen Kad Carta Individu (Grid View)
 // ─────────────────────────────────────────────────────────────
 function SingleStockGridCard({
   item,
@@ -120,7 +130,7 @@ function SingleStockGridCard({
     setError(null);
 
     api
-      .getChartData(formattedTicker, "1y", "1d", DEFAULT_CHART_CONFIG.emaPeriods)
+      .getChartData(formattedTicker, "1y", "1d", GRID_CHART_CONFIG.emaPeriods)
       .then((res) => {
         if (isMounted) setChartData(res);
       })
@@ -141,19 +151,19 @@ function SingleStockGridCard({
 
   return (
     <div
-      className={`flex flex-col rounded-xl overflow-hidden shadow-sm border ${
+      className={`flex flex-col rounded-xl overflow-hidden shadow-sm border transition-all ${
         isDark ? "bg-[#121722] border-gray-800" : "bg-white border-gray-200"
       }`}
     >
-      {/* 1. Header Kad Saham (Adapt mengikut tema) */}
+      {/* 1. Header Kad: Terapkan Tema Gelap & Terang dengan Betul */}
       <div
-        className={`flex items-center justify-between p-2.5 border-b ${
+        className={`flex items-center justify-between px-3 py-2 border-b ${
           isDark
             ? "bg-[#18202f] border-gray-800 text-gray-100"
             : "bg-gray-100 border-gray-200 text-gray-800"
         }`}
       >
-        <div className="flex items-center gap-1.5 truncate max-w-[70%]">
+        <div className="flex items-center gap-1.5 truncate max-w-[65%]">
           <span className="font-mono font-bold text-xs text-amber-500">
             {item.Code}
           </span>
@@ -161,6 +171,7 @@ function SingleStockGridCard({
             className={`text-xs font-semibold truncate ${
               isDark ? "text-gray-200" : "text-gray-800"
             }`}
+            title={item.Name}
           >
             {item.Name}
           </span>
@@ -206,8 +217,8 @@ function SingleStockGridCard({
         </div>
       </div>
 
-      {/* 2. Bahagian Carta (Tingkatkan ke 360px supaya tarikh bawah nampak jelas) */}
-      <div className="h-[360px] p-2">
+      {/* 2. Container Carta: Ketinggian 380px untuk memastikan paksi tarikh (X-Axis) tidak terpotong */}
+      <div className="h-[380px] p-2 relative">
         {loading ? (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...
@@ -220,7 +231,7 @@ function SingleStockGridCard({
           <StockChart
             data={chartData}
             ticker={formattedTicker}
-            config={DEFAULT_CHART_CONFIG}
+            config={GRID_CHART_CONFIG}
             theme={theme}
           />
         )}
@@ -229,6 +240,9 @@ function SingleStockGridCard({
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Komponen Utama SubsectorStocksTable
+// ─────────────────────────────────────────────────────────────
 export function SubsectorStocksTable({
   subsectors,
   theme = "dark",
@@ -242,14 +256,14 @@ export function SubsectorStocksTable({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mod Paparan: "split" (Jadual Kiri + Carta Kanan) | "grid" (Grid Semua Carta Saham)
+  // Mod Paparan: "split" (Jadual + Carta Tunggal) | "grid" (Semua Carta Saham)
   const [viewMode, setViewMode] = useState<"split" | "grid">("split");
 
-  // Pagination State Jadual
+  // Pagination Jadual
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 16;
 
-  // Pagination State Grid Semua Carta
+  // Pagination Grid Carta
   const [gridPage, setGridPage] = useState<number>(1);
   const gridPageSize = 6;
 
@@ -304,12 +318,10 @@ export function SubsectorStocksTable({
     DEFAULT_CHART_CONFIG.emaPeriods
   );
 
-  // Pagination Jadual
   const totalPages = Math.ceil(stocks.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
 
-  // Pagination Grid
   const totalGridPages = Math.ceil(stocks.length / gridPageSize) || 1;
   const paginatedGridStocks = useMemo(() => {
     const start = (gridPage - 1) * gridPageSize;
@@ -357,7 +369,7 @@ export function SubsectorStocksTable({
   return (
     <div className="space-y-4">
       {/* ─────────────────────────────────────────────────────────────
-          1. Header & Bar Tapisan (Filter Bar)
+          1. Header Bar & Bar Penapisan
       ───────────────────────────────────────────────────────────── */}
       <form
         onSubmit={handleFilterSubmit}
@@ -420,7 +432,7 @@ export function SubsectorStocksTable({
             Tapis & Cari
           </button>
 
-          {/* ⭐ BUTANG BARU: PAPAR SEMUA CARTA / JADUAL */}
+          {/* ⭐ Butang Toggle Paparan Grid vs Jadual */}
           <button
             type="button"
             disabled={loading || stocks.length === 0}
@@ -466,7 +478,7 @@ export function SubsectorStocksTable({
       </form>
 
       {/* ─────────────────────────────────────────────────────────────
-          2. KANDUNGAN UTAMA (MOD GRID vs MOD SPLIT)
+          2. Kandungan Utama (Mod Grid vs Mod Split)
       ───────────────────────────────────────────────────────────── */}
       {viewMode === "grid" ? (
         /* ═════════════════════════════════════════════════════════════
@@ -488,7 +500,6 @@ export function SubsectorStocksTable({
             </div>
           ) : (
             <>
-              {/* Grid 2 / 3 Kolum */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {paginatedGridStocks.map((item) => (
                   <SingleStockGridCard
@@ -568,18 +579,15 @@ export function SubsectorStocksTable({
                   <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
                     <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                       <tr>
-                        {/* Kolum 1: Kod (Sticky Left) */}
                         <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
                           {market === "US" ? "Symbol" : "Kod"}
                         </th>
-                        {/* Kolum 2: Nama (Sticky Left) */}
                         <th className="py-2.5 px-3 text-left sticky left-[75px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
                           Nama
                         </th>
                         <th className="py-2.5 px-2 text-center">Syariah</th>
                         <th className="py-2.5 px-3 text-right">Harga</th>
 
-                        {/* Kolum Khas Mengikut Pasaran */}
                         {market === "US" ? (
                           <>
                             <th className="py-2.5 px-3 text-center">Rec.</th>
@@ -599,7 +607,6 @@ export function SubsectorStocksTable({
                           </>
                         )}
 
-                        {/* Kolum Action (Sticky Right) */}
                         <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
                           Action
                         </th>
@@ -629,7 +636,6 @@ export function SubsectorStocksTable({
                                 : "hover:bg-gray-100/70 dark:hover:bg-gray-800/50"
                             }`}
                           >
-                            {/* Kolum 1 Freeze */}
                             <td
                               className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[75px] max-w-[75px] ${stickyBg}`}
                             >
@@ -637,7 +643,6 @@ export function SubsectorStocksTable({
                               {item.Code}
                             </td>
 
-                            {/* Kolum 2 Freeze */}
                             <td
                               className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[75px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
                             >
@@ -658,7 +663,6 @@ export function SubsectorStocksTable({
                               {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
                             </td>
 
-                            {/* Data Paparan Bersyarat (US vs MY) */}
                             {market === "US" ? (
                               <>
                                 <td className="py-2 px-3 text-center">
@@ -708,7 +712,6 @@ export function SubsectorStocksTable({
                               </>
                             )}
 
-                            {/* Action Button (Sticky Right) */}
                             <td
                               className={`py-1.5 px-2 text-center sticky right-0 z-[5] w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800 ${stickyBg}`}
                             >
@@ -744,7 +747,7 @@ export function SubsectorStocksTable({
                   </table>
                 </div>
 
-                {/* Pagination */}
+                {/* Pagination Jadual */}
                 {stocks.length > pageSize && (
                   <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                     <div>
@@ -777,7 +780,7 @@ export function SubsectorStocksTable({
             )}
           </div>
 
-          {/* Bahagian Kanan: Carta Saham Terpilih */}
+          {/* Bahagian Kanan: Carta Saham Pilihan */}
           <div className="xl:col-span-6 flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm min-h-[580px]">
             {selectedStock ? (
               <>
