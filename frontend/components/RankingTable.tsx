@@ -36,12 +36,12 @@ type SortField =
 type SortDirection = "asc" | "desc";
 
 const DEFAULT_CHART_CONFIG = {
-  emaPeriods: [10, 20, 50, 100],
+  emaPeriods: [5, 10, 20, 50, 100],
   showVolume: false,
   showRsi: false,
   showMacd: true,
   showCvd: false,
-  showCmf: false,
+  showCmf: true,
 };
 
 function formatNum(val: any, decimals: number = 2): string {

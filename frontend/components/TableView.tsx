@@ -628,7 +628,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
               ) : chartData ? (
                 <StockChart
                   data={chartData}
-                  config={{emaPeriods: [10,20,50,100,200], showVolume: true, showRsi: true, showMacd: true, showCvd: false, showCmf: false }}
+                  config={{emaPeriods: [10,20,50,100,200], showVolume: true, showRsi: false, showMacd: true, showCvd: false, showCmf: true }}
                   ticker={currentTicker}
                 />
               ) : (

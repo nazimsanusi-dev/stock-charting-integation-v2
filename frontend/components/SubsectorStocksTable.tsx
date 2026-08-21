@@ -36,10 +36,10 @@ const DEFAULT_CHART_CONFIG = {
 
 // Konfigurasi ringkas & kemas khas untuk paparan Grid (elak garisan berserabut)
 const GRID_CHART_CONFIG = {
-  emaPeriods: [10, 20, 50],
+  emaPeriods: [5, 10, 20, 50, 100, 200],
   showVolume: true,
   showRsi: false,
-  showMacd: false,
+  showMacd: true,
   showCvd: false,
   showCmf: false,
 };
