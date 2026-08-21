@@ -291,7 +291,7 @@ export function TableView({ selectedSheet, worksheet }: Props) {
       <div className="flex flex-col items-center justify-center h-72 p-6 text-center space-y-3">
         <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-500 text-sm max-w-md">
           <p className="font-semibold">⚠️ Gagal memuatkan data</p>
-          <p className="text-xs mt-1 text-rose-400">{error}</p>
+          {/* <p className="text-xs mt-1 text-rose-400">{error}</p> */}
         </div>
         <button
           onClick={load}

@@ -378,7 +378,7 @@ export function Sidebar({ params, onChange }: Props) {
 
             {worksheetsError ? (
               <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1">
-                <span>{worksheetsError}</span>
+                {/* <span>{worksheetsError}</span> */}
                 <button
                   onClick={() => fetchWorksheets()}
                   className="text-left underline font-medium hover:text-rose-600"
