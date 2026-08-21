@@ -151,13 +151,13 @@ function SingleStockGridCard({
 
   return (
     <div
-      className={`flex flex-col rounded-xl overflow-hidden shadow-sm border transition-all ${
+      className={`flex flex-col h-[390px] rounded-xl overflow-hidden shadow-sm border transition-all ${
         isDark ? "bg-[#121722] border-gray-800" : "bg-white border-gray-200"
       }`}
     >
-      {/* 1. Header Kad: Terapkan Tema Gelap & Terang dengan Betul */}
+      {/* 1. Header Kad Saham (Ketinggian tetap ~36px) */}
       <div
-        className={`flex items-center justify-between px-3 py-2 border-b ${
+        className={`shrink-0 flex items-center justify-between px-3 py-2 border-b ${
           isDark
             ? "bg-[#18202f] border-gray-800 text-gray-100"
             : "bg-gray-100 border-gray-200 text-gray-800"
@@ -217,8 +217,8 @@ function SingleStockGridCard({
         </div>
       </div>
 
-      {/* 2. Container Carta: Ketinggian 380px untuk memastikan paksi tarikh (X-Axis) tidak terpotong */}
-      <div className="h-[380px] p-2 relative">
+      {/* 2. Badan Carta: flex-1 + min-h-0 membolehkan carta mengisi baki ruang secara tepat */}
+      <div className="flex-1 min-h-0 w-full p-1.5 relative">
         {loading ? (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...

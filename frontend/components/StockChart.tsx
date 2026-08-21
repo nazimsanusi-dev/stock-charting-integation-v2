@@ -66,9 +66,9 @@ const COLOR_PALETTES = {
   dark: {
     up: "#26A69A",
     down: "#EF5350",
-    bg: "#111827",
+    bg: "#121722",
     grid: "#1F2937",
-    text: "#D1D5DB",
+    text: "#94A3B8",
     rsi: "#AB47BC",
     macd: "#42A5F5",
     macdSignal: "#FFA726",
@@ -122,7 +122,7 @@ interface HoverBarData {
 
 interface Props {
   data: ChartData;
-  config: SidebarParams["chartConfig"];
+  config?: SidebarParams["chartConfig"];
   ticker: string;
   mini?: boolean;
   theme?: "light" | "dark";
@@ -130,7 +130,14 @@ interface Props {
 
 export const StockChart = memo(function StockChart({
   data,
-  config,
+  config = {
+    emaPeriods: [10, 20, 50],
+    showVolume: true,
+    showRsi: false,
+    showMacd: false,
+    showCvd: false,
+    showCmf: false,
+  },
   ticker,
   mini = false,
   theme = "dark",
@@ -156,7 +163,7 @@ export const StockChart = memo(function StockChart({
   // State Hover Data OHLCV
   const [hoverData, setHoverData] = useState<HoverBarData | null>(null);
 
-  const C = COLOR_PALETTES[theme];
+  const C = COLOR_PALETTES[theme] || COLOR_PALETTES.dark;
   const drawingsRef = useRef<DrawingItem[]>(drawings);
   drawingsRef.current = drawings;
 
@@ -165,7 +172,7 @@ export const StockChart = memo(function StockChart({
 
   // Dapatkan lilin terakhir sebagai default apabila kursor tidak berada di atas carta
   const latestCandle = useMemo(() => {
-    if (!data.ohlcv || data.ohlcv.length === 0) return null;
+    if (!data?.ohlcv || data.ohlcv.length === 0) return null;
     const last = data.ohlcv[data.ohlcv.length - 1];
     const open = Number(last.open);
     const close = Number(last.close);
@@ -180,11 +187,11 @@ export const StockChart = memo(function StockChart({
       diff: close - open,
       volume: Number(last.volume || 0),
     };
-  }, [data.ohlcv]);
+  }, [data?.ohlcv]);
 
   const activeBarDisplay = hoverData || latestCandle;
 
-  // 1. Lukis Semula Canvas Overlay (Ultra-Sharp Retina HD)
+  // 1. Lukis Semula Canvas Overlay (Retina HD)
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -258,22 +265,22 @@ export const StockChart = memo(function StockChart({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Titik Pemegang TP (Boleh Diheret)
+        // Titik Pemegang TP
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
-        ctx.arc(midX, yTp, 6.5, 0, Math.PI * 2);
+        ctx.arc(midX, yTp, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Titik Pemegang SL (Boleh Diheret)
+        // Titik Pemegang SL
         ctx.fillStyle = "#EF5350";
         ctx.beginPath();
-        ctx.arc(midX, ySl, 6.5, 0, Math.PI * 2);
+        ctx.arc(midX, ySl, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
         const tpPct = (((d.tpPrice - d.entryPrice) / d.entryPrice) * 100).toFixed(2);
@@ -283,10 +290,10 @@ export const StockChart = memo(function StockChart({
         const rr = risk > 0 ? (reward / risk).toFixed(2) : "0.00";
 
         ctx.fillStyle = theme === "dark" ? "#FFFFFF" : "#111827";
-        ctx.font = "bold 10px monospace";
-        ctx.fillText(`Target: +${tpPct}% (RM${d.tpPrice.toFixed(3)})`, x1 + 6, yTp + 14);
-        ctx.fillText(`R:R = ${rr} | Entry: RM${d.entryPrice.toFixed(3)}`, x1 + 6, yEntry - 4);
-        ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(3)})`, x1 + 6, ySl - 4);
+        ctx.font = "bold 9px monospace";
+        ctx.fillText(`Target: +${tpPct}% (${d.tpPrice.toFixed(2)})`, x1 + 6, yTp + 12);
+        ctx.fillText(`R:R = ${rr} | Entry: ${d.entryPrice.toFixed(2)}`, x1 + 6, yEntry - 3);
+        ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(2)})`, x1 + 6, ySl - 3);
       }
 
       // --- LUKISAN PRICE & DATE RANGE ---
@@ -325,55 +332,40 @@ export const StockChart = memo(function StockChart({
         ctx.lineTo(x2 + 0.5, y2 + 0.5);
         ctx.stroke();
 
-        // Pin P1 (Boleh Diheret)
+        // Pin P1
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
-        ctx.arc(x1, y1, 6.5, 0, Math.PI * 2);
+        ctx.arc(x1, y1, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        const p1Text = `P1: ${formatDisplayDate(d.startTime)}, RM${d.startPrice.toFixed(3)}`;
-        ctx.font = "bold 9px monospace";
-        const p1Width = ctx.measureText(p1Text).width;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-        ctx.fillRect(x1 - p1Width / 2 - 4, y1 - 22, p1Width + 8, 16);
-        ctx.fillStyle = "#38BDF8";
-        ctx.fillText(p1Text, x1 - p1Width / 2, y1 - 10);
-
-        // Pin P2 (Boleh Diheret)
+        // Pin P2
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
-        ctx.arc(x2, y2, 6.5, 0, Math.PI * 2);
+        ctx.arc(x2, y2, 5.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-
-        const p2Text = `P2: ${formatDisplayDate(d.endTime)}, RM${d.endPrice.toFixed(3)}`;
-        const p2Width = ctx.measureText(p2Text).width;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-        ctx.fillRect(x2 - p2Width / 2 - 4, y2 + 8, p2Width + 8, 16);
-        ctx.fillStyle = isUp ? "#34D399" : "#F87171";
-        ctx.fillText(p2Text, x2 - p2Width / 2, y2 + 20);
 
         // Lencana Maklumat Peratus & Hari
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
-        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(3)} (${pct}%) | ${d.barsCount} Hari`;
+        const label = `${isUp ? "+" : ""}${priceDiff.toFixed(2)} (${pct}%) | ${d.barsCount}D`;
 
-        ctx.font = "bold 10px monospace";
+        ctx.font = "bold 9.5px monospace";
         const textWidth = ctx.measureText(label).width;
         const badgeX = Math.round(left + boxW / 2 - textWidth / 2 - 6);
-        const badgeY = top - 26 < 0 ? top + boxH + 8 : top - 26;
+        const badgeY = top - 24 < 0 ? top + boxH + 6 : top - 24;
 
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, textWidth + 12, 19, 4);
+        ctx.roundRect(badgeX, badgeY, textWidth + 12, 18, 4);
         ctx.fill();
 
         ctx.fillStyle = "#ffffff";
-        ctx.fillText(label, badgeX + 6, badgeY + 13);
+        ctx.fillText(label, badgeX + 6, badgeY + 12);
       }
     };
 
@@ -399,9 +391,9 @@ export const StockChart = memo(function StockChart({
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi TradingView Chart
+  // 2. Inisialisasi & Pengurusan Carta Lightweight Charts
   useEffect(() => {
-    if (!containerRef.current || !data.ohlcv?.length) return;
+    if (!containerRef.current || !data?.ohlcv?.length) return;
 
     let destroyed = false;
 
@@ -418,22 +410,42 @@ export const StockChart = memo(function StockChart({
 
         chartRef.current?.remove();
 
-        const chart = createChart(containerRef.current!, {
+        const container = containerRef.current;
+        const initialWidth = container.clientWidth || 300;
+        const initialHeight = container.clientHeight || (mini ? 200 : 340);
+
+        const chart = createChart(container, {
+          width: initialWidth,
+          height: initialHeight,
           layout: {
             background: { type: ColorType.Solid, color: C.bg },
             textColor: C.text,
             fontFamily: "Inter, system-ui, sans-serif",
-            fontSize: mini ? 9 : 11,
+            fontSize: mini ? 9 : 10,
           },
           grid: {
             vertLines: { color: C.grid },
             horzLines: { color: C.grid },
           },
           crosshair: { mode: CrosshairMode.Normal },
-          rightPriceScale: { borderColor: C.grid, autoScale: true },
-          timeScale: { borderColor: C.grid, timeVisible: !mini },
-          autoSize: true,
+          rightPriceScale: {
+            borderColor: C.grid,
+            autoScale: true,
+            scaleMargins: {
+              top: 0.08,
+              bottom: config?.showVolume ? 0.20 : 0.08,
+            },
+          },
+          timeScale: {
+            visible: true,
+            timeVisible: true,
+            secondsVisible: false,
+            borderColor: C.grid,
+            fixLeftEdge: true,
+            fixRightEdge: true,
+          },
         });
+
         chartRef.current = chart;
 
         const candle = chart.addSeries(CandlestickSeries, {
@@ -458,7 +470,7 @@ export const StockChart = memo(function StockChart({
           }))
         );
 
-        if (config.showVolume) {
+        if (config?.showVolume) {
           const volSeries = chart.addSeries(HistogramSeries, {
             priceFormat: { type: "volume" },
             priceScaleId: "vol",
@@ -466,14 +478,14 @@ export const StockChart = memo(function StockChart({
             priceLineVisible: false,
           });
           chart.priceScale("vol").applyOptions({
-            scaleMargins: { top: 0.8, bottom: 0 },
+            scaleMargins: { top: 0.80, bottom: 0 },
             borderVisible: false,
           });
           volSeries.setData(
             data.ohlcv.map((b) => ({
               time: formatLwcTime(b.time) as any,
               value: Number(b.volume || 0),
-              color: Number(b.close) >= Number(b.open) ? `${C.up}99` : `${C.down}99`,
+              color: Number(b.close) >= Number(b.open) ? `${C.up}66` : `${C.down}66`,
             }))
           );
           volSeriesRef.current = volSeries;
@@ -481,11 +493,16 @@ export const StockChart = memo(function StockChart({
           volSeriesRef.current = null;
         }
 
-        if (data.indicators?.ema) {
-          Object.entries(data.indicators.ema).forEach(([period, values], idx) => {
+        if (data.indicators?.ema && config?.emaPeriods) {
+          config.emaPeriods.forEach((period, idx) => {
+            const values = (data.indicators?.ema as any)?.[String(period)];
+            if (!values || !Array.isArray(values)) return;
+
             const points = values
               .map((v, i) =>
-                v !== null ? { time: times[i] as any, value: Number(v) } : null
+                v !== null && v !== undefined && !isNaN(v)
+                  ? { time: times[i] as any, value: Number(v) }
+                  : null
               )
               .filter(Boolean) as any[];
 
@@ -493,7 +510,6 @@ export const StockChart = memo(function StockChart({
             const s = chart.addSeries(LineSeries, {
               color: EMA_COLORS[idx % EMA_COLORS.length],
               lineWidth: 1,
-              title: "",
               priceLineVisible: false,
               lastValueVisible: false,
             });
@@ -501,7 +517,7 @@ export const StockChart = memo(function StockChart({
           });
         }
 
-        if (!mini && config.showRsi && data.indicators?.rsi) {
+        if (!mini && config?.showRsi && data.indicators?.rsi) {
           const rsiPoints = data.indicators.rsi
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
@@ -511,7 +527,6 @@ export const StockChart = memo(function StockChart({
             const rsiSeries = rsiPane.addSeries(LineSeries, {
               color: C.rsi,
               lineWidth: 1,
-              title: "",
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -530,7 +545,7 @@ export const StockChart = memo(function StockChart({
           }
         }
 
-        if (!mini && config.showMacd && data.indicators?.macd) {
+        if (!mini && config?.showMacd && data.indicators?.macd) {
           const macdPoints = data.indicators.macd
             .map((v, i) => (v !== null ? { time: times[i] as any, value: Number(v) } : null))
             .filter(Boolean) as any[];
@@ -557,7 +572,6 @@ export const StockChart = memo(function StockChart({
             const m = macdPane.addSeries(LineSeries, {
               color: C.macd,
               lineWidth: 1,
-              title: "",
               priceLineVisible: false,
               lastValueVisible: true,
             });
@@ -567,7 +581,6 @@ export const StockChart = memo(function StockChart({
               const s = macdPane.addSeries(LineSeries, {
                 color: C.macdSignal,
                 lineWidth: 1,
-                title: "",
                 priceLineVisible: false,
                 lastValueVisible: true,
               });
@@ -580,7 +593,7 @@ export const StockChart = memo(function StockChart({
           redrawCanvasRef.current();
         });
 
-        // Pantau Pergerakan Crosshair untuk Kemaskini OHLCV & % Perubahan secara Dinamik
+        // Pantau Pergerakan Crosshair
         chart.subscribeCrosshairMove((param: any) => {
           redrawCanvasRef.current();
           if (!param || !param.time || !param.seriesData) {
@@ -618,12 +631,30 @@ export const StockChart = memo(function StockChart({
           lastTickerRef.current = ticker;
           const totalBars = data.ohlcv.length;
           chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, totalBars - 105),
+            from: Math.max(0, totalBars - 100),
             to: totalBars - 1,
           });
+        } else {
+          chart.timeScale().fitContent();
         }
 
         redrawCanvasRef.current();
+
+        // ResizeObserver: Kunci utama agar X-Axis sentiasa kelihatan tanpa terpotong
+        const resizeObserver = new ResizeObserver((entries) => {
+          if (!entries || entries.length === 0 || !chartRef.current) return;
+          const { width, height } = entries[0].contentRect;
+          if (width > 0 && height > 0) {
+            chartRef.current.applyOptions({ width, height });
+            redrawCanvasRef.current();
+          }
+        });
+
+        resizeObserver.observe(container);
+
+        return () => {
+          resizeObserver.disconnect();
+        };
       }
     );
 
@@ -657,7 +688,7 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
-  // 4. Hit-Testing: Mengesan Kedudukan Titik Pemegang (Handles)
+  // 4. Hit-Testing: Mengesan Kedudukan Handles
   const findHandleAt = useCallback((clientX: number, clientY: number): DragHandleTarget | null => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -668,7 +699,7 @@ export const StockChart = memo(function StockChart({
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
     const timeScale = chart.timeScale();
-    const hitRadius = 16;
+    const hitRadius = 14;
 
     for (const d of drawingsRef.current) {
       if (d.type === "long") {
@@ -707,7 +738,7 @@ export const StockChart = memo(function StockChart({
     return null;
   }, []);
 
-  // 5. Pengendali Input & Modifikasi
+  // 5. Pengendali Input Mouse/Touch
   const handlePointerDown = (clientX: number, clientY: number) => {
     if (mini) return;
 
@@ -851,13 +882,13 @@ export const StockChart = memo(function StockChart({
   }, [draggingHandle, handlePointerMove]);
 
   return (
-    <div className="flex flex-col h-full w-full select-none">
+    <div className="flex flex-col h-full w-full select-none overflow-hidden relative">
       {!mini && (
         /* ------------------------------------------------------------- */
-        /* TOOLBAR 1-BARIS PADAT & RESPONSIF (TOOLS + LIVE OHLCV)        */
+        /* TOOLBAR 1-BARIS PADAT & RESPONSIF                             */
         /* ------------------------------------------------------------- */
-        <div className="flex items-center justify-between px-2 py-1 bg-gray-50/90 dark:bg-[#131924] border-b border-gray-200 dark:border-gray-800/80 text-[10px] gap-1.5 select-none min-h-[28px] overflow-hidden">
-          {/* BAHAGIAN KIRI: BUTANG ALATAN UKURAN (COMPACT ICONS) */}
+        <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-gray-50/90 dark:bg-[#131924] border-b border-gray-200 dark:border-gray-800/80 text-[10px] gap-1.5 select-none min-h-[28px] overflow-hidden">
+          {/* BAHAGIAN KIRI: BUTANG ALATAN */}
           <div className="flex items-center gap-1 shrink-0">
             {/* Pointer */}
             <button
@@ -976,11 +1007,11 @@ export const StockChart = memo(function StockChart({
             )}
           </div>
 
-          {/* BAHAGIAN KANAN: LIVE DATA OHLCV (PADAT & BEBAS BERTINDIH) */}
+          {/* BAHAGIAN KANAN: LIVE DATA OHLCV */}
           {activeBarDisplay && (
             <div className="flex items-center gap-1.5 text-[9px] sm:text-[9.5px] font-mono shrink-0 ml-auto pl-1.5 border-l border-gray-200 dark:border-gray-800">
               <span className="text-gray-500 hidden 2xl:inline">{activeBarDisplay.time}</span>
-              
+
               <div className="flex items-center gap-1.5 text-gray-400">
                 <span className="hidden sm:inline">
                   O:<span className="text-gray-700 dark:text-gray-200 ml-0.5">{activeBarDisplay.open.toFixed(2)}</span>
@@ -996,7 +1027,6 @@ export const StockChart = memo(function StockChart({
                 </span>
               </div>
 
-              {/* Peratus Perubahan (Sentiasa Dipaparkan) */}
               <span
                 className={`font-bold px-1 rounded ${
                   activeBarDisplay.change >= 0
@@ -1019,7 +1049,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* BEKAS CARTA & KANVAS PINTAR */}
+      {/* BEKAS CARTA & KANVAS PINTAR (Flex-1 & Min-h-0 Mengisi Ruang Secara Tepat) */}
       <div
         ref={containerRef}
         onWheel={() => redrawCanvasRef.current()}
@@ -1041,11 +1071,8 @@ export const StockChart = memo(function StockChart({
             }
           }
         }}
-        className="relative flex-1 w-full"
-        style={{ minHeight: mini ? 200 : 550 }}
+        className="relative flex-1 min-h-0 w-full overflow-hidden"
       >
-        <div className="absolute inset-0 w-full h-full" />
-
         {!mini && (
           <canvas
             ref={canvasRef}
