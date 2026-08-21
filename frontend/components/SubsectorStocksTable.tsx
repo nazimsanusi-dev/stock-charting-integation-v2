@@ -102,6 +102,8 @@ function SingleStockGridCard({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isDark = theme === "dark";
+
   const formattedTicker = item.Code
     ? market === "US"
       ? item.Code.replace(".KL", "").trim().toUpperCase()
@@ -118,7 +120,7 @@ function SingleStockGridCard({
     setError(null);
 
     api
-      .getChartData(formattedTicker, "1d", "1y", DEFAULT_CHART_CONFIG.emaPeriods)
+      .getChartData(formattedTicker, "1y", "1d", DEFAULT_CHART_CONFIG.emaPeriods)
       .then((res) => {
         if (isMounted) setChartData(res);
       })
@@ -138,14 +140,28 @@ function SingleStockGridCard({
   }, [formattedTicker, market]);
 
   return (
-    <div className="flex flex-col bg-white dark:bg-[#121722] border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
-      {/* Header Kad Saham */}
-      <div className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-850/80 border-b border-gray-200 dark:border-gray-800">
+    <div
+      className={`flex flex-col rounded-xl overflow-hidden shadow-sm border ${
+        isDark ? "bg-[#121722] border-gray-800" : "bg-white border-gray-200"
+      }`}
+    >
+      {/* 1. Header Kad Saham (Adapt mengikut tema) */}
+      <div
+        className={`flex items-center justify-between p-2.5 border-b ${
+          isDark
+            ? "bg-[#18202f] border-gray-800 text-gray-100"
+            : "bg-gray-100 border-gray-200 text-gray-800"
+        }`}
+      >
         <div className="flex items-center gap-1.5 truncate max-w-[70%]">
-          <span className="font-mono font-bold text-xs text-amber-500 dark:text-amber-400">
+          <span className="font-mono font-bold text-xs text-amber-500">
             {item.Code}
           </span>
-          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
+          <span
+            className={`text-xs font-semibold truncate ${
+              isDark ? "text-gray-200" : "text-gray-800"
+            }`}
+          >
             {item.Name}
           </span>
           {item.Shariah === "Yes" && (
@@ -156,9 +172,15 @@ function SingleStockGridCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-xs text-gray-900 dark:text-gray-100">
+          <span
+            className={`font-mono font-bold text-xs ${
+              isDark ? "text-gray-100" : "text-gray-900"
+            }`}
+          >
             {currencySymbol}
-            {item.Price !== null && item.Price !== undefined ? Number(item.Price).toFixed(2) : "-"}
+            {item.Price !== null && item.Price !== undefined
+              ? Number(item.Price).toFixed(2)
+              : "-"}
           </span>
           <button
             type="button"
@@ -184,8 +206,8 @@ function SingleStockGridCard({
         </div>
       </div>
 
-      {/* Bahagian Carta Saham */}
-      <div className="h-[280px] p-2">
+      {/* 2. Bahagian Carta (Tingkatkan ke 360px supaya tarikh bawah nampak jelas) */}
+      <div className="h-[360px] p-2">
         {loading ? (
           <div className="h-full flex items-center justify-center text-xs text-gray-400">
             <span className="animate-spin mr-1.5">⏳</span> Memuatkan {item.Code}...
