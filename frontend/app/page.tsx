@@ -435,7 +435,7 @@ export default function Home() {
 
                   {showRanking && (
                     <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-                      <RankingTable data={ranksData} theme={params.theme} />
+                      <RankingTable data={ranksData} theme={params.theme} market={currentMarket} />
                     </div>
                   )}
                 </section>
