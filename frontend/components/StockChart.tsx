@@ -151,16 +151,10 @@ export const StockChart = memo(function StockChart({
 
   const [activeTool, setActiveTool] = useState<DrawingTool>("none");
   const [drawings, setDrawings] = useState<DrawingItem[]>([]);
-
-  // State Ukuran Semasa Melukis Baharu
   const [rangeStart, setRangeStart] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
   const [rangeCurrent, setRangeCurrent] = useState<{ x: number; y: number; price: number; timeStr: string; barIdx: number } | null>(null);
-
-  // State Mengubah Suai Titik Pemegang (Handles)
   const [draggingHandle, setDraggingHandle] = useState<DragHandleTarget | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<DragHandleTarget | null>(null);
-
-  // State Hover Data OHLCV
   const [hoverData, setHoverData] = useState<HoverBarData | null>(null);
 
   const C = COLOR_PALETTES[theme] || COLOR_PALETTES.dark;
@@ -170,7 +164,6 @@ export const StockChart = memo(function StockChart({
   const hasRange = drawings.some((d) => d.type === "range");
   const hasLong = drawings.some((d) => d.type === "long");
 
-  // Dapatkan lilin terakhir sebagai default apabila kursor tidak berada di atas carta
   const latestCandle = useMemo(() => {
     if (!data?.ohlcv || data.ohlcv.length === 0) return null;
     const last = data.ohlcv[data.ohlcv.length - 1];
@@ -191,7 +184,6 @@ export const StockChart = memo(function StockChart({
 
   const activeBarDisplay = hoverData || latestCandle;
 
-  // 1. Lukis Semula Canvas Overlay (Retina HD)
   const redrawCanvas = useCallback(() => {
     if (mini) return;
     const canvas = canvasRef.current;
@@ -215,14 +207,11 @@ export const StockChart = memo(function StockChart({
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
 
     const timeScale = chart.timeScale();
 
     const drawItem = (d: DrawingItem) => {
-      // --- LUKISAN LONG POSITION ---
       if (d.type === "long") {
         const rawX1 = timeScale.timeToCoordinate(d.entryTime as any);
         const rawX2 = timeScale.timeToCoordinate(d.endTime as any) ?? (rawX1 !== null ? rawX1 + 110 : null);
@@ -241,21 +230,18 @@ export const StockChart = memo(function StockChart({
         const boxWidth = Math.max(80, x2 - x1);
         const midX = Math.round(x1 + boxWidth / 2);
 
-        // Zon TP
         ctx.fillStyle = "rgba(38, 166, 154, 0.22)";
         ctx.fillRect(x1, yTp, boxWidth, yEntry - yTp);
         ctx.strokeStyle = "#26A69A";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1 + 0.5, yTp + 0.5, boxWidth, yEntry - yTp);
 
-        // Zon SL
         ctx.fillStyle = "rgba(239, 83, 80, 0.22)";
         ctx.fillRect(x1, yEntry, boxWidth, ySl - yEntry);
         ctx.strokeStyle = "#EF5350";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1 + 0.5, yEntry + 0.5, boxWidth, ySl - yEntry);
 
-        // Garisan Entry
         ctx.strokeStyle = "#94a3b8";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
@@ -265,7 +251,6 @@ export const StockChart = memo(function StockChart({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Titik Pemegang TP
         ctx.fillStyle = "#26A69A";
         ctx.beginPath();
         ctx.arc(midX, yTp, 5.5, 0, Math.PI * 2);
@@ -274,7 +259,6 @@ export const StockChart = memo(function StockChart({
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Titik Pemegang SL
         ctx.fillStyle = "#EF5350";
         ctx.beginPath();
         ctx.arc(midX, ySl, 5.5, 0, Math.PI * 2);
@@ -296,7 +280,6 @@ export const StockChart = memo(function StockChart({
         ctx.fillText(`Stop: -${slPct}% (${d.slPrice.toFixed(2)})`, x1 + 6, ySl - 3);
       }
 
-      // --- LUKISAN PRICE & DATE RANGE ---
       if (d.type === "range") {
         const rawX1 = timeScale.timeToCoordinate(d.startTime as any);
         const rawX2 = timeScale.timeToCoordinate(d.endTime as any);
@@ -332,7 +315,6 @@ export const StockChart = memo(function StockChart({
         ctx.lineTo(x2 + 0.5, y2 + 0.5);
         ctx.stroke();
 
-        // Pin P1
         ctx.fillStyle = "#38BDF8";
         ctx.beginPath();
         ctx.arc(x1, y1, 5.5, 0, Math.PI * 2);
@@ -341,7 +323,6 @@ export const StockChart = memo(function StockChart({
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Pin P2
         ctx.fillStyle = isUp ? "#26A69A" : "#EF5350";
         ctx.beginPath();
         ctx.arc(x2, y2, 5.5, 0, Math.PI * 2);
@@ -350,7 +331,6 @@ export const StockChart = memo(function StockChart({
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Lencana Maklumat Peratus & Hari
         const pct = ((priceDiff / d.startPrice) * 100).toFixed(2);
         const label = `${isUp ? "+" : ""}${priceDiff.toFixed(2)} (${pct}%) | ${d.barsCount}D`;
 
@@ -391,7 +371,6 @@ export const StockChart = memo(function StockChart({
     redrawCanvas();
   }, [drawings, rangeStart, rangeCurrent, redrawCanvas]);
 
-  // 2. Inisialisasi & Pengurusan Carta Lightweight Charts
   useEffect(() => {
     if (!containerRef.current || !data?.ohlcv?.length) return;
 
@@ -441,8 +420,10 @@ export const StockChart = memo(function StockChart({
             timeVisible: true,
             secondsVisible: false,
             borderColor: C.grid,
-            fixLeftEdge: true,
-            fixRightEdge: true,
+            fixLeftEdge: false,   // ✅ Bebas tarik ke kiri
+            fixRightEdge: false,  // ✅ Bebas tarik ke kanan
+            rightOffset: 12,      // ✅ Ruang kosong 12 bar di sebelah kanan harga terkini
+            shiftVisibleRangeOnNewBar: true,
           },
         });
 
@@ -593,7 +574,6 @@ export const StockChart = memo(function StockChart({
           redrawCanvasRef.current();
         });
 
-        // Pantau Pergerakan Crosshair
         chart.subscribeCrosshairMove((param: any) => {
           redrawCanvasRef.current();
           if (!param || !param.time || !param.seriesData) {
@@ -627,20 +607,20 @@ export const StockChart = memo(function StockChart({
           }
         });
 
+        // Tetapkan ruang kosong di kanan semasa permulaan load
         if (ticker !== lastTickerRef.current && data.ohlcv.length > 0) {
           lastTickerRef.current = ticker;
           const totalBars = data.ohlcv.length;
           chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, totalBars - 100),
-            to: totalBars - 1,
+            from: Math.max(0, totalBars - 90),
+            to: totalBars + 12, // Memberi jarak 12 bar kosong di sebelah kanan
           });
         } else {
-          chart.timeScale().fitContent();
+          chart.timeScale().applyOptions({ rightOffset: 12 });
         }
 
         redrawCanvasRef.current();
 
-        // ResizeObserver: Kunci utama agar X-Axis sentiasa kelihatan tanpa terpotong
         const resizeObserver = new ResizeObserver((entries) => {
           if (!entries || entries.length === 0 || !chartRef.current) return;
           const { width, height } = entries[0].contentRect;
@@ -665,7 +645,6 @@ export const StockChart = memo(function StockChart({
     };
   }, [data, config, mini, theme, ticker]);
 
-  // 3. Helper Penukaran Koordinat
   const getCoordinatesRaw = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -688,7 +667,6 @@ export const StockChart = memo(function StockChart({
     return { x, y, price: Number(price.toFixed(3)), timeStr, barIdx };
   };
 
-  // 4. Hit-Testing: Mengesan Kedudukan Handles
   const findHandleAt = useCallback((clientX: number, clientY: number): DragHandleTarget | null => {
     const canvas = canvasRef.current;
     const chart = chartRef.current;
@@ -738,7 +716,6 @@ export const StockChart = memo(function StockChart({
     return null;
   }, []);
 
-  // 5. Pengendali Input Mouse/Touch
   const handlePointerDown = (clientX: number, clientY: number) => {
     if (mini) return;
 
@@ -884,13 +861,8 @@ export const StockChart = memo(function StockChart({
   return (
     <div className="flex flex-col h-full w-full select-none overflow-hidden relative">
       {!mini && (
-        /* ------------------------------------------------------------- */
-        /* TOOLBAR 1-BARIS PADAT & RESPONSIF                             */
-        /* ------------------------------------------------------------- */
         <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-gray-50/90 dark:bg-[#131924] border-b border-gray-200 dark:border-gray-800/80 text-[10px] gap-1.5 select-none min-h-[28px] overflow-hidden">
-          {/* BAHAGIAN KIRI: BUTANG ALATAN */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Pointer */}
             <button
               type="button"
               onClick={() => {
@@ -911,7 +883,6 @@ export const StockChart = memo(function StockChart({
               <span className="hidden xl:inline">Pointer</span>
             </button>
 
-            {/* Range Tool */}
             <button
               type="button"
               disabled={hasRange}
@@ -939,7 +910,6 @@ export const StockChart = memo(function StockChart({
               <span className="hidden xl:inline">Range{hasRange ? " (✓)" : rangeStart ? " (P2)" : ""}</span>
             </button>
 
-            {/* Long Tool */}
             <button
               type="button"
               disabled={hasLong}
@@ -963,7 +933,6 @@ export const StockChart = memo(function StockChart({
               <span className="hidden xl:inline">Long{hasLong ? " (✓)" : ""}</span>
             </button>
 
-            {/* Butang Padam */}
             {hasRange && (
               <button
                 type="button"
@@ -1007,7 +976,6 @@ export const StockChart = memo(function StockChart({
             )}
           </div>
 
-          {/* BAHAGIAN KANAN: LIVE DATA OHLCV */}
           {activeBarDisplay && (
             <div className="flex items-center gap-1.5 text-[9px] sm:text-[9.5px] font-mono shrink-0 ml-auto pl-1.5 border-l border-gray-200 dark:border-gray-800">
               <span className="text-gray-500 hidden 2xl:inline">{activeBarDisplay.time}</span>
@@ -1049,7 +1017,7 @@ export const StockChart = memo(function StockChart({
         </div>
       )}
 
-      {/* BEKAS CARTA & KANVAS PINTAR (Flex-1 & Min-h-0 Mengisi Ruang Secara Tepat) */}
+      {/* BEKAS CARTA & KANVAS PINTAR */}
       <div
         ref={containerRef}
         onWheel={() => redrawCanvasRef.current()}
