@@ -155,7 +155,7 @@ export const api = {
    */
   subsectorSingleOHLC: async (
     subsectorId: number | string,
-    market: MarketType = "MY",
+    market: string,// MarketType = "MY",
   ): Promise<ChartData> => {
     const params = new URLSearchParams({ market });
     const res = await fetch(`${API_BASE_URL}/api/subsector_ohlc/${subsectorId}?${params.toString()}`, {
