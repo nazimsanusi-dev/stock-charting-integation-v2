@@ -449,25 +449,44 @@ export function Sidebar({ params, onChange }: Props) {
               </button>
             </div>
 
-            {/* Kandungan Carian & Senarai (Muncul hanya jika showStocks === true) */}
+            {/* Kandungan Carian & Senarai Saham */}
             {showStocks && (
-              <div className="space-y-1.5 pt-1">
-                <input
-                  className="input w-full text-xs px-2.5 py-1.5 rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-[#26A69A]"
-                  placeholder="Search…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="space-y-2 pt-1.5">
+                {/* Input Carian Moden Bersama Ikon */}
+                <div className="relative">
+                  <svg
+                    className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    className="w-full text-xs pl-8 pr-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/90 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/40 transition-all font-medium"
+                    placeholder="Cari simbol atau nama..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
 
-                <div className="flex flex-col gap-0.5 max-h-52 overflow-y-auto mt-1 pr-1 custom-scrollbar">
-                  {loadingStocks && <p className="text-xs text-gray-400 py-1">Loading…</p>}
-                  
+                {/* Senarai Saham dengan Scrollbar Halus Gelap */}
+                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700/60 [&::-webkit-scrollbar-thumb]:rounded-full">
+                  {loadingStocks && (
+                    <div className="flex items-center gap-2 py-3 px-2 text-xs text-gray-400">
+                      <span className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                      <span>Memuatkan senarai saham...</span>
+                    </div>
+                  )}
+
                   {stocksError && (
-                    <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-500 flex flex-col gap-1 my-1">
+                    <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-400 flex flex-col gap-1 my-1">
                       <span>⚠ {stocksError}</span>
                       <button
                         onClick={() => fetchStocks()}
-                        className="text-left underline font-medium hover:text-rose-600"
+                        className="text-left underline text-xs font-semibold hover:text-rose-300 w-fit"
                       >
                         Cuba lagi
                       </button>
@@ -478,63 +497,65 @@ export function Sidebar({ params, onChange }: Props) {
                     const selected = selectedTicker === s.ticker;
                     const cleanChange = String(s.change ?? "").replace(/%/g, "");
                     const numChange = Number(cleanChange);
+                    const isPos = numChange > 0;
+                    const isNeg = numChange < 0;
 
                     return (
-                      <label
+                      <div
                         key={s.ticker}
-                        className={`flex items-center justify-between gap-1.5 cursor-pointer py-1 px-1.5 rounded text-xs transition-colors ${
-                          selected ? "bg-[#26A69A]/10" : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => selectStock(s)}
+                        className={`group flex items-center justify-between gap-2 cursor-pointer py-1.5 px-2.5 rounded-lg text-xs transition-all select-none border ${
+                          selected
+                            ? "bg-teal-500/15 border-teal-500/40 text-teal-400 font-semibold shadow-xs"
+                            : "border-transparent hover:bg-gray-100 dark:hover:bg-gray-800/60 text-gray-700 dark:text-gray-300"
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <input
-                            type="radio"
-                            name="stock-select"
-                            className="accent-[#26A69A] shrink-0"
-                            checked={selected}
-                            onChange={() => selectStock(s)}
-                            onClick={() => selected && selectStock(s)}
-                          />
+                        {/* Kiri: Indicator Dot + Kod & Nama Saham */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <span
-                            className={`truncate ${
-                              selected ? "text-[#1a7a72] dark:text-[#26A69A] font-semibold" : "text-gray-700 dark:text-gray-300"
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                              selected
+                                ? "bg-teal-400 ring-2 ring-teal-400/30"
+                                : "bg-transparent group-hover:bg-gray-500"
                             }`}
-                          >
-                            {s.name}
-                          </span>
+                          />
+
+                          <div className="flex items-baseline gap-1.5 min-w-0 truncate">
+                            <span className="font-semibold truncate text-gray-800 dark:text-gray-100">
+                              {s.name}
+                            </span>
+                            <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 shrink-0">
+                              {s.ticker}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-gray-400 dark:text-gray-500 text-[11px] font-mono">
-                            {s.ticker}
+                        {/* Kanan: Lencana % Perubahan */}
+                        {s.change !== undefined && s.change !== null && cleanChange !== "" && (
+                          <span
+                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 border ${
+                              isPos
+                                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                : isNeg
+                                ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+                                : "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                            }`}
+                          >
+                            {isPos ? `+${cleanChange}%` : `${cleanChange}%`}
                           </span>
-                          {s.change !== undefined && s.change !== null && cleanChange !== "" && (
-                            <span
-                              className={`text-[11px] font-mono font-medium ${
-                                numChange > 0
-                                  ? "text-emerald-500"
-                                  : numChange < 0
-                                  ? "text-red-500"
-                                  : "text-gray-400 dark:text-gray-500"
-                              }`}
-                            >
-                              {numChange > 0 ? `+${cleanChange}%` : `${cleanChange}%`}
-                            </span>
-                          )}
-                        </div>
-                      </label>
+                        )}
+                      </div>
                     );
                   })}
 
                   {!loadingStocks && !stocksError && filteredStocks.length === 0 && (
-                    <p className="text-xs text-gray-400 py-1">
-                      {stocks.length ? "No matches" : "No stocks loaded"}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 py-3 text-center">
+                      {stocks.length ? "Tiada padanan ditemui" : "Tiada saham dimuatkan"}
                     </p>
                   )}
                 </div>
               </div>
             )}
-          </div>
 
           <hr className="border-gray-100 dark:border-gray-800" />
 
