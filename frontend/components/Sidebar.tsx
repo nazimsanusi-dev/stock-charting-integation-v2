@@ -269,13 +269,13 @@ export function Sidebar({ params, onChange }: Props) {
               <label className="label mb-0">Sheet</label>
               <button
                 type="button"
-                onClick={() => fetchStocks()}
-                disabled={loadingStocks}
-                className="p-1.5 text-gray-400 hover:text-gray-200 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors disabled:opacity-40"
-                title="Muat semula senarai saham"
+                onClick={fetchSheets}
+                disabled={loadingSheets}
+                title="Muat semula senarai Sheet"
+                className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
               >
                 <svg
-                  className={`w-4 h-4 ${loadingStocks ? "animate-spin text-teal-400" : ""}`}
+                  className={`w-4 h-4 ${loadingSheets ? "animate-spin text-teal-400" : ""}`}
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -336,13 +336,13 @@ export function Sidebar({ params, onChange }: Props) {
               {params.selectedSheet?.url && (
                 <button
                   type="button"
-                  onClick={() => fetchStocks()}
-                  disabled={loadingStocks} // Gantikan dengan nama state sedia ada
-                  className="p-1.5 text-gray-400 hover:text-gray-200 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors disabled:opacity-40"
-                  title="Muat semula senarai saham"
+                  onClick={() => fetchWorksheets()}
+                  disabled={loadingWorksheets}
+                  title="Muat semula Worksheet"
+                  className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
                 >
                   <svg
-                    className={`w-4 h-4 ${loadingStocks ? "animate-spin text-teal-400" : ""}`}
+                    className={`w-4 h-4 ${loadingWorksheets ? "animate-spin text-teal-400" : ""}`}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
