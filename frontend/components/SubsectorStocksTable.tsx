@@ -833,7 +833,7 @@ export function SubsectorStocksTable({
                   </div>
                 </div>
 
-                <div className="flex-1 p-2 min-h-[520px]">
+                <div className="flex-1 flex flex-col w-full p-2 min-h-[520px] relative">
                   {chart.loading ? (
                     <div className="h-full flex items-center justify-center text-xs text-gray-400">
                       <span className="animate-spin inline-block mr-2">⏳</span> Memuatkan carta...

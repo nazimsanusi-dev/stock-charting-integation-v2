@@ -391,7 +391,7 @@ export const StockChart = memo(function StockChart({
 
         const container = containerRef.current;
         const initialWidth = container.clientWidth || 300;
-        const initialHeight = container.clientHeight || (mini ? 200 : 340);
+        const initialHeight = container.clientHeight || (mini ? 200 : 540);
 
         const chart = createChart(container, {
           width: initialWidth,
