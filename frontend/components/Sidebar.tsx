@@ -243,7 +243,7 @@ export function Sidebar({ params, onChange }: Props) {
               : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
           }`}
         >
-          <span>📋</span> Google Sheets Tracker
+          <span>📋</span> Stock Tracker (MY & US)
         </button>
 
         {/* Butang Baru: Stock Monitoring */}
