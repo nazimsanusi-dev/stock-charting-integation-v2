@@ -269,12 +269,25 @@ export function Sidebar({ params, onChange }: Props) {
               <label className="label mb-0">Sheet</label>
               <button
                 type="button"
-                onClick={fetchSheets}
-                disabled={loadingSheets}
-                title="Muat semula senarai Sheet"
-                className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
+                onClick={() => fetchStocks()}
+                disabled={loadingStocks}
+                className="p-1.5 text-gray-400 hover:text-gray-200 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors disabled:opacity-40"
+                title="Muat semula senarai saham"
               >
-                <span className={loadingSheets ? "animate-spin inline-block" : ""}>🔄</span>
+                <svg
+                  className={`w-4 h-4 ${loadingStocks ? "animate-spin text-teal-400" : ""}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 16h5v5" />
+                </svg>
               </button>
             </div>
 
@@ -323,12 +336,25 @@ export function Sidebar({ params, onChange }: Props) {
               {params.selectedSheet?.url && (
                 <button
                   type="button"
-                  onClick={() => fetchWorksheets()}
-                  disabled={loadingWorksheets}
-                  title="Muat semula Worksheet"
-                  className="text-[11px] text-gray-400 hover:text-[#26A69A] p-0.5 rounded transition"
+                  onClick={() => fetchStocks()}
+                  disabled={loadingStocks} // Gantikan dengan nama state sedia ada
+                  className="p-1.5 text-gray-400 hover:text-gray-200 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors disabled:opacity-40"
+                  title="Muat semula senarai saham"
                 >
-                  <span className={loadingWorksheets ? "animate-spin inline-block" : ""}>🔄</span>
+                  <svg
+                    className={`w-4 h-4 ${loadingStocks ? "animate-spin text-teal-400" : ""}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                    <path d="M16 16h5v5" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -402,10 +428,24 @@ export function Sidebar({ params, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => fetchStocks()}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                disabled={loadingStocks} // Gantikan dengan nama state sedia ada
+                className="p-1.5 text-gray-400 hover:text-gray-200 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors disabled:opacity-40"
                 title="Muat semula senarai saham"
               >
-                🔄
+                <svg
+                  className={`w-4 h-4 ${loadingStocks ? "animate-spin text-teal-400" : ""}`}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 16h5v5" />
+                </svg>
               </button>
             </div>
 
