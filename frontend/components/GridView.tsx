@@ -62,8 +62,12 @@ function StockCard({
               </span>
 
               {primaryData.loading ? (
-                <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                  <span className="animate-spin mr-1.5">⏳</span> Memuatkan...
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500 min-h-[160px]">
+                  <div className="relative flex items-center justify-center w-6 h-6">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#26A69A] opacity-20" />
+                    <span className="w-5 h-5 border-2 border-transparent border-t-[#26A69A] border-r-[#26A69A] rounded-full animate-spin" />
+                  </div>
+                  <span className="font-mono text-[11px]">Loading data...</span>
                 </div>
               ) : primaryData.data ? (
                 <div className="flex-1 min-h-0 w-full">
@@ -106,7 +110,7 @@ function StockCard({
           <div className="flex flex-col h-full w-full">
             {primaryData.loading ? (
               <div className="flex-1 flex items-center justify-center text-xs text-gray-400 dark:text-gray-500">
-                <span className="animate-spin mr-1.5">⏳</span> Memuatkan data carta...
+                <span className="animate-spin mr-1.5">⏳</span> { }Memuatkan data carta...
               </div>
             ) : primaryData.data ? (
               <div className="flex-1 min-h-0 w-full">

@@ -354,7 +354,7 @@ export default function Home() {
               <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center space-y-3">
                 <div className="text-3xl">⚠️</div>
                 <div className="text-rose-600 dark:text-rose-400 font-semibold text-base">
-                  Ralat Memuatkan Data {currentMarket === "US" ? "Industri US" : "Subsektor"}
+                  {currentMarket === "US" ? "Error Loading Data Industry US" : "Ralat Memuatkan Data Subsektor"}
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 max-w-md">
                   {subsectorError}

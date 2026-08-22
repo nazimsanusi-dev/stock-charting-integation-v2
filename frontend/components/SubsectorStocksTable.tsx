@@ -596,7 +596,7 @@ export function SubsectorStocksTable({
               </div>
             ) : stocks.length === 0 ? (
               <div className="py-20 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl">
-                Tiada saham melepasi kriteria penapisan (Min Price: {currencySymbol}{minPrice || "0"}).
+                {market === "US" ? "No stocks meet the filtering criteria (Min Price: " + currencySymbol + (minPrice || "0") + ")." : `Tiada saham melepasi kriteria penapisan (Min Harga: ${currencySymbol}${minPrice || "0"}).`}
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
@@ -604,11 +604,11 @@ export function SubsectorStocksTable({
                   <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
                     <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
                       <tr>
-                        <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
-                          {market === "US" ? "Symbol" : "Kod"}
-                        </th>
-                        <th className="py-2.5 px-3 text-left sticky left-[75px] z-20 bg-gray-100 dark:bg-gray-800 min-w-[125px] max-w-[125px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
+                        <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[130px] max-w-[130px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
                           Nama
+                        </th>
+                        <th className="py-2.5 px-3 text-left bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
+                          {market === "US" ? "Symbol" : "Kod"}
                         </th>
                         <th className="py-2.5 px-2 text-center">Syariah</th>
                         <th className="py-2.5 px-3 text-right">Harga</th>
@@ -662,16 +662,13 @@ export function SubsectorStocksTable({
                             }`}
                           >
                             <td
-                              className={`py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 sticky left-0 z-[5] min-w-[75px] max-w-[75px] ${stickyBg}`}
+                              className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[130px] max-w-[130px] sticky left-0 z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
                             >
                               {isSelected && <span className="text-amber-500 mr-1">▶</span>}
-                              {item.Code}
-                            </td>
-
-                            <td
-                              className={`py-2 px-3 text-gray-800 dark:text-gray-200 truncate min-w-[125px] max-w-[125px] sticky left-[75px] z-[5] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${stickyBg}`}
-                            >
                               {item.Name}
+                            </td>
+                            <td className="py-2 px-3 font-mono font-bold text-gray-900 dark:text-gray-100 min-w-[75px] max-w-[75px]">
+                              {item.Code}
                             </td>
 
                             <td className="py-2 px-2 text-center">
@@ -776,7 +773,7 @@ export function SubsectorStocksTable({
                 {stocks.length > pageSize && (
                   <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                     <div>
-                      {market === "US" ? "Showing" : "Menunjukkan"} {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} {market === "US" ? "of" : "dari"} {stocks.length} {market === "US" ? "stocks" : "saham"}
+                      {market === "US" ? "" : ""} {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} {market === "US" ? "of" : "dari"} {stocks.length} {market === "US" ? "stocks" : "saham"}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -890,7 +887,7 @@ export function SubsectorStocksTable({
               </>
             ) : (
               <div className="h-full min-h-[450px] flex items-center justify-center text-xs text-gray-400 p-8 text-center">
-                Pilih mana-mana baris saham di sebelah kiri untuk melihat carta.
+                {market === "US" ? "Select any stock row on the left to view the chart." : "Pilih mana-mana baris saham di sebelah kiri untuk melihat carta."}
               </div>
             )}
           </div>
