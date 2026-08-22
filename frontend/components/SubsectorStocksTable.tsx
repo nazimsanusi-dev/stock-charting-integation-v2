@@ -240,6 +240,25 @@ function SingleStockGridCard({
   );
 }
 
+function SortIcon({
+  field,
+  currentField,
+  direction,
+}: {
+  field: string;
+  currentField: string;
+  direction: "asc" | "desc";
+}) {
+  if (field !== currentField) {
+    return <span className="text-gray-400/40 ml-1">↕</span>;
+  }
+  return (
+    <span className="text-amber-500 ml-1 font-bold">
+      {direction === "asc" ? "▲" : "▼"}
+    </span>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // Komponen Utama SubsectorStocksTable
 // ─────────────────────────────────────────────────────────────
@@ -333,7 +352,7 @@ export function SubsectorStocksTable({
     DEFAULT_CHART_CONFIG.emaPeriods
   );
 
-    // 1. State untuk Column Sorting
+  // 1. State Sorting
   const [sortField, setSortField] = useState<string>("Change_Percent");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
@@ -346,14 +365,14 @@ export function SubsectorStocksTable({
     }
   };
 
-  // 2. Susun data secara dinamik mengikut jenis (Nombor vs Teks)
+  // 2. Susun Data secara Dinamik
   const sortedStocks = useMemo(() => {
     if (!stocks || stocks.length === 0) return [];
     return [...stocks].sort((a: any, b: any) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
 
-      // Bersihkan nilai nombor/peratusan/mata wang
+      // Format & bersihkan nilai nombor
       if (typeof aVal === "string") {
         const cleanA = aVal.replace(/[%,+$,RM]/g, "").trim();
         const cleanB = String(bVal || "").replace(/[%,+$,RM]/g, "").trim();
@@ -372,15 +391,17 @@ export function SubsectorStocksTable({
     });
   }, [stocks, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(stocks.length / pageSize) || 1;
+  // 3. Pagination Jadual
+  const totalPages = Math.ceil(sortedStocks.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
+  const paginatedStocks = sortedStocks.slice(startIndex, startIndex + pageSize);
 
-  const totalGridPages = Math.ceil(stocks.length / gridPageSize) || 1;
+  // 4. Pagination Grid Carta (Kini diselaraskan dengan sortedStocks)
+  const totalGridPages = Math.ceil(sortedStocks.length / gridPageSize) || 1;
   const paginatedGridStocks = useMemo(() => {
     const start = (gridPage - 1) * gridPageSize;
-    return stocks.slice(start, start + gridPageSize);
-  }, [stocks, gridPage]);
+    return sortedStocks.slice(start, start + gridPageSize);
+  }, [sortedStocks, gridPage]);
 
   const [monitorStatus, setMonitorStatus] = useState<Record<string, "idle" | "loading" | "success">>({});
 
@@ -420,12 +441,12 @@ export function SubsectorStocksTable({
 
   const currencySymbol = market === "US" ? "$" : "RM";
 
-  function SortIcon({ field, currentField, direction }: { field: string; currentField: string; direction: "asc" | "desc" }) {
-    if (field !== currentField) {
-      return <span className="text-gray-400/40 ml-1">↕</span>;
-    }
-    return <span className="text-amber-500 ml-1">{direction === "asc" ? "▲" : "▼"}</span>;
-  }
+  // function SortIcon({ field, currentField, direction }: { field: string; currentField: string; direction: "asc" | "desc" }) {
+  //   if (field !== currentField) {
+  //     return <span className="text-gray-400/40 ml-1">↕</span>;
+  //   }
+  //   return <span className="text-amber-500 ml-1">{direction === "asc" ? "▲" : "▼"}</span>;
+  // }
 
   return (
     <div className="space-y-4">
