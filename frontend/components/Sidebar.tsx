@@ -199,9 +199,39 @@ export function Sidebar({ params, onChange }: Props) {
     <aside className="w-60 shrink-0 flex flex-col gap-4 overflow-y-auto py-4 px-3 bg-[#FAFAFA] dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 h-screen sticky top-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-700/60 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-600">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">
+        {/* <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm tracking-wide">
           📈 Stock Monitor
-        </span>
+        </span> */}
+        <div className="flex items-center gap-2.5 select-none">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-[#26A69A] via-teal-500 to-indigo-600 text-white shadow-md shadow-teal-500/20">
+            <svg 
+              className="w-4 h-4" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M3 3v18h18" />
+              <path d="m19 9-5 5-4-4-3 3" />
+              <path d="M19 5v4h-4" />
+            </svg>
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="font-extrabold text-sm tracking-tight text-gray-900 dark:text-white">
+                NAS
+              </span>
+              <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                PRO
+              </span>
+            </div>
+            <span className="text-[10px] font-medium tracking-wider text-gray-500 dark:text-gray-400 uppercase mt-0.5">
+              Stock Screener
+            </span>
+          </div>
+        </div>
         <button
           onClick={() => setCollapsed(true)}
           className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 transition-colors text-xs"
