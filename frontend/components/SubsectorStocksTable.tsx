@@ -333,6 +333,45 @@ export function SubsectorStocksTable({
     DEFAULT_CHART_CONFIG.emaPeriods
   );
 
+    // 1. State untuk Column Sorting
+  const [sortField, setSortField] = useState<string>("Change_Percent");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  // 2. Susun data secara dinamik mengikut jenis (Nombor vs Teks)
+  const sortedStocks = useMemo(() => {
+    if (!stocks || stocks.length === 0) return [];
+    return [...stocks].sort((a: any, b: any) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      // Bersihkan nilai nombor/peratusan/mata wang
+      if (typeof aVal === "string") {
+        const cleanA = aVal.replace(/[%,+$,RM]/g, "").trim();
+        const cleanB = String(bVal || "").replace(/[%,+$,RM]/g, "").trim();
+        if (!isNaN(Number(cleanA)) && !isNaN(Number(cleanB)) && cleanA !== "" && cleanB !== "") {
+          aVal = Number(cleanA);
+          bVal = Number(cleanB);
+        }
+      }
+
+      if (aVal === null || aVal === undefined || aVal === "-") return 1;
+      if (bVal === null || bVal === undefined || bVal === "-") return -1;
+
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [stocks, sortField, sortDirection]);
+
   const totalPages = Math.ceil(stocks.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedStocks = stocks.slice(startIndex, startIndex + pageSize);
@@ -380,6 +419,13 @@ export function SubsectorStocksTable({
   };
 
   const currencySymbol = market === "US" ? "$" : "RM";
+
+  function SortIcon({ field, currentField, direction }: { field: string; currentField: string; direction: "asc" | "desc" }) {
+    if (field !== currentField) {
+      return <span className="text-gray-400/40 ml-1">↕</span>;
+    }
+    return <span className="text-amber-500 ml-1">{direction === "asc" ? "▲" : "▼"}</span>;
+  }
 
   return (
     <div className="space-y-4">
@@ -639,43 +685,94 @@ export function SubsectorStocksTable({
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40 shadow-sm">
-                <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
-                  <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
-                    <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800">
-                      <tr>
-                        <th className="py-2.5 px-3 text-left sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[130px] max-w-[130px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]">
-                          Nama
-                        </th>
-                        <th className="py-2.5 px-3 text-left bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]">
-                          {market === "US" ? "Symbol" : "Kod"}
-                        </th>
-                        <th className="py-2.5 px-2 text-center">Syariah</th>
-                        <th className="py-2.5 px-3 text-right">Harga</th>
+  <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+    <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+      <thead className="bg-gray-100 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200 dark:border-gray-800 select-none">
+        <tr>
+          {/* Nama */}
+          <th 
+            onClick={() => handleSort("Name")}
+            className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500 sticky left-0 z-20 bg-gray-100 dark:bg-gray-800 min-w-[130px] max-w-[130px] border-r border-gray-200 dark:border-gray-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
+          >
+            <div className="flex items-center justify-between">
+              <span>Nama</span>
+              <SortIcon field="Name" currentField={sortField} direction={sortDirection} />
+            </div>
+          </th>
 
-                        {market === "US" ? (
-                          <>
-                            <th className="py-2.5 px-3 text-center">Rec.</th>
-                            <th className="py-2.5 px-3 text-center">Cap Class</th>
-                            <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                            <th className="py-2.5 px-3 text-left">Sector</th>
-                            <th className="py-2.5 px-3 text-left">Industry</th>
-                          </>
-                        ) : (
-                          <>
-                            <th className="py-2.5 px-3 text-right">Perubahan</th>
-                            <th className="py-2.5 px-3 text-right">Change %</th>
-                            <th className="py-2.5 px-3 text-right">Volume</th>
-                            <th className="py-2.5 px-3 text-right">MCap (M)</th>
-                            <th className="py-2.5 px-3 text-left">Sector</th>
-                            <th className="py-2.5 px-3 text-left">Subsector</th>
-                          </>
-                        )}
+          {/* Kod / Symbol */}
+          <th 
+            onClick={() => handleSort("Code")}
+            className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500 bg-gray-100 dark:bg-gray-800 min-w-[75px] max-w-[75px]"
+          >
+            <div className="flex items-center justify-between">
+              <span>{market === "US" ? "Symbol" : "Kod"}</span>
+              <SortIcon field="Code" currentField={sortField} direction={sortDirection} />
+            </div>
+          </th>
 
-                        <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
+          {/* Syariah */}
+          <th 
+            onClick={() => handleSort("Shariah")}
+            className="py-2.5 px-2 text-center cursor-pointer hover:text-amber-500"
+          >
+            Syariah <SortIcon field="Shariah" currentField={sortField} direction={sortDirection} />
+          </th>
+
+          {/* Harga */}
+          <th 
+            onClick={() => handleSort("Price")}
+            className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500"
+          >
+            Harga <SortIcon field="Price" currentField={sortField} direction={sortDirection} />
+          </th>
+
+          {market === "US" ? (
+            <>
+              <th onClick={() => handleSort("recommendation")} className="py-2.5 px-3 text-center cursor-pointer hover:text-amber-500">
+                Rec. <SortIcon field="recommendation" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("marketCapClassification")} className="py-2.5 px-3 text-center cursor-pointer hover:text-amber-500">
+                Cap Class <SortIcon field="marketCapClassification" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("MCap_M")} className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500">
+                MCap (M) <SortIcon field="MCap_M" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Scraped_Sector")} className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500">
+                Sector <SortIcon field="Scraped_Sector" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Scraped_Subsector")} className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500">
+                Industry <SortIcon field="Scraped_Subsector" currentField={sortField} direction={sortDirection} />
+              </th>
+            </>
+          ) : (
+            <>
+              <th onClick={() => handleSort("Change")} className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500">
+                Perubahan <SortIcon field="Change" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Change_Percent")} className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500">
+                Change % <SortIcon field="Change_Percent" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Volume")} className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500">
+                Volume <SortIcon field="Volume" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("MCap_M")} className="py-2.5 px-3 text-right cursor-pointer hover:text-amber-500">
+                MCap (M) <SortIcon field="MCap_M" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Scraped_Sector")} className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500">
+                Sector <SortIcon field="Scraped_Sector" currentField={sortField} direction={sortDirection} />
+              </th>
+              <th onClick={() => handleSort("Scraped_Subsector")} className="py-2.5 px-3 text-left cursor-pointer hover:text-amber-500">
+                Subsector <SortIcon field="Scraped_Subsector" currentField={sortField} direction={sortDirection} />
+              </th>
+            </>
+          )}
+
+          <th className="py-2.5 px-2 text-center sticky right-0 z-20 bg-gray-100 dark:bg-gray-800 w-12 min-w-[48px] border-l border-gray-200 dark:border-gray-800">
+            Action
+          </th>
+        </tr>
+      </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-800/60">
                       {paginatedStocks.map((item: any, idx: number) => {
                         const changeVal = parseFloat(
