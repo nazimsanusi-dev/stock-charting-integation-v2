@@ -126,4 +126,5 @@ export interface AddMonitoringPayload {
   sector?: string;
   subsector?: string;
   source_table?: string;
+  market?: "MY" | "US";
 }
