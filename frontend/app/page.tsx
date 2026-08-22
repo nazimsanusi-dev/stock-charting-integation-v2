@@ -256,17 +256,24 @@ export default function Home() {
             <header className="border-b border-gray-200 dark:border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                  <span>{currentMarket === "US" ? "🇺🇸" : "🇲🇾"}</span>
+                  <img
+                    src={
+                      currentMarket === "US"
+                        ? "https://flagcdn.com/w40/us.png"
+                        : "https://flagcdn.com/w40/my.png"
+                    }
+                    alt={currentMarket}
+                    className="w-5 h-3.5 object-cover rounded shadow-xs inline-block"
+                    loading="lazy"
+                  />
                   <span>
-                    {currentMarket === "US"
-                      ? "Analisis & Ranking Industri Pasaran US"
-                      : "Analisis & Ranking Subsektor Pasaran Bursa"}
+                    {currentMarket === "US" ? "Performance US Industry" : "Performance Bursa Subsector"}
                   </span>
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {currentMarket === "US"
-                    ? "Data industri US Shariah dikemas kini dari BigQuery (us_stocks_data)"
-                    : "Data subsektor Bursa Malaysia dikemas kini dari BigQuery (bursa_dataset)"}
+                    ? "Source : Musaffa.com | Shariah Compliant Option"
+                    : "Source : KLSEscreener.com | Latest Data Bursa"}
                 </p>
               </div>
 
@@ -291,7 +298,15 @@ export default function Home() {
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-                <span>{loadingSubsector ? "Memuatkan..." : "Refresh Data"}</span>
+                <span>
+                  {currentMarket === "US"
+                    ? loadingSubsector
+                      ? "Loading..."
+                      : "Refresh Data"
+                    : loadingSubsector
+                    ? "Memuatkan..."
+                    : "Segarkan Data"}
+                </span>
               </button>
             </header>
 
@@ -310,10 +325,10 @@ export default function Home() {
                   <div className="flex justify-between items-center text-xs font-semibold text-gray-600 dark:text-gray-400">
                     <span className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
-                      Memuatkan data {currentMarket === "US" ? "industri US" : "subsektor Bursa"}...
+                     {currentMarket === "US" ? `Loading data US Industry...` : `Memuatkan Data Subsektor Bursa...`}
                     </span>
-                    <span className="text-[10px] font-mono tracking-wider text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                      BIGQUERY API
+                    <span className="animate-pulse text-[10px] font-mono tracking-wider text-teal-600 dark:text-teal-400 bg-teal-500/10 border border-teal-500/30 px-2 py-0.5 rounded shadow-sm shadow-teal-500/10">
+                      QUERY ENGINE API
                     </span>
                   </div>
 
@@ -329,7 +344,10 @@ export default function Home() {
                 </div>
 
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center max-w-xs leading-relaxed">
-                  Menyusun ranking momentum, indeks Base 100, & data lilin pasaran {currentMarket}.
+                  {currentMarket === "US"
+                    ? `Compiling ranking, Base 100 index & candlestick data for ${currentMarket}.`
+                    : `Menyusun ranking, indeks Base 100 &  pasaran ${currentMarket}.`
+                  }
                 </p>
               </div>
             ) : subsectorError ? (
@@ -373,7 +391,7 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        {currentMarket === "US" ? "Heatmap Industri US" : "Heatmap Subsektor"}
+                        {currentMarket === "US" ? "Heatmap US Industry" : "Peta Haba Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -411,14 +429,14 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        {currentMarket === "US" ? "Ranking Industri US" : "Ranking Subsektor"}
+                        {currentMarket === "US" ? "Ranking Industry US" : "Kedudukan Prestasi Subsektor"}
                       </h2>
                     </div>
                     <button
                       type="button"
                       className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                     >
-                      <span>{showRanking ? "Tutup" : "Buka"}</span>
+                      <span>{currentMarket === "US" ? (showRanking ? "Close" : "Open") : (showRanking ? "Tutup" : "Buka")}</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className={`h-4 w-4 transition-transform duration-200 ${
@@ -450,7 +468,7 @@ export default function Home() {
                       <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
                         {currentMarket === "US"
-                          ? "Senarai Saham Mengikut Industri US"
+                          ? "List Stock Based On Industry"
                           : "Senarai Saham Mengikut Subsektor"}
                       </h2>
                     </div>
@@ -494,7 +512,7 @@ export default function Home() {
                       <span className="h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
                         {currentMarket === "US"
-                          ? "Carta Indeks Industri US"
+                          ? "Index Chart US Industry"
                           : "Carta Indeks Subsektor"}
                       </h2>
                     </div>
