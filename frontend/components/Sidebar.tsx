@@ -203,9 +203,10 @@ export function Sidebar({ params, onChange }: Props) {
           📈 Stock Monitor
         </span> */}
         <div className="flex items-center gap-2.5 select-none">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-[#26A69A] via-teal-500 to-indigo-600 text-white shadow-md shadow-teal-500/20">
+          {/* Lencana Ikon */}
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-tr from-[#26A69A] via-teal-500 to-indigo-600 text-white shadow-md shadow-teal-500/20 shrink-0">
             <svg 
-              className="w-4 h-4" 
+              className="w-4 h-4 text-white" 
               viewBox="0 0 24 24" 
               fill="none" 
               stroke="currentColor" 
@@ -213,17 +214,22 @@ export function Sidebar({ params, onChange }: Props) {
               strokeLinecap="round" 
               strokeLinejoin="round"
             >
-              <path d="M3 3v18h18" />
-              <path d="m19 9-5 5-4-4-3 3" />
-              <path d="M19 5v4h-4" />
+              {/* Paksi L (X & Y) */}
+              <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+              
+              {/* Garisan Graf Bullish & Anak Panah Breakout */}
+              <path d="m8 14 4-4 3 3 5-6" />
+              <path d="M16 7h4v4" />
             </svg>
           </div>
+
+          {/* Teks Jenama */}
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5 leading-none">
               <span className="font-extrabold text-sm tracking-tight text-gray-900 dark:text-white">
                 NAS
               </span>
-              <span className="text-[10px] font-bold px-1 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
                 PRO
               </span>
             </div>
