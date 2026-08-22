@@ -416,7 +416,7 @@ export function SubsectorStocksTable({
           <div className="flex items-center gap-1.5">
             <input
               type="text"
-              placeholder={market === "US" ? "Cari Symbol / Syarikat US..." : "Cari kod atau nama..."}
+              placeholder={market === "US" ? "Find Symbol / Company Name..." : "Cari Kod / Nama..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#26A69A] w-36 sm:w-48"
@@ -776,7 +776,7 @@ export function SubsectorStocksTable({
                 {stocks.length > pageSize && (
                   <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900/90 border-t border-gray-200 dark:border-gray-800 text-[11px] text-gray-500 dark:text-gray-400">
                     <div>
-                      {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} dari {stocks.length} saham
+                      {market === "US" ? "Showing" : "Menunjukkan"} {startIndex + 1}–{Math.min(startIndex + pageSize, stocks.length)} {market === "US" ? "of" : "dari"} {stocks.length} {market === "US" ? "stocks" : "saham"}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -828,7 +828,7 @@ export function SubsectorStocksTable({
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                      <span>Harga: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
+                      <span>{market === "US" ? "Price" : "Harga"}: <strong className="text-gray-800 dark:text-gray-200">{currencySymbol}{selectedStock.Price}</strong></span>
                       {market === "US" && selectedStock.marketCapClassification && (
                         <>
                           <span>•</span>

@@ -302,7 +302,7 @@ export function RankingTable({ data, theme = "dark", market = "MY" }: Props) {
             type="text"
             placeholder={
               market === "US"
-                ? "Cari nama industri US..."
+                ? "Find US industry name..."
                 : "Cari nama subsektor..."
             }
             value={searchQuery}
@@ -313,8 +313,8 @@ export function RankingTable({ data, theme = "dark", market = "MY" }: Props) {
             className="text-xs py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-48 sm:w-64"
           />
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Jumlah: {processedData.length}{" "}
-            {market === "US" ? "industri" : "subsektor"}
+            {market === "US" ? "Total" : "Jumlah"} {processedData.length}{" "}
+            {market === "US" ? "industry" : "subsektor"}
           </span>
         </div>
 

@@ -935,7 +935,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-sky-500/20 text-sky-400 border border-sky-500/40 font-bold"
                   : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
-              title={hasRange ? "Range tool aktif" : "Ukur harga dan masa"}
+              title={hasRange ? "Range tool active" : "Measure price and time"}
             >
               <svg className="w-3 h-3 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21.3 8.7 8.7 21.3c-1 1-2.5 1-3.4 0l-2.6-2.6c-1-1-1-2.5 0-3.4L15.3 2.7c1-1 2.5-1 3.4 0l2.6 2.6c1 1 1 2.4 0 3.4Z" />
@@ -960,7 +960,7 @@ export const StockChart = memo(function StockChart({
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold"
                   : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
-              title={hasLong ? "Posisi Long aktif" : "Letak posisi TP/SL"}
+              title={hasLong ? "Posisi Long aktif" : "TP/SL"}
             >
               <svg className="w-3 h-3 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
