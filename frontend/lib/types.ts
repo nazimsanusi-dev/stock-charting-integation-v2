@@ -117,6 +117,7 @@ export interface SubsectorStockItem {
   Scraped_Subsector: string;
   marketCapClassification: string;
   recommendation: string;
+  ema_bullish: boolean;
 }
 
 export interface AddMonitoringPayload {

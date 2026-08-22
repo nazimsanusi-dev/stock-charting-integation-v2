@@ -228,10 +228,12 @@ export const api = {
     subsectorName: string = "",
     search: string = "",
     minPrice: string = "0.3",
-    market: MarketType = "MY"
+    market: MarketType = "MY",
+    emaBullish: boolean = false,
   ): Promise<SubsectorStockItem[]> {
     const cleanMarket = market === "US" ? "US" : "MY";
     const params = new URLSearchParams({ market: cleanMarket });
+    params.set("ema_bullish", emaBullish ? "true" : "false");
 
     const cleanSub = sanitizeInput(subsectorName);
     const cleanSearch = sanitizeInput(search);

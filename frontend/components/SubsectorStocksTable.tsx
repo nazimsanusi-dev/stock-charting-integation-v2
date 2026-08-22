@@ -251,27 +251,38 @@ export function SubsectorStocksTable({
   const [selectedSubsector, setSelectedSubsector] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [minPrice, setMinPrice] = useState<string>(market === "US" ? "1.0" : "0.3");
+  const [isEmaBullish, setIsEmaBullish] = useState<boolean>(false);
   const [stocks, setStocks] = useState<SubsectorStockItem[]>([]);
   const [selectedStock, setSelectedStock] = useState<SubsectorStockItem | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Mod Paparan: "split" (Jadual + Carta Tunggal) | "grid" (Semua Carta Saham)
+  // Mod Paparan
   const [viewMode, setViewMode] = useState<"split" | "grid">("split");
 
-  // Pagination Jadual
+  // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 16;
-
-  // Pagination Grid Carta
   const [gridPage, setGridPage] = useState<number>(1);
   const gridPageSize = 6;
 
-  const loadStocks = async (subName: string, search: string, minP: string) => {
+  // 1. Fungsi Utama Ambil Data
+  const loadStocks = async (
+    subName: string,
+    search: string,
+    minP: string,
+    emaBullish: boolean = isEmaBullish
+  ) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.subsectorStocks(subName, search, minP, market);
+      const data = await api.subsectorStocks(
+        subName,
+        search,
+        minP,
+        market,
+        emaBullish
+      );
       setStocks(data);
       setCurrentPage(1);
       setGridPage(1);
@@ -288,19 +299,23 @@ export function SubsectorStocksTable({
     }
   };
 
+  // 2. Reset Filter bila Tukar Market
   useEffect(() => {
     setSelectedSubsector("");
     setSearchQuery("");
     setMinPrice(market === "US" ? "1.0" : "0.3");
+    setIsEmaBullish(false);
   }, [market]);
 
+  // 3. Auto Trigger bila Subsector / Market / Filter EMA berubah
   useEffect(() => {
-    loadStocks(selectedSubsector, searchQuery, minPrice);
-  }, [selectedSubsector, market]);
+    loadStocks(selectedSubsector, searchQuery, minPrice, isEmaBullish);
+  }, [selectedSubsector, market, isEmaBullish]);
 
+  // 4. Form Submit
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadStocks(selectedSubsector, searchQuery, minPrice);
+    loadStocks(selectedSubsector, searchQuery, minPrice, isEmaBullish);
   };
 
   const activeTicker = selectedStock?.Code
@@ -443,6 +458,26 @@ export function SubsectorStocksTable({
             </span>
           </button>
 
+          {/* ⭐ Butang Toggle EMA Screener */}
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              const nextVal = !isEmaBullish;
+              setIsEmaBullish(nextVal);
+              loadStocks(selectedSubsector, searchQuery, minPrice, nextVal);
+            }}
+            className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition shadow-sm inline-flex items-center gap-1.5 ${
+              isEmaBullish
+                ? "bg-amber-500 hover:bg-amber-600 text-gray-950 border-amber-400 font-bold shadow-[0_0_12px_rgba(245,158,11,0.35)]"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-amber-500"
+            }`}
+            title="Tapis hanya kaunter yang menepati EMA 10 > 20 > 50 > 100"
+          >
+            <span>⚡</span>
+            <span>EMA Screener</span>
+          </button>
+
           {/* ⭐ Butang Toggle Paparan Grid vs Jadual */}
           <button
             type="button"
@@ -480,11 +515,10 @@ export function SubsectorStocksTable({
         {/* Butang Refresh */}
         <button
           type="button"
-          onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice)}
+          onClick={() => loadStocks(selectedSubsector, searchQuery, minPrice, isEmaBullish)}
           disabled={loading}
           className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition self-end xl:self-auto"
         >
-          {/* <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className={`h-4 w-4 ${loading ? "animate-spin text-blue-500" : ""}`}
@@ -501,7 +535,6 @@ export function SubsectorStocksTable({
           </svg>
         </button>
       </form>
-
       {/* ─────────────────────────────────────────────────────────────
           2. Kandungan Utama (Mod Grid vs Mod Split)
       ───────────────────────────────────────────────────────────── */}

@@ -230,6 +230,7 @@ async def _route(request, env):
       subsector_param = q("subsector", "")
       search_param = q("search", "")
       min_price_str = q("min_price", "0.3")
+      ema_bullish_param = q("ema_bullish", "false").lower() == "true"
 
       try:
         min_price_val = float(min_price_str) if min_price_str != "" else 0.0
@@ -242,6 +243,7 @@ async def _route(request, env):
           search=search_param,
           min_price=min_price_val,
           market=market,
+          ema_bullish=ema_bullish_param,
       )
       return _json({"stocks": stocks_data or []}, cache_seconds=60)
     except Exception as e:

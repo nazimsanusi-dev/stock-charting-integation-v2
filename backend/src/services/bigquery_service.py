@@ -234,100 +234,99 @@ class BigQueryService:
         search: str = "",
         min_price: float = 0.3,
         market: str = "MY",
+        ema_bullish: bool = False,
     ):
         where_clauses = []
 
         if market.upper() == "US":
-            # Query untuk US Shariah Stocks
-            if subsector_name and subsector_name not in [
-                "All Stock",
-                "all",
-                "",
-            ]:
+            join_sql = (
+                "INNER JOIN `etl-stock-screener-bursa.us_stocks_data.ema_bullish_detector` ema ON TRIM(s.id) = TRIM(ema.id)"
+                if ema_bullish
+                else ""
+            )
+
+            if subsector_name and subsector_name not in ["All Stock", "all", ""]:
                 clean_sub = subsector_name.replace("'", "\\'").strip()
-                where_clauses.append(f"industry = '{clean_sub}'")
+                where_clauses.append(f"s.industry = '{clean_sub}'")
 
             if search and search.strip():
                 clean_search = search.replace("'", "\\'").strip().lower()
                 where_clauses.append(
-                    f"(LOWER(name) LIKE '%{clean_search}%' OR LOWER(id) LIKE"
-                    f" '%{clean_search}%')"
+                    f"(LOWER(s.name) LIKE '%{clean_search}%' OR LOWER(s.id) LIKE '%{clean_search}%')"
                 )
 
             if min_price is not None and min_price > 0:
                 where_clauses.append(
-                    f"SAFE_CAST(currentPrice AS FLOAT64) >= {min_price}"
+                    f"SAFE_CAST(s.currentPrice AS FLOAT64) >= {min_price}"
                 )
 
-            where_sql = (
-                f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-            )
+            where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
             query = f"""
                 SELECT DISTINCT
-                    TRIM(name) AS Name, 
-                    id AS Code, 
+                    TRIM(s.name) AS Name, 
+                    s.id AS Code, 
                     'Yes' AS Shariah, 
-                    SAFE_CAST(currentPrice AS FLOAT64) AS Price, 
+                    SAFE_CAST(s.currentPrice AS FLOAT64) AS Price, 
                     0.0 AS Change, 
                     '0.00%' AS Change_Percent, 
                     0 AS Volume, 
-                    ROUND(SAFE_CAST(marketCapitalization AS FLOAT64) / 1000000, 2) AS MCap_M, 
+                    ROUND(SAFE_CAST(s.marketCapitalization AS FLOAT64) / 1000000, 2) AS MCap_M, 
                     NULL AS PE, 
                     NULL AS ROE, 
                     NULL AS DY,
-                    TRIM(sector) AS Scraped_Sector, 
-                    TRIM(industry) AS Scraped_Subsector,
-                    marketCapClassification,
-                    analyst_recommendation_weighted_avg AS recommendation
-                FROM `etl-stock-screener-bursa.us_stocks_data.shariah_stocks`
+                    TRIM(s.sector) AS Scraped_Sector, 
+                    TRIM(s.industry) AS Scraped_Subsector,
+                    s.marketCapClassification,
+                    s.analyst_recommendation_weighted_avg AS recommendation
+                FROM `etl-stock-screener-bursa.us_stocks_data.shariah_stocks` s
+                {join_sql}
                 {where_sql}
                 ORDER BY Price DESC
             """
         else:
-            # Query asal untuk Bursa Malaysia Stocks
-            if subsector_name and subsector_name not in [
-                "All Stock",
-                "all",
-                "",
-            ]:
+            join_sql = (
+                "INNER JOIN `etl-stock-screener-bursa.bursa_dataset.ema_bullish_detector` ema ON TRIM(CAST(s.Code AS STRING)) = TRIM(CAST(ema.code AS STRING))"
+                if ema_bullish
+                else ""
+            )
+
+            if subsector_name and subsector_name not in ["All Stock", "all", ""]:
                 clean_sub = subsector_name.replace("'", "\\'").strip()
-                where_clauses.append(f"Scraped_Subsector LIKE '%{clean_sub}%'")
+                where_clauses.append(f"s.Scraped_Subsector LIKE '%{clean_sub}%'")
 
             if search and search.strip():
                 clean_search = search.replace("'", "\\'").strip().lower()
                 where_clauses.append(
-                    f"(LOWER(Name) LIKE '%{clean_search}%' OR LOWER(Code) LIKE"
-                    f" '%{clean_search}%')"
+                    f"(LOWER(s.Name) LIKE '%{clean_search}%' OR LOWER(s.Code) LIKE '%{clean_search}%')"
                 )
 
             if min_price is not None and min_price > 0:
                 where_clauses.append(
-                    f"SAFE_CAST(Price AS FLOAT64) >= {min_price}"
+                    f"SAFE_CAST(s.Price AS FLOAT64) >= {min_price}"
                 )
 
-            where_sql = (
-                f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-            )
+            where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
             query = f"""
                 SELECT DISTINCT
-                    REGEXP_REPLACE(TRIM(Name), r'\\s+', ' ') AS Name, 
-                    Code, 
-                    Shariah, 
-                    SAFE_CAST(Price AS FLOAT64) AS Price, 
-                    SAFE_CAST(Change AS FLOAT64) AS Change, 
-                    FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
-                    SAFE_CAST(Volume AS INT64) AS Volume, 
-                    SAFE_CAST(MCap_M AS FLOAT64) AS MCap_M, 
-                    SAFE_CAST(PE AS FLOAT64) AS PE, 
-                    SAFE_CAST(ROE AS FLOAT64) AS ROE, 
-                    SAFE_CAST(DY AS FLOAT64) AS DY,
-                    TRIM(Scraped_Sector) AS Scraped_Sector, 
-                    TRIM(Scraped_Subsector) AS Scraped_Subsector
-                FROM `etl-stock-screener-bursa.bursa_dataset.stocks`
+                    REGEXP_REPLACE(TRIM(s.Name), r'\\s+', ' ') AS Name, 
+                    s.Code, 
+                    s.Shariah, 
+                    SAFE_CAST(s.Price AS FLOAT64) AS Price, 
+                    SAFE_CAST(s.Change AS FLOAT64) AS Change, 
+                    FORMAT('%.2f%%', SAFE_CAST(REPLACE(REPLACE(TRIM(s.Change_Percent), '%', ''), '+', '') AS FLOAT64)) AS Change_Percent, 
+                    SAFE_CAST(s.Volume AS INT64) AS Volume, 
+                    SAFE_CAST(s.MCap_M AS FLOAT64) AS MCap_M, 
+                    SAFE_CAST(s.PE AS FLOAT64) AS PE, 
+                    SAFE_CAST(s.ROE AS FLOAT64) AS ROE, 
+                    SAFE_CAST(s.DY AS FLOAT64) AS DY,
+                    TRIM(s.Scraped_Sector) AS Scraped_Sector, 
+                    TRIM(s.Scraped_Subsector) AS Scraped_Subsector
+                FROM `etl-stock-screener-bursa.bursa_dataset.stocks` s
+                {join_sql}
                 {where_sql}
-                ORDER BY SAFE_CAST(REPLACE(REPLACE(Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
+                ORDER BY SAFE_CAST(REPLACE(REPLACE(s.Change_Percent, '%', ''), '+', '') AS FLOAT64) DESC
             """
 
         rows = await self._execute_query(query)
