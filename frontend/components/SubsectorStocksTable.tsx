@@ -512,8 +512,11 @@ export function SubsectorStocksTable({
         <div className="space-y-4">
           {loading ? (
             <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
-              <span className="animate-spin inline-block mr-2 text-base">⏳</span>
-              Memuatkan senarai carta...
+              <div className="relative flex items-center justify-center w-6 h-6">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#26A69A] opacity-20" />
+                <span className="w-5 h-5 border-2 border-transparent border-t-[#26A69A] border-r-[#26A69A] rounded-full animate-spin" />
+              </div>
+              <span className="font-mono text-[11px]">{market === "US" ? "Loading US stock charts..." : "Memuatkan senarai carta..."}</span>
             </div>
           ) : error ? (
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
@@ -581,9 +584,12 @@ export function SubsectorStocksTable({
           <div className="xl:col-span-6 flex flex-col space-y-2">
             {loading ? (
               <div className="py-24 text-center text-xs text-gray-400 border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/30">
-                <span className="animate-spin inline-block mr-2 text-base">⏳</span>
-                Memuatkan senarai saham...
+              <div className="relative flex items-center justify-center w-6 h-6">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#26A69A] opacity-20" />
+                <span className="w-5 h-5 border-2 border-transparent border-t-[#26A69A] border-r-[#26A69A] rounded-full animate-spin" />
               </div>
+              <span className="font-mono text-[11px]">{market === "US" ? "Loading US stock ..." : "Memuatkan senarai saham..."}</span>
+            </div>
             ) : error ? (
               <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs rounded-xl text-center">
                 {error} -{" "}

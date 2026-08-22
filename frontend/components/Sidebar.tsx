@@ -105,18 +105,22 @@ export function Sidebar({ params, onChange }: Props) {
         const r = await api.stocks(url, ws);
         
         // Tapis baris header yang tidak sah (cth: "YTD%", "TICKER", dsb.)
-        const cleanStocks = (r.stocks || []).filter((s: any) => {
-          const ticker = String(s.ticker || "").toUpperCase().trim();
-          const change = String(s.change || "").toUpperCase().trim();
-          return (
-            ticker !== "" &&
-            ticker !== "TICKER" &&
-            ticker !== "CODE" // && change !== "YTD%"
-          );
-        });
+        //   const cleanStocks = (r.stocks || []).filter((s: any) => {
+        //     const ticker = String(s.ticker || "").toUpperCase().trim();
+        //     const change = String(s.change || "").toUpperCase().trim();
+        //     return (
+        //       ticker !== "" &&
+        //       ticker !== "TICKER" &&
+        //       ticker !== "CODE" // && change !== "YTD%"
+        //     );
+        //   });
 
-        setStocks(cleanStocks);
-        onChange({ ...params, allStocks: cleanStocks });
+        //   setStocks(cleanStocks);
+        //   onChange({ ...params, allStocks: cleanStocks });
+
+        const rawStocks = r.stocks || [];
+        setStocks(rawStocks);
+        onChange({ ...params, allStocks: rawStocks });
       } catch (err: any) {
         setStocksError(err?.message || "Gagal memuatkan senarai stok.");
         setStocks([]);
