@@ -267,13 +267,13 @@ export default function Home() {
                     loading="lazy"
                   />
                   <span>
-                    {currentMarket === "US" ? "Performance US Industry" : "Performance Bursa Subsector"}
+                    {currentMarket === "US" ? "Performance US Industry" : "Prestasi Bursa Subsektor"}
                   </span>
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {currentMarket === "US"
                     ? "Source : Musaffa.com | Shariah Compliant Option"
-                    : "Source : KLSEscreener.com | Latest Data Bursa"}
+                    : "Sumber : KLSEscreener.com | Data Bursa Terkini"}
                 </p>
               </div>
 
@@ -281,7 +281,7 @@ export default function Home() {
               <button
                 onClick={fetchSubsectorData}
                 disabled={loadingSubsector}
-                title="Segarkan data terkini"
+                // title="Segarkan data terkini"
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-700 transition disabled:opacity-50 w-fit shadow-sm"
               >
                 <svg
@@ -391,14 +391,14 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        {currentMarket === "US" ? "Heatmap US Industry" : "Peta Haba Subsektor"}
+                        {currentMarket === "US" ? "Heatmap Industry" : "Peta Haba Subsektor"}
                       </h2>
                     </div>
                     <button
                       type="button"
                       className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                     >
-                      <span>{showHeatmap ? "Tutup" : "Buka"}</span>
+                      <span>{currentMarket === "US" ? (showHeatmap ? "Close" : "Open") : (showHeatmap ? "Tutup" : "Buka")}</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className={`h-4 w-4 transition-transform duration-200 ${
@@ -429,7 +429,7 @@ export default function Home() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-blue-500"></span>
                       <h2 className="text-base font-bold text-gray-800 dark:text-gray-200">
-                        {currentMarket === "US" ? "Ranking Industry US" : "Kedudukan Prestasi Subsektor"}
+                        {currentMarket === "US" ? "Ranking Industry" : "Kedudukan Prestasi Subsektor"}
                       </h2>
                     </div>
                     <button
@@ -476,7 +476,7 @@ export default function Home() {
                       type="button"
                       className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                     >
-                      <span>{showStocksTable ? "Tutup" : "Buka"}</span>
+                      <span>{currentMarket === "US" ? (showStocksTable ? "Close" : "Open") : (showStocksTable ? "Tutup" : "Buka")}</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className={`h-4 w-4 transition-transform duration-200 ${
@@ -520,7 +520,7 @@ export default function Home() {
                       type="button"
                       className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm"
                     >
-                      <span>{showChartGrid ? "Tutup" : "Buka"}</span>
+                      <span>{currentMarket === "US" ? (showChartGrid ? "Close" : "Open") : (showChartGrid ? "Tutup" : "Buka")}</span>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className={`h-4 w-4 transition-transform duration-200 ${

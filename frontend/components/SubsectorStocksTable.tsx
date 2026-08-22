@@ -377,15 +377,15 @@ export function SubsectorStocksTable({
       >
         <div className="flex flex-wrap items-center gap-3">
           {/* Dropdown Subsektor / Industri */}
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              {market === "US" ? "Industri:" : "Subsektor:"}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 shrink-0">
+              {market === "US" ? "Industry:" : "Subsektor:"}
             </label>
             <select
               value={selectedSubsector}
               onChange={(e) => setSelectedSubsector(e.target.value)}
               disabled={loading}
-              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium cursor-pointer"
+              className="text-xs py-1.5 px-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium cursor-pointer flex-1 sm:flex-initial w-full sm:w-auto max-w-[200px] sm:max-w-[240px] md:max-w-xs truncate focus:outline-none focus:ring-1 focus:ring-[#26A69A]"
             >
               <option value="">#0 All Stock (Semua Saham)</option>
               {subsectors.map((s) => (
@@ -427,9 +427,20 @@ export function SubsectorStocksTable({
           <button
             type="submit"
             disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-lg bg-[#26A69A] hover:bg-[#208a80] text-white font-medium transition shadow-sm"
+            className="text-xs px-3 py-1.5 rounded-lg bg-[#26A69A] hover:bg-[#208a80] text-white font-medium transition shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
           >
-            Tapis & Cari
+            {loading && (
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
+            <span>
+              {market === "US"
+                ? loading
+                  ? "Filtering..."
+                  : "Find & Filter"
+                : loading
+                ? "Menapis..."
+                : "Tapis & Cari"}
+            </span>
           </button>
 
           {/* ⭐ Butang Toggle Paparan Grid vs Jadual */}
@@ -450,7 +461,7 @@ export function SubsectorStocksTable({
                   <rect width="18" height="18" x="3" y="3" rx="2" />
                   <path d="M3 9h18M9 21V9" />
                 </svg>
-                <span>Paparan Jadual</span>
+                <span>{market === "US" ? (loading ? "Loading..." : "Table View") : (loading ? "Memuatkan..." : "Paparan Jadual")}</span>
               </>
             ) : (
               <>
@@ -460,7 +471,7 @@ export function SubsectorStocksTable({
                   <rect width="7" height="7" x="14" y="14" rx="1" />
                   <rect width="7" height="7" x="3" y="14" rx="1" />
                 </svg>
-                <span>Papar Semua Carta ({stocks.length})</span>
+                <span>{market === "US" ? (loading ? "Loading..." : `Show All Charts (${stocks.length})`) : (loading ? "Memuatkan..." : `Papar Semua Carta (${stocks.length})`)}</span>
               </>
             )}
           </button>
@@ -473,7 +484,21 @@ export function SubsectorStocksTable({
           disabled={loading}
           className="text-xs text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm transition self-end xl:self-auto"
         >
-          <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh
+          {/* <span className={loading ? "animate-spin" : ""}>🔄</span> Refresh */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`h-4 w-4 ${loading ? "animate-spin text-blue-500" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
         </button>
       </form>
 
